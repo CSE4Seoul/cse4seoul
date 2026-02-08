@@ -1,15 +1,17 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion'; // Variants 타입 추가
 import Link from 'next/link';
 
 export default function Home() {
-  const fadeInUp = {
+  // 여기에 ': Variants' 라고 명찰을 달아 typescript 오류 해결
+  const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
   };
 
-  const stagger = {
+  // 여기도 마찬가지
+  const stagger: Variants = {
     visible: { transition: { staggerChildren: 0.2 } }
   };
 
