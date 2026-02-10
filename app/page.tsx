@@ -2,6 +2,7 @@
 
 import { motion, Variants } from 'framer-motion';
 import Link from 'next/link';
+import { Analytics } from "@vercel/analytics/next"
 
 export default function Home() {
   const fadeInUp: Variants = {
@@ -43,7 +44,7 @@ export default function Home() {
           variants={fadeInUp}
           className="mx-auto mb-10 max-w-3xl text-base leading-relaxed text-gray-300 md:text-xl"
         >
-          우리는 서울권 개발자 연합 <strong>CSE4Seoul</strong>입니다.
+          우리는 서울권 개발자들의 연합 <strong>CSE4Seoul</strong>입니다.
           <br />
           실험과 협업을 통해 더 빠르게 만들고, 더 단단하게 성장합니다.
         </motion.p>
@@ -80,7 +81,7 @@ export default function Home() {
             rel="noreferrer"
             className="mt-3 inline-block font-bold text-cyan-300 underline decoration-cyan-400/70 underline-offset-4 transition-colors hover:text-cyan-200"
           >
-            hamin-portfolio.vercel.app 방문하기 ↗
+            조하민 포트폴리오 방문하기 ↗
           </a>
         </motion.div>
       </motion.section>
