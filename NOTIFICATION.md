@@ -30,3 +30,23 @@ CSE4Seoul은 건국대, 동국대, 경희대, 가천대, 성균관대 등 서울
 ---
 **"Stay Hungry, Stay Foolish."**
 Team CSE4Seoul
+
+
+app/
+├── layout.tsx           # (Global) 전역 레이아웃 (네비게이션 바, 푸터)
+├── page.tsx             # (Public) 랜딩 페이지 (지금 만든 거)
+│
+├── (auth)/              # [인증 그룹] 로그인 관련 (URL에 (auth)는 안 보임)
+│   ├── login/           # -> /login (로그인 페이지)
+│   └── callback/        # -> /auth/callback (Supabase 인증 처리용)
+│
+├── (main)/              # [메인 앱 그룹] 로그인한 클랜원 전용 공간
+│   ├── layout.tsx       # (App Layout) 사이드바, 유저 정보 표시
+│   ├── dashboard/       # -> /dashboard (내 전적 요약, 오늘의 승률)
+│   ├── clan/            # -> /clan (클랜원 명단, 대학별 소속 표시)
+│   ├── analysis/        # -> /analysis (★ 핵심: C++ 승률 분석기)
+│   └── community/       # -> /community (게시판, 훈수 두기)
+│
+└── api/                 # [백엔드] 서버 로직
+    ├── clan/            # 클랜 정보 가져오기 (Clash Royale API)
+    └── engine/          # C++ Wasm 연산 요청 처리
