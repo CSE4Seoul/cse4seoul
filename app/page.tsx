@@ -1,59 +1,78 @@
-'use client';
-
-import { motion, Variants } from 'framer-motion';
-import Link from 'next/link';
+import Link from "next/link";
 
 export default function Home() {
-  const fadeInUp: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
-  };
-
-  const stagger: Variants = {
-    visible: { transition: { staggerChildren: 0.2 } }
-  };
-
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-black text-white overflow-hidden relative">
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-black to-black z-0" />
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white relative overflow-hidden">
+      {/* 1. 배경 효과 (Glow & Grid) */}
+      <div className="absolute top-0 left-0 w-full h-full z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/30 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600/30 rounded-full blur-[100px] animate-pulse delay-1000" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" /> {/* grid.svg 없어도 티 안남 */}
+      </div>
 
-      <motion.div 
-        className="z-10 text-center px-4 max-w-5xl"
-        initial="hidden"
-        animate="visible"
-        variants={stagger}
-      >
-        <motion.div variants={fadeInUp} className="mb-6 flex justify-center">
-          <span className="px-4 py-1.5 text-sm font-medium text-cyan-400 bg-cyan-950/50 border border-cyan-800 rounded-full backdrop-blur-md">
-            CSE4Seoul Kernel v1.0
-          </span>
-        </motion.div>
+      {/* 2. 메인 카드 (Glassmorphism) */}
+      <div className="z-10 flex flex-col items-center text-center space-y-8 p-12 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl max-w-2xl mx-4">
+        
+        {/* 타이틀 섹션 */}
+        <div className="space-y-4">
+          <div className="inline-block px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 mb-4">
+            <span className="text-sm font-medium text-purple-300 tracking-wide">
+              PRIVATE CLAN PLATFORM
+            </span>
+          </div>
+          <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60 tracking-tight">
+            CSE4Seoul
+          </h1>
+          <p className="text-lg text-gray-400 max-w-md mx-auto">
+            건국대학교 컴퓨터공학부를 위한<br/>
+            프라이빗 클랜 매니지먼트 시스템
+          </p>
+        </div>
 
-        <motion.h1 
-          variants={fadeInUp}
-          className="text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500"
-        >
-          Game, Code, <br className="hidden md:block" /> and Evolve with AI.
-        </motion.h1>
-
-        <motion.p 
-          variants={fadeInUp}
-          className="text-lg md:text-xl text-gray-400 mb-10 leading-relaxed max-w-2xl mx-auto"
-        >
-          우리는 서울권 개발자 연합 <strong>CSE4Seoul</strong>입니다.<br/>
-          리눅스의 오픈소스 정신을 계승하여, 실패를 두려워하지 않고<br/>
-          함께 성장하는 <strong>Bazaar(시장)</strong> 모델을 지향합니다.
-        </motion.p>
-
-        <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a href="https://github.com/CSE4Seoul" target="_blank" className="px-8 py-4 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
-            GitHub 기여하기
-          </a>
-          <Link href="/login" className="px-8 py-4 border border-gray-700 text-gray-300 font-medium rounded-lg hover:bg-white/10 transition-colors">
-            클랜원 로그인
+        {/* 액션 버튼들 */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full justify-center pt-4">
+          <Link
+            href="/login"
+            className="px-8 py-4 rounded-xl bg-white text-black font-bold text-lg hover:bg-gray-200 transition-all transform hover:scale-105 shadow-lg shadow-white/10"
+          >
+            Agent Login
           </Link>
-        </motion.div>
-      </motion.div>
+          <Link
+            href="/dashboard"
+            className="px-8 py-4 rounded-xl bg-white/5 text-white border border-white/10 font-bold text-lg hover:bg-white/10 transition-all backdrop-blur-md"
+          >
+            Dashboard
+          </Link>
+        </div>
+
+        {/* 구분선 */}
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent my-8" />
+
+        {/* Founder 정보 (요청하신 부분!) */}
+        <div className="flex flex-col items-center space-y-3">
+          <p className="text-xs text-gray-500 uppercase tracking-widest">System Architect</p>
+          <div className="flex items-center gap-3 bg-black/30 px-5 py-3 rounded-full border border-gray-800 hover:border-gray-600 transition-colors">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-sm text-gray-300">
+              Founder: <span className="text-white font-semibold">조하민 (Developer)</span>
+            </span>
+          </div>
+          
+          <a 
+            href="https://hamin-portfolio.vercel.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs text-blue-400 hover:text-blue-300 hover:underline transition-colors flex items-center gap-1"
+          >
+            View Portfolio ↗
+          </a>
+        </div>
+      </div>
+
+      {/* 하단 카피라이트 */}
+      <footer className="absolute bottom-6 text-xs text-gray-600">
+        © 2026 CSE4Seoul. All systems operational.
+      </footer>
     </main>
   );
 }
