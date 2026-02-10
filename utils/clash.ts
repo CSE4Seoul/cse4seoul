@@ -1,4 +1,4 @@
-const BASE_URL = 'https://proxy.royaleapi.dev/v1';
+const BASE_URL = 'https://api.clashroyale.com/v1';
 
 export async function getClanInfo() {
   const clanTag = process.env.NEXT_PUBLIC_CLAN_TAG;
