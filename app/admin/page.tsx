@@ -1,10 +1,11 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { approveUser } from './actions';
+import { unstable_noStore as noStore } from 'next/cache'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
+  noStore();
   const supabase = await createClient();
 
   // 1. 관리자 권한 체크 (보안)
