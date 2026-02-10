@@ -1,6 +1,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
+import { getClanInfo } from '@/utils/clash';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single();
 
+    const clanData = await getClanInfo();
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-12 relative overflow-hidden">
       {/* 배경 데코레이션 */}
@@ -84,17 +86,26 @@ export default async function DashboardPage() {
           <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-purple-500/30 transition-all duration-300 group shadow-xl">
              <div className="flex justify-between items-center mb-6">
                <h3 className="text-gray-500 text-xs font-bold tracking-wider group-hover:text-purple-400 transition-colors">CLAN STATUS</h3>
-               <span className="text-purple-500 text-xs bg-purple-900/20 px-2 py-1 rounded border border-purple-900/50">Live</span>
+               <span className={`text-xs px-2 py-1 rounded border ${clanData ? 'text-purple-500 bg-purple-900/20 border-purple-900/50' : 'text-red-500 bg-red-900/20 border-red-900/50'}`}>
+                 {clanData ? 'Live' : 'Offline'}
+               </span>
              </div>
              
              <div className="flex items-end gap-2 mb-2">
-                <span className="text-5xl font-bold text-white tracking-tighter">14</span>
+                {/* ⚡️ 실제 멤버 수 표시 */}
+                <span className="text-5xl font-bold text-white tracking-tighter">
+                  {clanData ? clanData.members : '-'}
+                </span>
                 <span className="text-gray-400 mb-2 font-medium">/ 50</span>
              </div>
              <p className="text-sm text-gray-500 mb-6">Active Members</p>
              
+             {/* ⚡️ 게이지 바 자동 조절 */}
              <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-gradient-to-r from-purple-600 to-blue-500 h-full w-[28%] shadow-[0_0_10px_rgba(147,51,234,0.5)]"></div>
+                <div 
+                  className="bg-gradient-to-r from-purple-600 to-blue-500 h-full shadow-[0_0_10px_rgba(147,51,234,0.5)] transition-all duration-1000"
+                  style={{ width: `${(clanData?.members || 0) / 50 * 100}%` }}
+                ></div>
              </div>
           </div>
 
@@ -111,6 +122,62 @@ export default async function DashboardPage() {
             </div>
           </div>
 
+        </div>
+
+        <div className="mt-8 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+            <h3 className="text-gray-400 text-sm font-bold tracking-wider">MEMBER ROSTER</h3>
+            <span className="text-xs text-gray-500 font-mono">TOP 5 AGENTS</span>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-gray-400">
+              <thead className="bg-gray-900/50 text-xs uppercase font-medium text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">Rank</th>
+                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Role</th>
+                  <th className="px-6 py-4 text-right">Trophies</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {clanData?.memberList?.slice(0, 5).map((member: any, index: number) => (
+                  <tr key={member.tag} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-mono text-gray-500">#{index + 1}</td>
+                    <td className="px-6 py-4 font-bold text-white flex items-center gap-2">
+                      {index === 0 && <span className="text-yellow-500">👑</span>}
+                      {member.name}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-[10px] border ${
+                        member.role === 'leader' ? 'border-yellow-900/50 text-yellow-500 bg-yellow-900/20' :
+                        member.role === 'coLeader' ? 'border-purple-900/50 text-purple-400 bg-purple-900/20' :
+                        'border-gray-700 text-gray-400 bg-gray-800'
+                      }`}>
+                        {member.role.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-yellow-500 font-mono">
+                      🏆 {member.trophies}
+                    </td>
+                  </tr>
+                )) || (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                      No data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* 전체보기 버튼 (장식용) */}
+          <div className="p-4 border-t border-gray-800 text-center">
+            <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+              View All Agents →
+            </button>
+          </div>
         </div>
         
         {/* 하단 로그아웃 */}
