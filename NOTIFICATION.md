@@ -50,3 +50,4 @@ app/
 └── api/                 # [백엔드] 서버 로직
     ├── clan/            # 클랜 정보 가져오기 (Clash Royale API)
     └── engine/          # C++ Wasm 연산 요청 처리
+    
