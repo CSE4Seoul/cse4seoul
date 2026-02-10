@@ -2,6 +2,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { getClanInfo } from '@/utils/clash';
+import Link from 'next/link';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
 
     const clanData = await getClanInfo();
   return (
+    
     <div className="min-h-screen bg-black text-white p-6 md:p-12 relative overflow-hidden">
       {/* 배경 데코레이션 */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] -z-10" />
@@ -56,6 +58,25 @@ export default async function DashboardPage() {
 
         {/* 메인 대시보드 그리드 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* 게시판 바로가기 버튼 추가 */}
+<div className="mt-8 mb-4">
+  <Link 
+    href="/board" 
+    className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 hover:border-blue-500/60 transition-all group"
+  >
+    <div className="flex items-center gap-3">
+      <span className="text-2xl">🖋️</span>
+      <div>
+        <h3 className="font-bold text-white">전략 게시판 (Strategy Board)</h3>
+        <p className="text-xs text-gray-400">클랜원들과 작전 및 정보를 공유하세요.</p>
+      </div>
+    </div>
+    <span className="text-blue-400 group-hover:translate-x-1 transition-transform">
+      Enter →
+    </span>
+  </Link>
+</div>
           
           {/* 1. 내 프로필 카드 */}
           <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-blue-500/30 transition-all duration-300 group shadow-xl">
