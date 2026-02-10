@@ -7,10 +7,24 @@ const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+export const metadata = {
+  title: 'CSE4Seoul | Game, Code, and Evolve',
+  description: '서울권 대학 연합 개발자 플랫폼. 리눅스 정신을 계승하여 실패를 두려워하지 않는 실험적인 문화를 만듭니다.',
+  openGraph: {
+    title: 'CSE4Seoul HQ',
+    description: 'Game, Code, and Evolve with AI.',
+    url: 'https://cse4seoul.vercel.app',
+    siteName: 'CSE4Seoul',
+    images: [
+      {
+        url: '/opengraph-image.png', // 이따가 설명드릴 이미지 파일
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'ko_KR',
+    type: 'website',
+  },
 };
 
 const geistSans = Geist({
