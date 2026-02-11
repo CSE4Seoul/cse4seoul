@@ -6,7 +6,13 @@ import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createComment } from "../actions";
-import { MessageSquare, Clock, User, Lock, Eye, ChevronLeft, Send, Shield } from 'lucide-react';
+import { deleteComment } from "../actions"; 
+import { deletePost } from "../actions";
+
+import { 
+  MessageSquare, Clock, User, Lock, Eye, 
+  ChevronLeft, Send, Shield, Trash2 
+} from 'lucide-react';
 
 // Supabase 클라이언트 초기화
 const supabase = createClient();
@@ -16,6 +22,7 @@ interface Post {
   title: string;
   content: string;
   author_name: string | null;
+  author_id: string; // 추가
   is_anonymous: boolean;
   is_premium: boolean;
   created_at: string;
@@ -27,6 +34,7 @@ interface Comment {
   id: string;
   content: string;
   author_name: string | null;
+  author_id: string; // 추가
   is_anonymous: boolean;
   created_at: string;
   post_id: string;
@@ -45,6 +53,7 @@ export default function PostDetailPage({
   const [commentContent, setCommentContent] = useState('');
   const [isAnonymousComment, setIsAnonymousComment] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null); // 추가
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,7 +61,11 @@ export default function PostDetailPage({
         const resolvedParams = await params;
         setId(resolvedParams.id);
 
-        // 게시글 데이터 가져오기
+        // 1. 현재 유저 정보 가져오기 (추가)
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+
+        // 2. 게시글 데이터 가져오기
         const { data: postData } = await supabase
           .from('posts')
           .select('*')
@@ -72,7 +85,7 @@ export default function PostDetailPage({
           .update({ view_count: (postData.view_count || 0) + 1 })
           .eq('id', resolvedParams.id);
 
-        // 댓글 데이터 가져오기
+        // 3. 댓글 데이터 가져오기
         const { data: commentsData } = await supabase
           .from('comments')
           .select('*')
@@ -118,6 +131,20 @@ export default function PostDetailPage({
       console.error('댓글 작성 실패:', error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCommentDelete = async (commentId: string) => {
+    if (!post) return;
+    
+    if (confirm("이 분석을 삭제하시겠습니까?")) {
+      try {
+        await deleteComment(commentId, post.id);
+        // 삭제 후 상태 업데이트 (로컬에서 제거)
+        setComments(comments.filter(c => c.id !== commentId));
+      } catch (error) {
+        console.error('댓글 삭제 실패:', error);
+      }
     }
   };
 
@@ -266,21 +293,39 @@ export default function PostDetailPage({
             </div>
           </div>
 
-          {/* 게시글 푸터 */}
-          <footer className="mt-10 pt-8 border-t border-gray-800">
-            <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1">
-                  <Lock className="w-4 h-4" />
-                  최종 수정: {new Date(post.updated_at || post.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                <span>보안 등급: {post.is_premium ? '최고' : '표준'}</span>
-              </div>
-            </div>
-          </footer>
+          {/* 게시글 푸터 부분 */}
+<footer className="mt-10 pt-8 border-t border-gray-800">
+  <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500">
+    <div className="flex items-center gap-4">
+      <span className="flex items-center gap-1">
+        <Lock className="w-4 h-4" />
+        최종 수정: {new Date(post.updated_at || post.created_at).toLocaleDateString()}
+      </span>
+    </div>
+    <div className="flex items-center gap-2">
+      <Shield className="w-4 h-4" />
+      <span>보안 등급: {post.is_premium ? '최고' : '표준'}</span>
+      
+      {/* 게시글 삭제 버튼 */}
+      {currentUser && currentUser.id === post.author_id && (
+        <button 
+          type="button"
+          className="ml-4 px-3 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-1"
+          onClick={async () => {
+            if(confirm("이 작전 보고서를 삭제하시겠습니까?")) {
+              // deletePost 액션 필요
+              await deletePost(post.id);
+              router.push('/board');
+            }
+          }}
+        >
+          <Trash2 className="w-3 h-3" />
+          삭제
+        </button>
+      )}
+    </div>
+  </div>
+</footer>
         </article>
 
         {/* 댓글 섹션 */}
@@ -431,6 +476,18 @@ export default function PostDetailPage({
                   
                   {/* 댓글 액션 */}
                   <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-800/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* 삭제 버튼 로직 */}
+                    {currentUser && currentUser.id === comment.author_id && (
+                      <button 
+                        type="button"
+                        className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-400 transition-colors"
+                        onClick={() => handleCommentDelete(comment.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        삭제
+                      </button>
+                    )}
+                    
                     <button 
                       type="button"
                       className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
