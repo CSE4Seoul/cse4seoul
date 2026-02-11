@@ -6,6 +6,11 @@ import { Send, User, Shield, Zap, Clock, Bot, Trash2 } from 'lucide-react';
 
 const supabase = createClient();
 const MAX_MESSAGE_LENGTH = 500;
+const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY;
+
+if (!ENCRYPTION_KEY) {
+  console.error("🚨 암호화 키가 설정되지 않았습니다! .env.local 확인 필요.");
+}
 
 const SECURITY_NOTICE = {
   storage: '현재 메시지는 평문으로 저장됩니다. 민감한 정보는 절대 공유하지 마세요.',
