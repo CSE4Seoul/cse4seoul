@@ -5,6 +5,12 @@ import { createClient } from '@/utils/supabase/client';
 import { Send, User, Shield, Zap, Clock, Bot, Trash2 } from 'lucide-react';
 
 const supabase = createClient();
+const MAX_MESSAGE_LENGTH = 500;
+
+const SECURITY_NOTICE = {
+  storage: '현재 메시지는 평문으로 저장됩니다. 민감한 정보는 절대 공유하지 마세요.',
+  encryptionStatus: 'E2E 암호화는 개발 중이며, 완료 전까지는 채팅을 공지/일반 대화 용도로만 사용하세요.',
+};
 
 interface ChatMessage {
   id: string;
@@ -40,13 +46,28 @@ const formatTime = (dateString: string) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
+const sanitizeMessage = (input: string) => {
+  // 제어문자 제거 + 앞뒤 공백 제거
+  const normalized = input.replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  return normalized.slice(0, MAX_MESSAGE_LENGTH);
+};
+
+const containsSensitivePattern = (message: string) => {
+  const patterns = [
+    /\b\d{3}-\d{3,4}-\d{4}\b/, // 전화번호
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i, // 이메일
+    /\b\d{6}-\d{7}\b/, // 주민등록번호 형태
+  ];
+
+  return patterns.some((pattern) => pattern.test(message));
+};
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [userAgentName, setUserAgentName] = useState<string>('');
   const [activeUsers, setActiveUsers] = useState<number>(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 1. 초기 설정 및 메시지 로드
@@ -149,6 +170,18 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
+    const sanitized = sanitizeMessage(newMessage);
+
+    if (!sanitized) {
+      alert('메시지가 비어있거나 유효하지 않습니다.');
+      return;
+    }
+
+    if (containsSensitivePattern(sanitized)) {
+      alert('개인정보로 보이는 내용(전화번호/이메일/주민번호 형식)은 전송할 수 없습니다.');
+      return;
+    }
+
     setIsSending(true);
     
     try {
@@ -165,7 +198,7 @@ export default function ChatPage() {
       expiresAt.setHours(expiresAt.getHours() + 24);
 
       const { error } = await supabase.from('messages').insert({
-        content: newMessage.trim(),
+        content: sanitized,
         author_id: user.id,
         author_name: userAgentName,
         is_anonymous: true,
@@ -260,7 +293,10 @@ export default function ChatPage() {
           <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl">
             <p className="text-xs text-yellow-300 flex items-center gap-2">
               <span className="font-bold">⚠️ 공지:</span>
-              현재 메시지는 평문으로 저장됩니다. 민감한 정보는 공유하지 마세요. 암호화 기능은 2026-02-18 예상 완성입니다.
+              {SECURITY_NOTICE.storage} 암호화 기능은 2026-02-18 예상 완성입니다.
+            </p>
+            <p className="text-[11px] text-yellow-200/90 mt-2">
+              {SECURITY_NOTICE.encryptionStatus}
             </p>
           </div>
         </header>
@@ -440,7 +476,7 @@ export default function ChatPage() {
               <ul className="space-y-2 text-xs text-gray-400">
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-500 mt-0.5">⏳</span>
-                  <span>암호화 기능 개발 예정 (2026-02-18)</span>
+                  <span>E2E 암호화 개발 예정 (2026-02-18)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -452,7 +488,7 @@ export default function ChatPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-500 mt-0.5">⏳</span>
-                  <span>24시간 자동삭제 개발 예정 (2026-02-18)</span>
+                  <span>24시간 자동삭제 고도화 진행 중 (정기 검증 예정)</span>
                 </li>
               </ul>
             </div>
@@ -463,11 +499,11 @@ export default function ChatPage() {
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-400">암호화 강도</span>
-                    <span className="text-yellow-400">⏳ 개발 중</span>
+                    <span className="text-gray-400">암호화 상태</span>
+                    <span className="text-yellow-400">⚠️ 평문 저장</span>
                   </div>
                   <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-full w-1/2"></div>
+                    <div className="bg-gradient-to-r from-orange-500 to-red-500 h-full w-1/4"></div>
                   </div>
                 </div>
                 <div>
@@ -496,7 +532,7 @@ export default function ChatPage() {
         {/* 하단 정보 */}
         <footer className="mt-6 pt-4 border-t border-gray-800/50 text-center">
           <p className="text-xs text-gray-600">
-            ⚡ 실시간 작전 통신 시스템 v1.0 · 모든 통신은 암호화되어 보호됩니다 · 
+            ⚡ 실시간 작전 통신 시스템 v1.0 · 현재 평문 저장 모드(민감정보 입력 금지) · 
             <span className="text-blue-400 ml-2">🚨 긴급 보고: 통신부대-{Math.floor(Math.random() * 9999)}</span>
           </p>
         </footer>
