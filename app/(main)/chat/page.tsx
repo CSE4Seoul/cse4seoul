@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, FormEvent } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Send, User, Shield, Zap, Clock, Bot } from 'lucide-react';
+import { Send, User, Shield, Zap, Clock, Bot, Trash2 } from 'lucide-react';
 
 const supabase = createClient();
 
@@ -13,6 +13,8 @@ interface ChatMessage {
   author_name: string;
   is_anonymous: boolean;
   created_at: string;
+  expires_at?: string;  // ✨ 만료 시간
+  is_deleted?: boolean;  // ✨ 소프트 삭제 플래그
 }
 
 // 랜덤 요원 이름 생성기
@@ -57,6 +59,8 @@ export default function ChatPage() {
         const { data, error } = await supabase
           .from('messages')
           .select('*')
+          .eq('is_deleted', false)  // ✨ 삭제되지 않은 것만
+          .gt('expires_at', new Date().toISOString())  // ✨ 만료되지 않은 것만
           .order('created_at', { ascending: true })
           .limit(100);
         
@@ -84,7 +88,12 @@ export default function ChatPage() {
           table: 'messages'
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage]);
+          const newMsg = payload.new as ChatMessage;
+          
+          // ✨ 만료되지 않은 메시지만 추가
+          if (newMsg.expires_at && new Date(newMsg.expires_at) > new Date() && !newMsg.is_deleted) {
+            setMessages(prev => [...prev, newMsg]);
+          }
           updateActiveUsers();
         }
       )
@@ -109,6 +118,32 @@ export default function ChatPage() {
     setActiveUsers(baseUsers);
   };
 
+  // ✨ 메시지 삭제 함수
+  const deleteMessage = async (messageId: string) => {
+    if (!confirm('이 메시지를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_deleted: true })
+        .eq('id', messageId);
+
+      if (error) {
+        console.error('메시지 삭제 실패:', error);
+        alert('메시지 삭제 실패: ' + error.message);
+        return;
+      }
+
+      // 화면에서 즉시 제거
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (err) {
+      console.error('삭제 중 오류:', err);
+      alert('삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   // 2. 메시지 전송 함수
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -125,11 +160,17 @@ export default function ChatPage() {
         return;
       }
 
+      // ✨ 24시간 후 자동 삭제 설정
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
       const { error } = await supabase.from('messages').insert({
         content: newMessage.trim(),
         author_id: user.id,
         author_name: userAgentName,
         is_anonymous: true,
+        expires_at: expiresAt.toISOString(),
+        is_deleted: false,
       });
 
       if (error) {
@@ -216,10 +257,10 @@ export default function ChatPage() {
           </div>
 
           {/* 안내 문구 */}
-          <div className="mt-4 p-3 bg-blue-900/20 border border-blue-800/50 rounded-xl">
-            <p className="text-xs text-blue-300 flex items-center gap-2">
-              <span className="font-bold">📢 작전 규칙:</span>
-              모든 대화는 암호화되어 저장되며, 익명성을 보장합니다. 작전 관련 정보만 공유해주세요.
+          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl">
+            <p className="text-xs text-yellow-300 flex items-center gap-2">
+              <span className="font-bold">⚠️ 공지:</span>
+              현재 메시지는 평문으로 저장됩니다. 민감한 정보는 공유하지 마세요. 암호화 기능은 2026-02-18 예상 완성입니다.
             </p>
           </div>
         </header>
@@ -261,9 +302,19 @@ export default function ChatPage() {
                             {formatTime(msg.created_at)}
                           </span>
                           {isCurrentUser && (
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-yellow-600 to-orange-500 flex items-center justify-center text-xs font-bold">
-                              {msg.author_name.charAt(0)}
-                            </div>
+                            <>
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-yellow-600 to-orange-500 flex items-center justify-center text-xs font-bold">
+                                {msg.author_name.charAt(0)}
+                              </div>
+                              {/* ✨ 메시지 삭제 버튼 */}
+                              <button
+                                onClick={() => deleteMessage(msg.id)}
+                                className="p-1 rounded-md hover:bg-red-900/30 transition-colors group"
+                                title="메시지 삭제"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
+                              </button>
+                            </>
                           )}
                         </div>
                         <div
@@ -274,6 +325,13 @@ export default function ChatPage() {
                           }`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                          
+                          {/* ✨ 만료 시간 표시 */}
+                          {msg.expires_at && (
+                            <div className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-600 opacity-75">
+                              {`만료: ${new Date(msg.expires_at).toLocaleString('ko-KR')}`}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -323,7 +381,7 @@ export default function ChatPage() {
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <div className="flex items-center gap-1">
                     <Shield className="w-3 h-3" />
-                    <span>E2E 암호화</span>
+                    <span>⏳ 암호화 개발 중</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <User className="w-3 h-3" />
@@ -381,8 +439,8 @@ export default function ChatPage() {
               </h3>
               <ul className="space-y-2 text-xs text-gray-400">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <span>모든 대화는 암호화되어 저장</span>
+                  <span className="text-yellow-500 mt-0.5">⏳</span>
+                  <span>암호화 기능 개발 예정 (2026-02-18)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -393,8 +451,8 @@ export default function ChatPage() {
                   <span>개인정보 절대 금지</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">✓</span>
-                  <span>24시간 후 자동 삭제</span>
+                  <span className="text-yellow-500 mt-0.5">⏳</span>
+                  <span>24시간 자동삭제 개발 예정 (2026-02-18)</span>
                 </li>
               </ul>
             </div>
@@ -406,10 +464,10 @@ export default function ChatPage() {
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-400">암호화 강도</span>
-                    <span className="text-green-400">AES-256</span>
+                    <span className="text-yellow-400">⏳ 개발 중</span>
                   </div>
                   <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-gradient-to-r from-green-500 to-cyan-500 h-full w-full"></div>
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-full w-1/2"></div>
                   </div>
                 </div>
                 <div>
