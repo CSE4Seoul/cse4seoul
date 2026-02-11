@@ -4,6 +4,39 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
+
+export async function createComment(formData: FormData) {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single();
+
+  const postId = formData.get('postId') as string;
+  const content = formData.get('content') as string;
+  const isAnonymous = formData.get('is_anonymous') === 'on';
+
+  const { error } = await supabase.from('comments').insert({
+    post_id: postId,
+    content,
+    author_id: user.id,
+    author_name: profile?.full_name || 'Unknown',
+    is_anonymous: isAnonymous,
+  });
+
+  if (error) {
+    console.error('Comment error:', error);
+    return;
+  }
+
+  revalidatePath(`/board/${postId}`);
+}
+
 export async function createPost(formData: FormData) {
   const supabase = await createClient();
 
@@ -35,6 +68,8 @@ export async function createPost(formData: FormData) {
     console.error(error);
     return;
   }
+
+  
 
   // 3. 캐시 갱신 및 리다이렉트
   revalidatePath('/board');
