@@ -1,72 +1,181 @@
-📅 2026-02-10
--하민
-✅ 오늘 완료된 작업 (Today's Progress)
+📅 작업 타임라인
+🗓️ 2026-02-10 (화)
+✅ 완료된 작업
 
-    Git Remote 설정 및 환경 동기화
+    Git 환경 설정
 
-        origin 저장소 연결 완료: https://github.com/CSE4Seoul/cse4seoul.git
+        원격 저장소(origin) 연결: https://github.com/CSE4Seoul/cse4seoul.git
 
-        Codespaces 및 로컬 환경에서 개발 서버(npm run dev) 정상 구동 확인.
+        Codespaces 및 로컬 개발 서버 정상 구동 확인
 
-        현재 브랜치(main)와 원격 저장소 동기화 상태 유지.
+        main 브랜치 동기화 유지
 
-    인프라 확장 준비
+    인프라 준비
 
-        Oracle Cloud Free Tier 가입 시도 및 결제 수단 검증(KB 트래블러스 체크카드 활용).
+        Oracle Cloud Free Tier 가입 시도 (KB 트래블러스 체크카드 사용)
 
-        서버 아키텍처 구상을 위한 MariaDB/Apache/PHP 환경 검토.
+        MariaDB/Apache/PHP 환경 검토 및 아키텍처 설계
 
-🚀 예정된 작업 (To-Do List)
+🚀 예정 작업
 
-    게시판(Board) 기능 구현
+    게시판 기능
 
-        Supabase를 활용한 Post 테이블 설계.
+        Supabase Post 테이블 설계
 
-        Next.js 서버 컴포넌트를 이용한 게시글 리스트 렌더링.
+        Next.js 서버 컴포넌트로 게시글 리스트 렌더링
 
-    익명 채팅(Anonymous Chat) 기능
+    익명 채팅
 
-        Supabase Realtime 또는 Socket.io를 활용한 실시간 통신 구현.
+        Supabase Realtime 또는 Socket.io 연동
 
-        닉네임 랜덤 생성 로직 구축.
+        랜덤 닉네임 생성 시스템
 
-    회원 관리 시스템
+    회원 관리
 
-        클랜원 인증 로직 및 NextAuth.js 연동 검토.
+        클랜원 인증 로직 구축
 
-⚠️ 잠재적 취약점 및 개선 사항 (Security & Vulnerabilities)
+        NextAuth.js 연동 검토
 
-    SQL Injection 및 권한 관리
+⚠️ 보안 이슈
 
-        Supabase 활용 시 RLS(Row Level Security) 정책 설정 필수. 익명 채팅 시 타인의 메시지를 수정/삭제할 수 없도록 정책 검증 필요.
+    SQL Injection 방지: Supabase RLS(Row Level Security) 정책 설정 필요
 
-    입력값 검증 (XSS 방어)
+    XSS 방어: 사용자 입력값 Sanitizing 처리 필수
 
-        익명 게시판 및 채팅 특성상 사용자가 입력한 스크립트가 실행되지 않도록 데이터 새니타이징(Sanitizing) 처리 필요.
+    인프라 문제: Oracle Cloud 계정 생성 오류 발생 → 48시간 후 재시도 또는 AWS Educate 전환 고려
 
-    인프라 가입 제한
+🗓️ 2026-02-11 (수) - 긴급 빌드 및 기능 확장
+🔧 해결된 기술 이슈
 
-        현재 Oracle Cloud 계정 생성 트랜잭션 오류 발생 중. 48시간 대기 후 IP 세탁(LTE 데이터 사용)을 통한 재시도 또는 AWS Educate로의 전환 플랜 B 고려.
+    Next.js 15 호환성
 
-## 📅 2026-02-11 (수) - 긴급 빌드 및 서버 액션 수정
+        PostDetailPage의 비동기 params 처리로 빌드 에러 해결
 
-### ✅ 해결된 기술 이슈
-- **Next.js 15 Async Params 대응**
-  - `PostDetailPage`에서 `params`를 비동기(`Promise`)로 처리하도록 수정하여 빌드 에러(`Uncached data was accessed outside of <Suspense>`) 해결.
-- **Server Actions 구조 개선**
-  - 게시판 작성 로직을 `app/actions.ts`로 분리하여 `Invalid Server Actions request` 에러 해결.
-  - `@/` 경로 인식 오류를 상대 경로(`../actions`)로 수정하여 모듈 로딩 문제 해결.
-- **Supabase 연동 버그 수정**
-  - `utils` 내 오타(`wdadw`...) 제거 및 데이터 삽입(Insert) 로직 정상화.
+        Uncached data was accessed outside of <Suspense> 오류 수정
 
-### 🚀 다음 타격 목표
-- **게시판 디자인 고도화**: Clash Royale 테마(파란색/금색 조합) 적용.
-- **익명 채팅창 기능 설계**: Supabase Realtime 사용 여부 결정.
+    Server Actions 구조
 
-### ✅ 진행 상황
-- **글쓰기 페이지(Write Page) 전면 개편**
-  - '전략 본부 기밀 보고서' 컨셉의 다크 테마 UI 적용.
-  - Lucide-react 아이콘 및 Tailwind 애니메이션을 활용한 하이엔드 UX 구현.
-  - 익명 모드, 프리미엄 설정, 댓글 허용 등 세부 보안 옵션 기능 추가.
-- **Client-Side 상태 관리**
-  - `useState`를 활용한 제출 로딩 상태(isSubmitting) 처리 및 UX 피드백 강화.
+        app/actions.ts로 게시판 작성 로직 분리
+
+        Invalid Server Actions request 에러 해결
+
+        모듈 경로 오류 수정 (@/ → ../actions)
+
+    Supabase 연동
+
+        utils 내 오타 제거 및 데이터 삽입 로직 정상화
+
+🎨 UI/UX 개선
+
+    글쓰기 페이지 전면 개편
+
+        '전략 본부 기밀 보고서' 컨셉의 다크 테마 적용
+
+        Lucide-react 아이콘 + Tailwind 애니메이션 구현
+
+        추가 기능: 익명 모드, 프리미엄 설정, 댓글 허용 옵션
+
+    클라이언트 상태 관리
+
+        useState로 제출 로딩 상태(isSubmitting) 관리
+
+        사용자 피드백 강화
+
+📊 시스템 기능 완성
+
+    상세 조회 시스템
+
+        동적 라우팅(/board/[id]) 구현 완료
+
+        notFound()로 존재하지 않는 게시글 404 처리
+
+    댓글 생태계
+
+        comments 테이블 설계 (게시글-유저 1:N 관계)
+
+        실시간 유사 댓글 시스템 (RevalidatePath 활용)
+
+        익명/실명 댓글 모드 지원
+
+    시스템 안정화
+
+        대시보드에 '전략 게시판' 바로가기 배치
+
+        웹 접근성 개선: type="button" 명시
+
+        next.config.js 보안 설정으로 Server Action Origin 오류 방지
+
+🚀 향후 개발 계획
+📡 1. 실시간 익명 채팅 (우선순위: 높음)
+데이터베이스
+
+    messages 테이블 생성 및 RLS 보안 정책 설정
+
+    Supabase Realtime Publication 활성화
+
+사용자 인터페이스
+
+    카카오톡/디스코드 스타일 채팅 UI 구현
+
+    위치: app/(main)/chat/page.tsx
+
+로직 구현
+
+    supabase.channel().on()으로 실시간 메시지 구독
+
+    새로고침 없이 실시간 메시지 표시
+
+UX 개선
+
+    새 메시지 도착 시 자동 스크롤(scrollRef 활용)
+
+🛠️ 2. 게시판 기능 고도화
+CRUD 확장
+
+    본인 글/댓글만 수정/삭제 가능한 권한 시스템
+
+    useTransition으로 삭제 시 UI 멈춤 현상 방지
+
+멀티미디어 지원
+
+    Supabase Storage 버킷 생성
+
+    글쓰기 에디터에 이미지 첨부 기능 추가
+
+성능 최적화
+
+    페이지네이션 구현 (더 보기 버튼 또는 페이지 번호)
+
+    100개 이상 게시글 로딩 속도 개선
+
+🎨 3. 디자인 개선
+
+    Clash Royale 테마 색상(파란색/금색) 일관성 적용
+
+    게시판 디자인 고도화
+
+📊 현재 상태 요약
+
+    프로젝트 단계: 개발 중기 (핵심 기능 구현 완료, 고도화 진행 중)
+
+    기술 스택: Next.js 15, TypeScript, Supabase, Tailwind CSS
+
+    주요 완료 기능: 게시판 CRUD, 댓글 시스템, 동적 라우팅
+
+    다음 마일스톤: 실시간 채팅 기능 구현
+
+    인프라: Oracle Cloud/AWS Educate 검토 중
+
+🔗 관련 파일 구조 (요약)
+text
+
+app/
+├── actions.ts              # Server Actions
+├── (main)/
+│   ├── board/
+│   │   ├── [id]/          # 동적 게시글 상세
+│   │   └── write/         # 글쓰기 페이지
+│   └── chat/              # 예정: 채팅 페이지
+└── utils/                 # Supabase 유틸리티
+
+이 문서는 2026년 2월 11일 기준 최신 상태를 반영합니다.
