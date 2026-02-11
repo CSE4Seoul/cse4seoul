@@ -76,6 +76,22 @@ export default async function DashboardPage() {
       Enter →
     </span>
   </Link>
+
+  <Link 
+  href="/chat" 
+  className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 hover:border-green-500/60 transition-all group mt-4"
+>
+  <div className="flex items-center gap-3">
+    <span className="text-2xl">💬</span>
+    <div>
+      <h3 className="font-bold text-white">실시간 작전 채널 (Live Chat)</h3>
+      <p className="text-xs text-gray-400">클랜원들과 실시간으로 작전을 논의하세요.</p>
+    </div>
+  </div>
+  <span className="text-green-400 group-hover:translate-x-1 transition-transform">
+    Enter →
+  </span>
+</Link>
 </div>
           
           {/* 1. 내 프로필 카드 */}
