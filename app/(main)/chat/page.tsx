@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, FormEvent } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Send, User, Shield, Zap, Clock, Bot, Trash2 } from 'lucide-react';
 
+
 const supabase = createClient();
 const MAX_MESSAGE_LENGTH = 500;
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY;
@@ -19,13 +20,14 @@ const SECURITY_NOTICE = {
 
 interface ChatMessage {
   id: string;
-  content: string;
+  content: string;           // DB에 저장된 값 (암호화된 문자열 또는 평문)
+  decryptedContent?: string; // ← 화면에 보여줄 복호화된 내용 (추가!)
   author_id: string;
   author_name: string;
   is_anonymous: boolean;
   created_at: string;
-  expires_at?: string;  // ✨ 만료 시간
-  is_deleted?: boolean;  // ✨ 소프트 삭제 플래그
+  expires_at?: string;
+  is_deleted?: boolean;
 }
 
 // 랜덤 요원 이름 생성기
@@ -57,6 +59,37 @@ const sanitizeMessage = (input: string) => {
   return normalized.slice(0, MAX_MESSAGE_LENGTH);
 };
 
+const encryptMessage = async (message: string): Promise<string> => {
+  if (!ENCRYPTION_KEY) return message;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(ENCRYPTION_KEY), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: encoder.encode('secure-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return 'ENC:' + btoa(String.fromCharCode(...combined)); // ENC: 접두사 추가
+};
+
+const decryptMessage = async (content: string): Promise<string> => {
+  if (!content.startsWith('ENC:') || !ENCRYPTION_KEY) return content;
+  try {
+    const encryptedData = content.replace('ENC:', '');
+    const binaryString = atob(encryptedData);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+    const iv = bytes.slice(0, 12);
+    const encrypted = bytes.slice(12);
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(ENCRYPTION_KEY), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: encoder.encode('secure-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
+    return new TextDecoder().decode(decrypted);
+  } catch (e) { return '🔒 복호화 실패'; }
+};
+
 const containsSensitivePattern = (message: string) => {
   const patterns = [
     /\b\d{3}-\d{3,4}-\d{4}\b/, // 전화번호
@@ -76,66 +109,88 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 1. 초기 설정 및 메시지 로드
-  useEffect(() => {
-    // 랜덤 요원 이름 생성
-    setUserAgentName(generateAgentName());
+ useEffect(() => {
+  setUserAgentName(generateAgentName());
 
-    const fetchMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('is_deleted', false)  // ✨ 삭제되지 않은 것만
-          .gt('expires_at', new Date().toISOString())  // ✨ 만료되지 않은 것만
-          .order('created_at', { ascending: true })
-          .limit(100);
-        
-        if (error) {
-          console.error('메시지 로딩 오류:', error);
-          return;
+  // app/(main)/chat/page.tsx 내 loadMessages 함수 수정
+
+const loadMessages = async () => {
+  try {
+    console.log("데이터 로딩 시작..."); // 디버깅용
+    let query = supabase
+      .from('messages')
+      .select('*')
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true });
+
+    // ⚠️ 만약 데이터가 안 보인다면 아래 gt(...) 부분을 주석 처리하고 테스트해 보세요.
+    // .gt('expires_at', new Date().toISOString()) 
+
+    const { data, error } = await query.limit(100);
+
+    if (error) {
+      console.error('메시지 로드 오류', error);
+      return;
+    }
+
+    console.log("가져온 로우 데이터:", data); // DB에서 넘어온 원본 데이터 확인
+
+    const messagesWithDecrypted = await Promise.all(
+      (data || []).map(async (row) => {
+        const decrypted = await decryptMessage(row.content);
+        return {
+          ...row,
+          decryptedContent: decrypted,
+        } satisfies ChatMessage;
+      })
+    );
+
+    setMessages(messagesWithDecrypted);
+  } catch (err) {
+    console.error('메시지 초기 로드 실패', err);
+  }
+};
+
+  loadMessages();
+
+  // 실시간 구독
+  const channel = supabase
+    .channel('realtime:messages')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      },
+      async (payload) => {
+        const newRow = payload.new as ChatMessage;
+
+        if (
+          newRow.expires_at &&
+          new Date(newRow.expires_at) > new Date() &&
+          !newRow.is_deleted
+        ) {
+          const decrypted = await decryptMessage(newRow.content);
+          setMessages((prev) => [
+            ...prev,
+            { ...newRow, decryptedContent: decrypted },
+          ]);
         }
-        
-        setMessages(data || []);
-      } catch (err) {
-        console.error('메시지 로딩 실패:', err);
+
+        updateActiveUsers();
       }
-    };
+    )
+    .subscribe();
 
-    fetchMessages();
+  updateActiveUsers();
+  const interval = setInterval(updateActiveUsers, 30000);
 
-    // ⚡️ 실시간 구독 설정
-    const channel = supabase
-      .channel('realtime:messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          
-          // ✨ 만료되지 않은 메시지만 추가
-          if (newMsg.expires_at && new Date(newMsg.expires_at) > new Date() && !newMsg.is_deleted) {
-            setMessages(prev => [...prev, newMsg]);
-          }
-          updateActiveUsers();
-        }
-      )
-      .subscribe();
-
-    // 활성 사용자 수 업데이트 (간단한 구현)
-    updateActiveUsers();
-    
-    // 정기적으로 활성 사용자 수 업데이트
-    const interval = setInterval(updateActiveUsers, 30000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
-  }, []);
+  return () => {
+    supabase.removeChannel(channel);
+    clearInterval(interval);
+  };
+}, []);
 
   const updateActiveUsers = async () => {
     // 실제 구현에서는 WebSocket 연결 수를 확인하거나,
@@ -171,59 +226,61 @@ export default function ChatPage() {
   };
 
   // 2. 메시지 전송 함수
-  const sendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || isSending) return;
+ const sendMessage = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!newMessage.trim() || isSending) return;
 
-    const sanitized = sanitizeMessage(newMessage);
+  const sanitized = sanitizeMessage(newMessage);
 
-    if (!sanitized) {
-      alert('메시지가 비어있거나 유효하지 않습니다.');
+  if (!sanitized) {
+    alert('메시지가 비어있거나 유효하지 않습니다.');
+    return;
+  }
+
+  if (containsSensitivePattern(sanitized)) {
+    alert('개인정보로 보이는 내용(전화번호/이메일/주민번호 형식)은 전송할 수 없습니다.');
+    return;
+  }
+
+  setIsSending(true);
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("보안 채널 접속을 위해 로그인이 필요합니다.");
       return;
     }
 
-    if (containsSensitivePattern(sanitized)) {
-      alert('개인정보로 보이는 내용(전화번호/이메일/주민번호 형식)은 전송할 수 없습니다.');
+    // 여기서 암호화
+    const encrypted = await encryptMessage(sanitized);
+
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    const { error } = await supabase.from('messages').insert({
+      content: encrypted,          // ← 암호화된 내용 저장
+      author_id: user.id,
+      author_name: userAgentName,
+      is_anonymous: true,
+      expires_at: expiresAt.toISOString(),
+      is_deleted: false,
+    });
+
+    if (error) {
+      console.error('메시지 전송 실패:', error);
+      alert('메시지 전송 실패: ' + error.message);
       return;
     }
 
-    setIsSending(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        alert("보안 채널 접속을 위해 로그인이 필요합니다.");
-        setIsSending(false);
-        return;
-      }
-
-      // ✨ 24시간 후 자동 삭제 설정
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-
-      const { error } = await supabase.from('messages').insert({
-        content: sanitized,
-        author_id: user.id,
-        author_name: userAgentName,
-        is_anonymous: true,
-        expires_at: expiresAt.toISOString(),
-        is_deleted: false,
-      });
-
-      if (error) {
-        console.error('메시지 전송 실패:', error);
-        alert('메시지 전송 실패: ' + error.message);
-      } else {
-        setNewMessage('');
-      }
-    } catch (err) {
-      console.error('전송 중 오류:', err);
-      alert('전송 중 오류가 발생했습니다.');
-    } finally {
-      setIsSending(false);
-    }
-  };
+    setNewMessage('');
+  } catch (err) {
+    console.error('전송 중 오류:', err);
+    alert('전송 중 오류가 발생했습니다.');
+  } finally {
+    setIsSending(false);
+  }
+};
 
   // 3. 자동 스크롤
   useEffect(() => {
@@ -359,21 +416,22 @@ export default function ChatPage() {
                           )}
                         </div>
                         <div
-                          className={`px-4 py-3 rounded-2xl max-w-[85%] shadow-lg ${
-                            isCurrentUser
-                              ? 'bg-gradient-to-r from-yellow-900/40 to-orange-900/30 border border-yellow-800/50 text-white rounded-br-none'
-                              : 'bg-gradient-to-r from-blue-900/40 to-cyan-900/30 border border-blue-800/50 text-gray-100 rounded-bl-none'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                          
-                          {/* ✨ 만료 시간 표시 */}
-                          {msg.expires_at && (
-                            <div className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-600 opacity-75">
-                              {`만료: ${new Date(msg.expires_at).toLocaleString('ko-KR')}`}
-                            </div>
-                          )}
-                        </div>
+  className={`px-4 py-3 rounded-2xl max-w-[85%] shadow-lg ${
+    isCurrentUser
+      ? 'bg-gradient-to-r from-yellow-900/40 to-orange-900/30 border border-yellow-800/50 text-white rounded-br-none'
+      : 'bg-gradient-to-r from-blue-900/40 to-cyan-900/30 border border-blue-800/50 text-gray-100 rounded-bl-none'
+  }`}
+>
+  <p className="text-sm whitespace-pre-wrap break-words">
+    {msg.decryptedContent ?? '복호화 중...'}   {/* ← 여기 변경 */}
+  </p>
+
+  {msg.expires_at && (
+    <div className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-600 opacity-75">
+      {`만료: ${new Date(msg.expires_at).toLocaleString('ko-KR')}`}
+    </div>
+  )}
+</div>
                       </div>
                     );
                   })}
