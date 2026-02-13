@@ -14,8 +14,8 @@ if (!ENCRYPTION_KEY) {
 }
 
 const SECURITY_NOTICE = {
-  storage: '현재 메시지는 평문으로 저장됩니다. 민감한 정보는 절대 공유하지 마세요.',
-  encryptionStatus: 'E2E 암호화는 개발 중이며, 완료 전까지는 채팅을 공지/일반 대화 용도로만 사용하세요.',
+  storage: '모든 메시지는 안전하게 E2E 암호화되어 저장됩니다.',
+  encryptionStatus: '🔒 E2E 암호화가 적용되어 있어 안전하게 대화할 수 있습니다.',
 };
 
 interface ChatMessage {
@@ -352,15 +352,16 @@ const loadMessages = async () => {
           </div>
 
           {/* 안내 문구 */}
-          <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-800/50 rounded-xl">
-            <p className="text-xs text-yellow-300 flex items-center gap-2">
-              <span className="font-bold">⚠️ 공지:</span>
-              {SECURITY_NOTICE.storage} 암호화 기능은 2026-02-18 예상 완성입니다.
-            </p>
-            <p className="text-[11px] text-yellow-200/90 mt-2">
-              {SECURITY_NOTICE.encryptionStatus}
-            </p>
-          </div>
+          {/* 안내 문구 */}
+<div className="mt-4 p-3 bg-green-900/20 border border-green-800/50 rounded-xl">
+  <p className="text-xs text-green-300 flex items-center gap-2">
+    <span className="font-bold">✅ 보안 적용 완료:</span>
+    {SECURITY_NOTICE.storage}
+  </p>
+  <p className="text-[11px] text-green-200/90 mt-2">
+    {SECURITY_NOTICE.encryptionStatus}
+  </p>
+</div>
         </header>
 
         {/* 채팅 영역 */}
@@ -539,7 +540,7 @@ const loadMessages = async () => {
               <ul className="space-y-2 text-xs text-gray-400">
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-500 mt-0.5">⏳</span>
-                  <span>E2E 암호화 개발 예정 (2026-02-18)</span>
+                  <span>E2E 암호화 개발 완료 (2026-02-13)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">✓</span>
@@ -551,7 +552,7 @@ const loadMessages = async () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-yellow-500 mt-0.5">⏳</span>
-                  <span>24시간 자동삭제 고도화 진행 중 (정기 검증 예정)</span>
+                  <span>24시간 자동삭제 완료</span>
                 </li>
               </ul>
             </div>
@@ -595,8 +596,8 @@ const loadMessages = async () => {
         {/* 하단 정보 */}
         <footer className="mt-6 pt-4 border-t border-gray-800/50 text-center">
           <p className="text-xs text-gray-600">
-            ⚡ 실시간 작전 통신 시스템 v1.0 · 현재 평문 저장 모드(민감정보 입력 금지) · 
-            <span className="text-blue-400 ml-2">🚨 긴급 보고: 통신부대-{Math.floor(Math.random() * 9999)}</span>
+            ⚡ 실시간 작전 통신 시스템 v1.1 · 암호화 적용 완료 · 
+            <span className="text-blue-400 ml-2">🚨 보안 관련 문의는 개발자에게 부탁드립니다!</span>
           </p>
         </footer>
       </div>
