@@ -21,7 +21,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+  // 💡 투명 망토(auth)를 빼고, 진짜 주소인 /callback과 /reset-password 로 연결!
+  redirectTo: `${window.location.origin}/callback?next=/reset-password`,
+});
     if (error) {
       setError(error.message);
       setLoading(false);
