@@ -564,7 +564,7 @@ const loadMessages = async () => {
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-400">암호화 상태</span>
-                    <span className="text-yellow-400">⚠️ 평문 저장</span>
+                    <span className="text-yellow-400">🔐암호화 후 저장</span>
                   </div>
                   <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
                     <div className="bg-gradient-to-r from-orange-500 to-red-500 h-full w-1/4"></div>
