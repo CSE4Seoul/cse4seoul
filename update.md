@@ -234,3 +234,9 @@ select cron.schedule(
 
 ### 🛡️ 보안 및 성능 최적화
 * 컴포넌트 구조 분리(`SystemStatus`)를 통해 무한 리렌더링 문제를 해결하고, 실시간 트래픽 환경에서 하이드레이션 경고를 방지하여 성능을 대폭 개선했습니다.
+
+fix: 대시보드 렌더링 에러 수정 및 KERNEL v1.0 허브 페이지 구축
+
+- clanData.memberList 렌더링 전 유효성 검사 로직 추가로 애플리케이션 크래시 에러 해결
+- Dashboard 및 Board 페이지 사이버펑크 테마 UI/UX 적용
+- 서버 컴포넌트 환경의 시간대(Timezone) KST 고정 설정으로 정확한 시간 표시 보장

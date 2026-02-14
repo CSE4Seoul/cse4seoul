@@ -7,7 +7,6 @@ import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wif
 
 const MAX_MESSAGE_LENGTH = 500;
 
-// ✨ 기본 키 안전장치: 환경변수가 없거나 로드 전이어도 에러가 나지 않도록 fallback 문자열 추가
 const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY || 'fallback-public-key-2026';
 
 if (!process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY) {
@@ -208,6 +207,8 @@ export default function ChatPage() {
   const [userAgentName, setUserAgentName] = useState<string>('');
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+// ✨ 기본 키 안전장치: 환경변수가 없거나 로드 전이어도 에러가 나지 않도록 fallback 문자열 추가
 
   const [roomKeyInput, setRoomKeyInput] = useState<string>('');
   const [activeKey, setActiveKey] = useState<string>('');
@@ -283,15 +284,20 @@ export default function ChatPage() {
   };
 
   const deleteMessage = async (messageId: string) => {
-    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
-    try {
-      const { error } = await supabase.from('messages').update({ is_deleted: true }).eq('id', messageId);
-      if (error) throw error;
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
-    } catch (err) {
-      alert('삭제 중 오류가 발생했습니다.');
-    }
-  };
+  if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+
+  setDeletingId(messageId); // ✨ 로딩 시작 (해당 메시지 ID 저장)
+
+  try {
+    const { error } = await supabase.from('messages').update({ is_deleted: true }).eq('id', messageId);
+    if (error) throw error;
+    setMessages(prev => prev.filter(msg => msg.id !== messageId));
+  } catch (err) {
+    alert('삭제 중 오류가 발생했습니다.');
+  } finally {
+    setDeletingId(null); // ✨ 로딩 종료 (성공하든 실패하든 초기화)
+  }
+};
 
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -468,9 +474,15 @@ export default function ChatPage() {
                             {formatTime(msg.created_at)}
                           </span>
                           {isCurrentUser && (
-                            <button onClick={() => deleteMessage(msg.id)} className="p-1 rounded-md hover:bg-red-900/30 transition-colors group">
-                              <Trash2 className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
-                            </button>
+                            <button onClick={() => deleteMessage(msg.id)} disabled={deletingId === msg.id} className="p-1 rounded-md hover:bg-red-900/30 transition-colors group disabled:cursor-not-allowed">
+  {deletingId === msg.id ? (
+    // ✨ 현재 지우고 있는 메시지라면 뱅글뱅글 도는 빨간 스피너 표시
+    <div className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-400 rounded-full animate-spin"></div>
+  ) : (
+    // 아닐 경우 평소처럼 쓰레기통 표시
+    <Trash2 className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
+  )}
+</button>
                           )}
                         </div>
                         <div className={`px-4 py-3 rounded-2xl max-w-[85%] shadow-lg ${isCurrentUser ? 'bg-gradient-to-r from-yellow-900/40 to-orange-900/30 border border-yellow-800/50 text-white rounded-br-none' : 'bg-gradient-to-r from-blue-900/40 to-cyan-900/30 border border-blue-800/50 text-gray-100 rounded-bl-none'}`}>
