@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/client';
 import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock } from 'lucide-react';
 
 const MAX_MESSAGE_LENGTH = 500;
-
 const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY || 'fallback-public-key-2026';
 
 if (!process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY) {
@@ -93,8 +92,8 @@ const containsSensitivePattern = (message: string) => {
 };
 
 const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
-  // ✨ 성능 안정을 위해 내부로 위치 이동
-  const supabase = createClient();
+  // ✨ 성능 고정 1: SystemStatus 내부의 클라이언트도 재생성 방지
+  const [supabase] = useState(() => createClient());
   const [serverLatency, setServerLatency] = useState(0);
   const [bandwidth, setBandwidth] = useState('안정적');
 
@@ -198,8 +197,9 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
 
 export default function ChatPage() {
   const router = useRouter();
-  // ✨ 성능 안정을 위해 내부로 위치 이동
-  const supabase = createClient();
+  
+  // ✨ 성능 고정 2: 타이핑할 때마다 통신망 끊기는 현상 원천 차단!
+  const [supabase] = useState(() => createClient());
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -208,7 +208,6 @@ export default function ChatPage() {
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-// ✨ 기본 키 안전장치: 환경변수가 없거나 로드 전이어도 에러가 나지 않도록 fallback 문자열 추가
 
   const [roomKeyInput, setRoomKeyInput] = useState<string>('');
   const [activeKey, setActiveKey] = useState<string>('');
@@ -256,6 +255,7 @@ export default function ChatPage() {
 
     loadMessages();
 
+    // 이제 타이핑을 해도 이 통신망은 절대 끊어지지 않습니다.
     const channel = supabase
       .channel('realtime:messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -284,20 +284,20 @@ export default function ChatPage() {
   };
 
   const deleteMessage = async (messageId: string) => {
-  if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
 
-  setDeletingId(messageId); // ✨ 로딩 시작 (해당 메시지 ID 저장)
+    setDeletingId(messageId); 
 
-  try {
-    const { error } = await supabase.from('messages').update({ is_deleted: true }).eq('id', messageId);
-    if (error) throw error;
-    setMessages(prev => prev.filter(msg => msg.id !== messageId));
-  } catch (err) {
-    alert('삭제 중 오류가 발생했습니다.');
-  } finally {
-    setDeletingId(null); // ✨ 로딩 종료 (성공하든 실패하든 초기화)
-  }
-};
+    try {
+      const { error } = await supabase.from('messages').update({ is_deleted: true }).eq('id', messageId);
+      if (error) throw error;
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (err) {
+      alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeletingId(null); 
+    }
+  };
 
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -476,10 +476,8 @@ export default function ChatPage() {
                           {isCurrentUser && (
                             <button onClick={() => deleteMessage(msg.id)} disabled={deletingId === msg.id} className="p-1 rounded-md hover:bg-red-900/30 transition-colors group disabled:cursor-not-allowed">
   {deletingId === msg.id ? (
-    // ✨ 현재 지우고 있는 메시지라면 뱅글뱅글 도는 빨간 스피너 표시
     <div className="w-3.5 h-3.5 border-2 border-red-500/30 border-t-red-400 rounded-full animate-spin"></div>
   ) : (
-    // 아닐 경우 평소처럼 쓰레기통 표시
     <Trash2 className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />
   )}
 </button>
