@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import Link from "next/link";
-import { Calendar, User, Eye, MessageSquare, Zap } from 'lucide-react';
+import { Calendar, User, Eye, MessageSquare, Zap, ChevronLeft } from 'lucide-react';
 
 export default async function BoardPage() {
   const supabase = await createClient();
@@ -20,7 +20,7 @@ export default async function BoardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 md:p-8">
-      {/* 디자인된 배경 요소들 */}
+      {/* 배경 효과 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
@@ -30,6 +30,23 @@ export default async function BoardPage() {
       <div className="relative max-w-6xl mx-auto">
         {/* 헤더 섹션 */}
         <div className="mb-12 pt-8">
+          {/* 상단 네비게이션 바 */}
+          <div className="flex items-center justify-between mb-6">
+            <Link
+              href="/dashboard"
+              className="group flex items-center gap-2 px-4 py-2 text-sm text-gray-300 bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg hover:bg-blue-900/30 hover:border-blue-700/50 hover:text-blue-300 transition-all duration-200 w-fit shadow-lg"
+            >
+              <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+              <span>통제실로 복귀</span>
+            </Link>
+
+            {/* 실시간 상태 표시 */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-lg">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-xs text-gray-400">실시간 업데이트 중</span>
+            </div>
+          </div>
+
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -65,13 +82,24 @@ export default async function BoardPage() {
             <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">실시간 참여</span>
-                <span className="text-2xl font-bold text-cyan-400">24</span>
+                <span className="text-2xl font-bold text-cyan-400">
+                  {posts?.reduce((acc, post) => acc + (post.view_count || 0), 0) || 0}
+                </span>
               </div>
             </div>
             <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">최신 업데이트</span>
-                <span className="text-lg font-bold text-green-400">방금 전</span>
+                <span className="text-lg font-bold text-green-400">
+                  {posts && posts.length > 0 
+                    ? new Date(posts[0].created_at).toLocaleDateString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : '방금 전'}
+                </span>
               </div>
             </div>
           </div>
@@ -95,7 +123,7 @@ export default async function BoardPage() {
                   </div>
                 </div>
 
-                {/* 고급 배지 */}
+                {/* 프리미엄 배지 */}
                 {post.is_premium && (
                   <div className="absolute top-4 left-4">
                     <span className="px-3 py-1 bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/30 rounded-full text-yellow-300 text-xs font-bold flex items-center gap-1">

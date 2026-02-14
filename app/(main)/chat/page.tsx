@@ -1,22 +1,23 @@
 'use client';
 
 import { useEffect, useState, useRef, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock } from 'lucide-react';
+import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock } from 'lucide-react';
 
-const supabase = createClient();
 const MAX_MESSAGE_LENGTH = 500;
-// ✨ 기본 환경변수 키를 DEFAULT_KEY로 저장해둡니다.
-const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY;
 
-if (!DEFAULT_KEY) {
-  console.error("🚨 암호화 키가 설정되지 않았습니다! .env.local 확인 필요.");
+// ✨ 기본 키 안전장치: 환경변수가 없거나 로드 전이어도 에러가 나지 않도록 fallback 문자열 추가
+const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY || 'fallback-public-key-2026';
+
+if (!process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY) {
+  console.warn("⚠️ 환경 변수(NEXT_PUBLIC_CHAT_ENCRYPTION_KEY)가 없어 임시 공개 키로 작동합니다.");
 }
 
 interface ChatMessage {
   id: string;
   content: string;
-  decryptedContent?: string | null; // ✨ 복호화 실패 시 null 허용 (화면에서 숨김 처리용)
+  decryptedContent?: string | null;
   author_id: string;
   author_name: string;
   is_anonymous: boolean;
@@ -25,7 +26,6 @@ interface ChatMessage {
   is_deleted?: boolean;
 }
 
-// 랜덤 요원 이름 생성기
 const generateAgentName = () => {
   const prefixes = ['어둠의', '빛의', '전략의', '신속한', '정밀한', '신비로운', '침묵의', '폭풍의'];
   const suffixes = ['매', '호랑이', '독수리', '늑대', '고스트', '팬텀', '나이트', '로드'];
@@ -35,7 +35,6 @@ const generateAgentName = () => {
   return `${prefix} ${suffix} #${numbers.toString().padStart(3, '0')}`;
 };
 
-// 타임스탬프 포맷팅
 const formatTime = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
@@ -52,7 +51,6 @@ const sanitizeMessage = (input: string) => {
   return input.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, MAX_MESSAGE_LENGTH);
 };
 
-// ✨ 암호화 함수: 활성화된 키(activeKey)를 받아서 암호화
 const encryptMessage = async (message: string, secretKey: string): Promise<string> => {
   if (!secretKey) return message;
   const encoder = new TextEncoder();
@@ -67,7 +65,6 @@ const encryptMessage = async (message: string, secretKey: string): Promise<strin
   return 'ENC:' + btoa(String.fromCharCode(...combined));
 };
 
-// ✨ 복호화 함수: 키가 다르면 null을 반환하여 화면에서 숨깁니다.
 const decryptMessage = async (content: string, secretKey: string): Promise<string | null> => {
   if (!content.startsWith('ENC:') || !secretKey) return content;
   try {
@@ -83,7 +80,7 @@ const decryptMessage = async (content: string, secretKey: string): Promise<strin
     const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
     return new TextDecoder().decode(decrypted);
   } catch (e) {
-    return null; // 🤫 여기서 핵심! 키가 다르면 에러 대신 null을 반환합니다.
+    return null; 
   }
 };
 
@@ -96,8 +93,9 @@ const containsSensitivePattern = (message: string) => {
   return patterns.some((pattern) => pattern.test(message));
 };
 
-// 밖으로 분리된 시스템 상태 컴포넌트
 const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
+  // ✨ 성능 안정을 위해 내부로 위치 이동
+  const supabase = createClient();
   const [serverLatency, setServerLatency] = useState(0);
   const [bandwidth, setBandwidth] = useState('안정적');
 
@@ -116,7 +114,7 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
     measureLatency();
     const interval = setInterval(measureLatency, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [supabase]);
 
   const getBandwidthWidth = () => {
     switch(bandwidth) {
@@ -135,7 +133,6 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
       </h3>
       
       <div className="space-y-4">
-        {/* 암호화 상태 */}
         <div className="group">
           <div className="flex justify-between text-xs mb-1.5">
             <span className="text-gray-400 flex items-center gap-1">
@@ -151,7 +148,6 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
           </div>
         </div>
 
-        {/* 서버 지연 */}
         <div className="group">
           <div className="flex justify-between text-xs mb-1.5">
             <span className="text-gray-400 flex items-center gap-1">
@@ -176,7 +172,6 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
           </div>
         </div>
 
-        {/* 대역폭 */}
         <div className="group">
           <div className="flex justify-between text-xs mb-1.5">
             <span className="text-gray-400 flex items-center gap-1">
@@ -202,8 +197,11 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
   );
 };
 
-// 메인 채팅 컴포넌트
 export default function ChatPage() {
+  const router = useRouter();
+  // ✨ 성능 안정을 위해 내부로 위치 이동
+  const supabase = createClient();
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -211,22 +209,17 @@ export default function ChatPage() {
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ✨ 접속 상태 및 암호 키 State
   const [roomKeyInput, setRoomKeyInput] = useState<string>('');
   const [activeKey, setActiveKey] = useState<string>('');
   const [isJoined, setIsJoined] = useState<boolean>(false);
   
-  // 공개 모드 여부 판단
   const isPublicMode = activeKey === DEFAULT_KEY;
 
-  // ✨ 접속 처리 함수
   const handleJoin = (e: FormEvent) => {
     e.preventDefault();
     if (roomKeyInput.trim() === '') {
-      // 아무것도 입력하지 않으면 기본 키(공개 광장) 사용
-      setActiveKey(DEFAULT_KEY || '');
+      setActiveKey(DEFAULT_KEY);
     } else {
-      // 입력한 암호 키 사용(비밀 방)
       setActiveKey(roomKeyInput);
     }
     setIsJoined(true);
@@ -246,7 +239,7 @@ export default function ChatPage() {
 
         const messagesWithDecrypted = await Promise.all(
           (data || []).map(async (row) => {
-            const decrypted = await decryptMessage(row.content, activeKey); // ✨ 현재 통신망 키로 복호화
+            const decrypted = await decryptMessage(row.content, activeKey);
             return {
               ...row,
               decryptedContent: decrypted,
@@ -268,7 +261,7 @@ export default function ChatPage() {
         async (payload) => {
           const newRow = payload.new as ChatMessage;
           if (newRow.expires_at && new Date(newRow.expires_at) > new Date() && !newRow.is_deleted) {
-            const decrypted = await decryptMessage(newRow.content, activeKey); // ✨ 실시간 수신 시에도 현재 키로 복호화
+            const decrypted = await decryptMessage(newRow.content, activeKey);
             setMessages((prev) => [...prev, { ...newRow, decryptedContent: decrypted }]);
           }
           updateActiveUsers();
@@ -282,7 +275,7 @@ export default function ChatPage() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [isJoined, activeKey]);
+  }, [isJoined, activeKey, supabase]);
 
   const updateActiveUsers = async () => {
     const baseUsers = 3 + Math.floor(Math.random() * 7);
@@ -314,7 +307,6 @@ export default function ChatPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return alert("보안 채널 접속을 위해 로그인이 필요합니다.");
 
-      // ✨ 현재 접속한 통신망의 키로 암호화
       const encrypted = await encryptMessage(sanitized, activeKey);
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
@@ -348,7 +340,6 @@ export default function ChatPage() {
     }
   };
 
-  // ✨ 접속 모달창 UI (입력하지 않으면 공개 모드로 안내)
   if (!isJoined) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-white relative overflow-hidden">
@@ -390,7 +381,6 @@ export default function ChatPage() {
     );
   }
 
-  // ✨ 실제 채팅방 UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-blue-950 text-white p-4 md:p-8 relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMjIiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0LjVIMjR2LTloMTJ2OXoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-10"></div>
@@ -399,6 +389,14 @@ export default function ChatPage() {
         <header className="mb-8 border-b border-blue-800/30 pb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
+              <button 
+                onClick={() => router.push('/dashboard')}
+                className="group flex items-center gap-2 px-3 py-1.5 mb-3 text-xs font-medium text-gray-300 bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-lg hover:bg-blue-900/30 hover:border-blue-700/50 hover:text-blue-300 transition-all duration-200 w-fit shadow-lg"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+                <span>대시보드 복귀</span>
+                <span className="ml-1 text-[10px] text-gray-500 group-hover:text-blue-400/70">통제실</span>
+              </button>
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 shadow-lg shadow-blue-500/20">
                   <Zap className="w-6 h-6" />
@@ -428,7 +426,6 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* ✨ 접속 모드에 따른 알림 패널 */}
           <div className={`mt-4 p-3 border rounded-xl ${isPublicMode ? 'bg-yellow-900/20 border-yellow-800/50' : 'bg-green-900/20 border-green-800/50'}`}>
             <p className={`text-xs flex items-center gap-2 ${isPublicMode ? 'text-yellow-400' : 'text-green-300'}`}>
               <span className="font-bold">
@@ -442,7 +439,6 @@ export default function ChatPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3 flex flex-col h-[calc(100vh-280px)]">
             <div className="flex-1 overflow-y-auto bg-gray-900/30 border-2 border-gray-800/50 rounded-3xl p-4 md:p-6 space-y-4 backdrop-blur-sm shadow-2xl">
-              {/* ✨ 핵심: null인 메시지(다른 주파수)는 필터링해서 없는 것처럼 처리합니다! */}
               {messages.filter(m => m.decryptedContent !== null).length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500">
                   <div className="w-16 h-16 bg-gradient-to-br from-gray-800 to-gray-900 rounded-full flex items-center justify-center mb-4 border border-gray-700">
@@ -453,7 +449,6 @@ export default function ChatPage() {
               ) : (
                 <>
                   {messages.map((msg) => {
-                    // 복호화 실패(null)한 메시지는 렌더링 스킵!
                     if (msg.decryptedContent === null) return null;
 
                     const isCurrentUser = msg.author_name === userAgentName;
