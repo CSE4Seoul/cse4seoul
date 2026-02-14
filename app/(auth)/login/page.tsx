@@ -49,9 +49,12 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     setResetMessage(null);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${location.origin}/auth/reset-password`,
+      // 🚨 이 부분을 톨게이트를 거치도록 수정하세요!
+      redirectTo: `${location.origin}/auth/callback?next=/auth/reset-password`,
     });
+    
     if (error) {
       setError(error.message);
     } else {
