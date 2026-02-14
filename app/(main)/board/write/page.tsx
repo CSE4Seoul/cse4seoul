@@ -1,361 +1,274 @@
-// app/(main)/board/write/page.tsx
-'use client';
+import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
+import { getClanInfo } from '@/utils/clash';
+import Link from 'next/link';
+import { Zap } from 'lucide-react';
 
-import { createPost } from '../actions';
-import { Target, Lock, Send, FileText, AlertTriangle, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+export default async function DashboardPage() {
+  const supabase = await createClient();
 
-export default function WritePage() {
-  const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authorOption, setAuthorOption] = useState<'anonymous' | 'named'>('anonymous');
-  const [isPremium, setIsPremium] = useState(false);
-  const [allowComments, setAllowComments] = useState(true);
+  // 1. 로그인 체크
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return redirect('/login');
+  }
 
-  const handleSubmit = async (formData: FormData) => {
-    setIsSubmitting(true);
-    try {
-      formData.append('is_anonymous', authorOption === 'anonymous' ? 'true' : 'false');
-      formData.append('is_premium', isPremium ? 'true' : 'false');
-      formData.append('allow_comments', allowComments ? 'true' : 'false');
-      
-      await createPost(formData);
-      // 성공 후 리다이렉트 또는 알림
-      router.push('/board');
-    } catch (error) {
-      console.error('작성 실패:', error);
-      setIsSubmitting(false);
-    }
-  };
+  // 2. 프로필 정보 가져오기
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  const clanData = await getClanInfo();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 md:p-8">
-      {/* 배경 디자인 요소 */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-orange-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-10 w-80 h-80 bg-rose-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/3 right-1/4 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl"></div>
-      </div>
+    <div className="min-h-screen bg-black text-white p-6 md:p-12 relative overflow-hidden">
+      {/* 배경 데코레이션 */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] -z-10" />
 
-      <div className="relative max-w-4xl mx-auto">
-        {/* 헤더 */}
-        <div className="mb-10 pt-8">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white" />
-              </div>
-              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-white" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 via-amber-300 to-orange-400 bg-clip-text text-transparent">
-                작전 보고서 생성
+      <div className="max-w-5xl mx-auto z-10 relative">
+        {/* 헤더 섹션 */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 border-b border-gray-800 pb-8 gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                Command Center
               </h1>
-              <p className="text-gray-400 text-sm mt-1">최고 기밀 정보 입력 섹터</p>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-900/50 text-blue-300 border border-blue-800">
+                KERNEL v1.0
+              </span>
+            </div>
+            <p className="text-gray-400">
+              Welcome back, Agent {profile?.full_name || user.email?.split('@')[0]}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* 소속 대학 뱃지 */}
+            {profile?.university && (
+              <span className="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm font-bold text-gray-200 shadow-lg flex items-center gap-2">
+                🏫 {profile.university}
+              </span>
+            )}
+
+            {/* 채팅 바로가기 버튼 */}
+            <Link
+              href="/chat"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600/80 to-cyan-600/80 hover:from-blue-500 hover:to-cyan-500 border border-blue-500/50 rounded-lg text-sm font-medium text-white shadow-lg flex items-center gap-2 transition-all"
+            >
+              <Zap className="w-4 h-4" />
+              <span>전략 통신실</span>
+            </Link>
+
+            {/* 시스템 상태 */}
+            <span className="px-3 py-1 bg-green-950/50 text-green-400 text-xs rounded-full border border-green-900 flex items-center gap-2 shadow-[0_0_10px_rgba(74,222,128,0.2)]">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>
+              System Online
+            </span>
+          </div>
+        </header>
+
+        {/* 메인 대시보드 그리드 (3열) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* 1. 내 프로필 카드 */}
+          <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-blue-500/30 transition-all duration-300 group shadow-xl">
+            <div className="flex justify-between items-start mb-6">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-xl font-bold shadow-lg">
+                {profile?.full_name ? profile.full_name[0] : 'U'}
+              </div>
+              <span className="text-xs font-mono text-gray-500 border border-gray-800 px-2 py-1 rounded">
+                UID: {user.id.slice(0, 4)}...
+              </span>
+            </div>
+
+            <h3 className="text-gray-500 text-xs font-bold tracking-wider mb-1">OPERATOR IDENTITY</h3>
+            <div className="text-2xl font-bold text-white mb-1">{profile?.full_name || 'Unknown Agent'}</div>
+            <div className="text-blue-400 text-sm font-medium mb-4">{profile?.role || 'Member'}</div>
+
+            <div className="space-y-2 pt-4 border-t border-gray-800">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">University</span>
+                <span className="text-gray-300">{profile?.university || 'Not Set'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Email</span>
+                <span className="text-gray-300">{user.email}</span>
+              </div>
             </div>
           </div>
 
-          {/* 진행 상태 바 */}
-          <div className="flex items-center gap-4 mb-8">
-            {['기본 정보', '세부 내용', '보안 설정', '제출 준비'].map((step, index) => (
-              <div key={step} className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-                  ${index === 0 
-                    ? 'bg-gradient-to-br from-orange-500 to-amber-600 text-white' 
-                    : 'bg-gray-800/50 text-gray-500 border border-gray-700'
-                  }`}>
-                  {index + 1}
-                </div>
-                <span className={`text-sm ${index === 0 ? 'text-orange-300' : 'text-gray-500'}`}>
-                  {step}
-                </span>
-                {index < 3 && (
-                  <div className="w-8 h-0.5 bg-gray-800 ml-2"></div>
-                )}
-              </div>
-            ))}
+          {/* 2. 클랜 상태 카드 */}
+          <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-purple-500/30 transition-all duration-300 group shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-gray-500 text-xs font-bold tracking-wider group-hover:text-purple-400 transition-colors">
+                CLAN STATUS
+              </h3>
+              <span
+                className={`text-xs px-2 py-1 rounded border ${
+                  clanData
+                    ? 'text-purple-500 bg-purple-900/20 border-purple-900/50'
+                    : 'text-red-500 bg-red-900/20 border-red-900/50'
+                }`}
+              >
+                {clanData ? 'Live' : 'Offline'}
+              </span>
+            </div>
+
+            <div className="flex items-end gap-2 mb-2">
+              <span className="text-5xl font-bold text-white tracking-tighter">
+                {clanData ? clanData.members : '-'}
+              </span>
+              <span className="text-gray-400 mb-2 font-medium">/ 50</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">Active Members</p>
+
+            <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-purple-600 to-blue-500 h-full shadow-[0_0_10px_rgba(147,51,234,0.5)] transition-all duration-1000"
+                style={{ width: `${((clanData?.members || 0) / 50) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* 3. 시스템 로그 */}
+          <div className="bg-black/60 border border-gray-800 p-6 rounded-2xl flex flex-col font-mono text-xs shadow-xl">
+            <h3 className="text-gray-500 font-bold mb-4 flex items-center gap-2">
+              <span className="w-2 h-2 bg-gray-500 rounded-full"></span> SYSTEM LOGS
+            </h3>
+            <div className="flex-1 space-y-3 text-gray-400 overflow-hidden">
+              <p>
+                <span className="text-blue-500">[INFO]</span> Secure connection established.
+              </p>
+              <p>
+                <span className="text-green-500">[SUCCESS]</span> User profile loaded.
+              </p>
+              <p>
+                <span className="text-purple-500">[DB]</span> Profiles table connected.
+              </p>
+              <p>
+                <span className="text-yellow-500 animate-pulse">[WAIT]</span> Waiting for Clash Royale API...
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* 메인 폼 */}
-        <form action={handleSubmit} className="space-y-8">
-          {/* 작전명 섹션 */}
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative bg-gray-900/60 backdrop-blur-sm border-2 border-gray-800 rounded-2xl p-6 transition-all duration-300 group-hover:border-orange-500/50">
-              <div className="flex items-center gap-3 mb-4">
-                <Target className="w-5 h-5 text-orange-400" />
-                <label className="text-lg font-bold text-white">작전명 (제목)</label>
-                <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs rounded-full">필수</span>
-              </div>
-              <input 
-                name="title" 
-                required 
-                className="w-full bg-black/50 border border-gray-700 rounded-xl p-4 text-white text-lg placeholder-gray-500 
-                  focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent transition-all"
-                placeholder="예: 프로젝트 프롬프터스 - AI 전략 개편안"
-                maxLength={100}
-                disabled={isSubmitting}
-              />
-              <div className="flex justify-end mt-2">
-                <span className="text-xs text-gray-500">최대 100자</span>
-              </div>
+        {/* 전술 기록 및 작전 채널 (전체 너비) */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 게시판 카드 */}
+          <Link
+            href="/board"
+            className="group flex flex-col p-6 rounded-2xl bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-800/50 hover:border-blue-500/60 transition-all hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-3xl">📋</span>
+              <span className="text-xs text-blue-400 group-hover:translate-x-1 transition-transform">
+                바로가기 →
+              </span>
             </div>
+            <h3 className="text-xl font-bold text-white mb-1">전술 기록 게시판</h3>
+            <p className="text-sm text-gray-400">작전 회의록, 전략 분석, 병력 배치 계획을 공유하세요.</p>
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
+              실시간 업데이트
+            </div>
+          </Link>
+
+          {/* 채팅 카드 */}
+          <Link
+            href="/chat"
+            className="group flex flex-col p-6 rounded-2xl bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-800/50 hover:border-green-500/60 transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-3xl">💬</span>
+              <span className="text-xs text-green-400 group-hover:translate-x-1 transition-transform">
+                바로가기 →
+              </span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-1">실시간 작전 채널</h3>
+            <p className="text-sm text-gray-400">암호화된 실시간 통신으로 즉각적인 작전 지시와 논의가 가능합니다.</p>
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+              접속자 {Math.floor(Math.random() * 5) + 3}명
+            </div>
+          </Link>
+        </div>
+
+        {/* 멤버 목록 테이블 */}
+        <div className="mt-8 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+            <h3 className="text-gray-400 text-sm font-bold tracking-wider">MEMBER ROSTER</h3>
+            <span className="text-xs text-gray-500 font-mono">TOP 5 AGENTS</span>
           </div>
 
-          {/* 작전 상세 섹션 */}
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative bg-gray-900/60 backdrop-blur-sm border-2 border-gray-800 rounded-2xl p-6 transition-all duration-300 group-hover:border-amber-500/50">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-amber-400" />
-                  <label className="text-lg font-bold text-white">상세 작전 계획 (내용)</label>
-                  <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-xs rounded-full">고급 편집</span>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    type="button" 
-                    className="px-3 py-1 bg-gray-800 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
-                    disabled={isSubmitting}
-                  >
-                    마크다운
-                  </button>
-                  <button 
-                    type="button" 
-                    className="px-3 py-1 bg-gray-800 rounded-lg text-xs text-gray-400 hover:text-white transition-colors"
-                    disabled={isSubmitting}
-                  >
-                    미리보기
-                  </button>
-                </div>
-              </div>
-              <textarea 
-                name="content" 
-                required 
-                rows={12}
-                className="w-full bg-black/50 border border-gray-700 rounded-xl p-4 text-white placeholder-gray-500 
-                  focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-transparent transition-all
-                  font-mono text-sm leading-relaxed resize-none"
-                placeholder={`# 개요\n• 전략적 목표\n• 주요 과제\n\n# 실행 계획\n1. 단계별 접근 방식\n2. 예상 리소스\n3. 위험 요소 및 대응책\n\n# 예상 결과\n• 성공 지표\n• 영향도 분석`}
-                disabled={isSubmitting}
-              />
-              <div className="flex justify-between items-center mt-3">
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    기밀 정보는 암호화됩니다
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500">
-                  권장 길이: 500-2000자
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 보안 설정 섹션 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Lock className="w-5 h-5 text-blue-400" />
-                <label className="text-lg font-bold text-white">작성자 설정</label>
-              </div>
-              
-              <div className="space-y-4">
-                <div 
-                  className="flex items-center justify-between p-4 bg-black/30 rounded-xl hover:bg-black/50 transition-colors cursor-pointer group/anon"
-                  onClick={() => !isSubmitting && setAuthorOption('anonymous')}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <input 
-                        type="radio" 
-                        name="author_option" 
-                        value="anonymous" 
-                        id="anonymous"
-                        className="sr-only"
-                        checked={authorOption === 'anonymous'}
-                        onChange={() => setAuthorOption('anonymous')}
-                        disabled={isSubmitting}
-                      />
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
-                        ${authorOption === 'anonymous' ? 'border-blue-500' : 'border-gray-600'}`}>
-                        <div className={`w-2.5 h-2.5 rounded-full bg-blue-500 transition-opacity
-                          ${authorOption === 'anonymous' ? 'opacity-100' : 'opacity-0'}`}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="anonymous" className="font-medium text-white cursor-pointer">익명 모드</label>
-                      <p className="text-sm text-gray-400">작성자 정보가 공개되지 않습니다</p>
-                    </div>
-                  </div>
-                  <div className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 group-hover/anon:text-white">
-                    기본 설정
-                  </div>
-                </div>
-
-                <div 
-                  className="flex items-center justify-between p-4 bg-black/30 rounded-xl hover:bg-black/50 transition-colors cursor-pointer group/named"
-                  onClick={() => !isSubmitting && setAuthorOption('named')}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <input 
-                        type="radio" 
-                        name="author_option" 
-                        value="named" 
-                        id="named"
-                        className="sr-only"
-                        checked={authorOption === 'named'}
-                        onChange={() => setAuthorOption('named')}
-                        disabled={isSubmitting}
-                      />
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center
-                        ${authorOption === 'named' ? 'border-green-500' : 'border-gray-600'}`}>
-                        <div className={`w-2.5 h-2.5 rounded-full bg-green-500 transition-opacity
-                          ${authorOption === 'named' ? 'opacity-100' : 'opacity-0'}`}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="named" className="font-medium text-white cursor-pointer">신원 공개</label>
-                      <p className="text-sm text-gray-400">작성자 정보가 함께 표시됩니다</p>
-                    </div>
-                  </div>
-                  <div className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 group-hover/named:text-white">
-                    선택적
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Sparkles className="w-5 h-5 text-purple-400" />
-                <label className="text-lg font-bold text-white">추가 옵션</label>
-              </div>
-              
-              <div className="space-y-4">
-                <label className="flex items-center gap-3 p-4 bg-black/30 rounded-xl hover:bg-black/50 transition-colors cursor-pointer">
-                  <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      name="is_premium" 
-                      className="sr-only"
-                      checked={isPremium}
-                      onChange={(e) => !isSubmitting && setIsPremium(e.target.checked)}
-                      disabled={isSubmitting}
-                    />
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center
-                      ${isPremium ? 'bg-purple-500 border-purple-500' : 'border-gray-600'}`}>
-                      <svg className={`w-3 h-3 text-white transition-opacity ${isPremium ? 'opacity-100' : 'opacity-0'}`} 
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-white">프리미엄 전략으로 등록</span>
-                    <p className="text-sm text-gray-400">특별 주목을 받을 수 있습니다</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-4 bg-black/30 rounded-xl hover:bg-black/50 transition-colors cursor-pointer">
-                  <div className="relative">
-                    <input 
-                      type="checkbox" 
-                      name="allow_comments" 
-                      className="sr-only"
-                      checked={allowComments}
-                      onChange={(e) => !isSubmitting && setAllowComments(e.target.checked)}
-                      disabled={isSubmitting}
-                    />
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center
-                      ${allowComments ? 'bg-green-500 border-green-500' : 'border-gray-600'}`}>
-                      <svg className={`w-3 h-3 text-white transition-opacity ${allowComments ? 'opacity-100' : 'opacity-0'}`} 
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-medium text-white">댓글 허용</span>
-                    <p className="text-sm text-gray-400">다른 요원들의 피드백을 받습니다</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          {/* 제출 버튼 섹션 */}
-          <div className="sticky bottom-8 mt-12">
-            <div className="bg-gradient-to-r from-gray-900/80 via-black/80 to-gray-900/80 backdrop-blur-xl border border-gray-800 rounded-2xl p-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-2">작전 보고서를 제출하시겠습니까?</h3>
-                  <p className="text-sm text-gray-400">
-                    {isSubmitting 
-                      ? '작전 보고서를 전송 중입니다...' 
-                      : '제출 후 수정이 제한될 수 있습니다. 모든 내용을 확인해주세요.'
-                    }
-                  </p>
-                </div>
-                
-                <div className="flex gap-4">
-                  <button 
-                    type="button"
-                    className="px-8 py-3 rounded-xl font-bold border border-gray-700 text-gray-400 hover:text-white hover:border-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => router.back()}
-                    disabled={isSubmitting}
-                  >
-                    취소
-                  </button>
-                  
-                  <button 
-                    type="submit"
-                    className="group relative px-10 py-3 rounded-xl font-bold bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600 
-                      hover:shadow-[0_0_40px_rgba(251,191,36,0.3)] transition-all duration-300 overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-white/10 to-amber-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                    <span className={`flex items-center gap-3 relative z-10 ${isSubmitting ? 'opacity-0' : 'opacity-100'}`}>
-                      <Send className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                      <span className="text-lg">
-                        {isSubmitting ? '전송 중...' : '작전 보고서 제출'}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-gray-400">
+              <thead className="bg-gray-900/50 text-xs uppercase font-medium text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">Rank</th>
+                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Role</th>
+                  <th className="px-6 py-4 text-right">Trophies</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {clanData?.memberList?.slice(0, 5).map((member: any, index: number) => (
+                  <tr key={member.tag} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-mono text-gray-500">#{index + 1}</td>
+                    <td className="px-6 py-4 font-bold text-white flex items-center gap-2">
+                      {index === 0 && <span className="text-yellow-500">👑</span>}
+                      {member.name}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] border ${
+                          member.role === 'leader'
+                            ? 'border-yellow-900/50 text-yellow-500 bg-yellow-900/20'
+                            : member.role === 'coLeader'
+                            ? 'border-purple-900/50 text-purple-400 bg-purple-900/20'
+                            : 'border-gray-700 text-gray-400 bg-gray-800'
+                        }`}
+                      >
+                        {member.role.toUpperCase()}
                       </span>
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
+                    </td>
+                    <td className="px-6 py-4 text-right text-yellow-500 font-mono">🏆 {member.trophies}</td>
+                  </tr>
+                )) || (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                      No data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        </form>
 
-        {/* 푸터 노트 */}
-        <div className="mt-16 pt-8 border-t border-gray-800/50">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-500">
-            <div>
-              <h4 className="text-gray-400 font-medium mb-2">보안 안내</h4>
-              <p>모든 데이터는 엔드투엔드 암호화되어 전송됩니다</p>
-            </div>
-            <div>
-              <h4 className="text-gray-400 font-medium mb-2">작성 가이드</h4>
-              <p>명확하고 구체적인 작전 계획을 작성해주세요</p>
-            </div>
-            <div>
-              <h4 className="text-gray400 font-medium mb-2">지원</h4>
-              <p>기술적 문제 발생 시 즉시 보고해주세요</p>
-            </div>
+          <div className="p-4 border-t border-gray-800 text-center">
+            <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors">View All Agents →</button>
           </div>
         </div>
+
+        {/* 하단 로그아웃 */}
+        <form action="/auth/signout" method="post" className="mt-12 flex justify-center">
+          <button className="px-6 py-2 rounded-full border border-red-900/50 text-red-400 text-sm hover:bg-red-950/30 hover:text-red-300 transition-colors flex items-center gap-2">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Disconnect Secure Session
+          </button>
+        </form>
       </div>
     </div>
   );
