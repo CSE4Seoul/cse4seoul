@@ -244,4 +244,6 @@ fix: 대시보드 렌더링 에러 수정 및 KERNEL v1.0 허브 페이지 구�
 - 암호 복호화 시 키 고정 문제로 실시간 업데이트 안되는 문제 해결
 
 15(일)
--장기적으로 한글 설정과 영어 설정 분리가 필요해보임
+-장기적으로 한글 설정과 영어 설정 분리가 필요해보임(사용자 경험 개선용)
+
+Solved Password input and reset button synchronization issue
