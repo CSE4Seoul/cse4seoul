@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
+import { LanguageProvider } from '../contexts/LanguageContext';
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -35,20 +36,16 @@ const geistSans = Geist({
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+    <html lang="ko">
+      <body>
+        {/* 👇 앱 전체를 Provider로 감싸줍니다 */}
+        <LanguageProvider>
           {children}
-        </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   );
