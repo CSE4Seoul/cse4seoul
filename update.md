@@ -244,6 +244,42 @@ fix: 대시보드 렌더링 에러 수정 및 KERNEL v1.0 허브 페이지 구�
 - 암호 복호화 시 키 고정 문제로 실시간 업데이트 안되는 문제 해결
 
 15(일)
--장기적으로 한글 설정과 영어 설정 분리가 필요해보임(사용자 경험 개선용)
+-장기적으로 한글 설정과 영어 설정 분리가 필요해보임(사용자 경험 개선용) - 11:56에 해결 ㅇ온료
 
 Solved Password input and reset button synchronization issue
+
+# 🛡️ 시스템 보안 및 성능 점검 리스트 (Security & Performance Audit)
+
+## ✅ 1. 방어 완료 및 테스트 성공 (Resolved)
+- **XSS (Cross-Site Scripting) 방어**
+  - 테스트: 채팅창에 `<script>alert('해킹완료');</script>` 및 HTML 태그 주입 시도
+  - 결과: 스크립트가 실행되지 않고 평문 텍스트로 렌더링 됨.
+  - 원인: React/Next.js의 기본 JSX 이스케이프(Escaping) 기능이 정상 작동하여 1차 방어 성공.
+- **브라우저 콘솔 해킹 (전역 변수 노출) 방어**
+  - 테스트: 브라우저 F12 콘솔에서 `supabase.from('users').select('*')` 직접 호출 시도
+  - 결과: `supabase is not defined` 에러 발생.
+  - 원인: Next.js 빌드 시 글로벌 스코프에 DB 객체가 노출되지 않도록 번들링 보호 정상 작동.
+
+## 🚧 2. 확인 및 조치 필요 (Action Items)
+### ⚡ 프론트엔드 성능 최적화 (UX)
+- [ ] **메시지 삭제 시 INP (Interaction to Next Paint) 지연 해결**
+  - 이슈: 채팅 삭제 버튼 클릭 시 UI 업데이트가 920ms 동안 블로킹되는 현상 발견.
+  - 조치 계획: DB 삭제 통신이 완료될 때까지 기다리지 않고, 화면에서 먼저 메시지를 지우는 **낙관적 업데이트(Optimistic UI)** 패턴 적용 필요.
+
+### 🔒 백엔드 및 데이터베이스 보안
+- [ ] **Supabase RLS (Row Level Security) 정책 점검**
+  - 이슈: 해커가 F12 네트워크 탭에서 `ANON_KEY`를 탈취하여 외부에서 API를 쏠 경우를 대비해야 함.
+  - 조치 계획: DB의 `messages` 테이블 등에서 데이터 삭제/수정 시, 반드시 `auth.uid() == user_id` 인지 검증하는 RLS 정책이 뚫리지 않게 설정되어 있는지 재확인.
+- [ ] **채팅 도배 공격 방지 (Rate Limiting)**
+  - 이슈: 현재 1초에 수십 번 전송 버튼(엔터)을 연타할 경우 제한 없이 DB에 인서트될 위험 존재 (과금 폭탄 및 DoS 위험).
+  - 조치 계획: 
+    1. 프론트엔드: 연속 클릭 방지 (Throttling/Debouncing 처리).
+    2. 백엔드(선택): Supabase DB 트리거를 활용한 짧은 시간 내 연속 Insert 제한.
+
+### 🔑 종단간 암호화(E2EE) 키 관리 취약점 점검
+- [ ] **비밀 키 보관 위치 확인**
+  - XSS 등 탈취 위험을 막기 위해 키를 `localStorage`나 `Cookie`에 평문으로 보관하지 않고, 메모리(React State 등)에만 보관하고 있는지 점검.
+- [ ] **서버 데이터 전송 검증**
+  - 완벽한 E2EE를 위해 사용자가 입력한 '직접 설정 암호키'가 어떠한 경우에도 서버(Supabase DB)로 전송되지 않는지 네트워크 로그 확인.
+- [ ] **표준 암호화 알고리즘 사용 여부**
+  - 자체 제작한 암호화 공식이 아닌, 검증된 라이브러리(예: `crypto-js`의 AES 알고리즘) 또는 Web Crypto API를 사용 중인지 코드 리뷰.
