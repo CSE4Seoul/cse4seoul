@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         {!showResetForm ? (
           // Login Form
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form key="login-form" onSubmit={handleLogin} className="space-y-4">
             <input
               type="email"
               value={email}
@@ -126,7 +126,7 @@ export default function LoginPage() {
           </form>
         ) : (
           // Password Reset Form
-          <form onSubmit={handlePasswordReset} className="space-y-4">
+          <form key="reset-form" onSubmit={handlePasswordReset} className="space-y-4">
             <p className="text-gray-300 text-sm mb-4">
               Enter your email address and we'll send you a link to reset your password.
             </p>
