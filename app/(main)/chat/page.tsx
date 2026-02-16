@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock } from 'lucide-react';
 
+
+
+// 🔥 방금 만든 유틸 파일에서 암호화/복호화 함수를 불러옵니다!
+import { encryptMessage, decryptMessage } from '@/utils/encryption';
+
 const MAX_MESSAGE_LENGTH = 500;
+
 const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY || 'fallback-public-key-2026';
 
 if (!process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY) {
@@ -47,80 +53,6 @@ const formatTime = (dateString: string) => {
 
 const sanitizeMessage = (input: string) => {
   return input.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, MAX_MESSAGE_LENGTH);
-};
-
-const encryptMessage = async (message: string, secretKey: string): Promise<string> => {
-  if (!secretKey) return message;
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-
-  // 1. 매번 다르게 생성되는 랜덤 Salt (16바이트)
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(secretKey), 'PBKDF2', false, ['deriveKey']);
-  
-  // 2. 랜덤 Salt를 넣어 진짜 키 생성
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, 
-    keyMaterial, 
-    { name: 'AES-GCM', length: 256 }, 
-    false, 
-    ['encrypt', 'decrypt']
-  );
-  
-  // 3. 매번 다르게 생성되는 랜덤 IV (12바이트)
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
-  
-  // 4. [Salt(16)] + [IV(12)] + [암호문] 순서로 하나로 합치기!
-  const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
-  combined.set(salt, 0);
-  combined.set(iv, salt.length);
-  combined.set(new Uint8Array(encrypted), salt.length + iv.length);
-
-  // 5. 안전한 Base64 인코딩 (긴 문자열도 버그 없이 처리)
-  let binary = '';
-  for (let i = 0; i < combined.byteLength; i++) {
-    binary += String.fromCharCode(combined[i]);
-  }
-  return 'ENC:' + btoa(binary);
-};
-
-const decryptMessage = async (encryptedData: string, secretKey: string): Promise<string | null> => {
-  if (!secretKey || !encryptedData.startsWith('ENC:')) return encryptedData;
-
-  try {
-    const base64 = encryptedData.slice(4);
-    const binaryStr = atob(base64);
-    const combined = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      combined[i] = binaryStr.charCodeAt(i);
-    }
-
-    // 1. [Salt(16)], [IV(12)], [암호문] 정확히 썰어서 분리하기
-    const salt = combined.slice(0, 16);
-    const iv = combined.slice(16, 28);
-    const data = combined.slice(28);
-
-    const encoder = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(secretKey), 'PBKDF2', false, ['deriveKey']);
-    
-    // 2. 암호문에 같이 배달 온 Salt를 써서 열쇠 복원
-    const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, 
-      keyMaterial, 
-      { name: 'AES-GCM', length: 256 }, 
-      false, 
-      ['encrypt', 'decrypt']
-    );
-
-    // 3. 복호화 짠!
-    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
-    const decoder = new TextDecoder();
-    return decoder.decode(decrypted);
-  } catch (error) {
-    // 🔥 하민님의 완벽한 의도: 키가 틀리면 아예 '없는 메시지' 취급해버리기!
-    return null; 
-  }
 };
 
 const containsSensitivePattern = (message: string) => {
@@ -356,7 +288,8 @@ export default function ChatPage() {
 
       const encrypted = await encryptMessage(sanitized, activeKey);
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+expiresAt.setDate(expiresAt.getDate() + 7);
 
       const { error } = await supabase.from('messages').insert({
         content: encrypted,
