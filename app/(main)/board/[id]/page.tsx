@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { createComment } from "../actions";
 import { deleteComment } from "../actions"; 
 import { deletePost } from "../actions";
+import { decryptMessage } from '@/utils/encryption';
+const DEFAULT_KEY = process.env.NEXT_PUBLIC_CHAT_ENCRYPTION_KEY || 'fallback-public-key-2026';
 
 import { 
   MessageSquare, Clock, User, Lock, Eye, 
@@ -55,13 +57,16 @@ export default function PostDetailPage({
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null); // 추가
 
+  const [decryptedContent, setDecryptedContent] = useState<string>('');
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [unlockPassword, setUnlockPassword] = useState<string>('');
+  const [isUnlocking, setIsUnlocking] = useState<boolean>(false);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const resolvedParams = await params;
         setId(resolvedParams.id);
-
-        // 1. 현재 유저 정보 가져오기 (추가)
         const { data: { user } } = await supabase.auth.getUser();
         setCurrentUser(user);
 
@@ -72,12 +77,20 @@ export default function PostDetailPage({
           .eq('id', resolvedParams.id)
           .single();
 
-        if (!postData) {
-          // 404 처리
-          return;
-        }
-
+        if (!postData) return;
         setPost(postData);
+
+        // 🔥 여기가 핵심! 가져오자마자 기본 키로 찔러보기!
+        const attemptDecrypt = await decryptMessage(postData.content, DEFAULT_KEY);
+        
+        if (attemptDecrypt !== null) {
+          // 공개글! (기본 키로 스르륵 풀림)
+          setDecryptedContent(attemptDecrypt);
+          setIsLocked(false);
+        } else {
+          // 보호글! (커스텀 비밀번호가 걸려있음)
+          setIsLocked(true);
+        }
 
         // 조회수 증가
         await supabase
@@ -102,6 +115,25 @@ export default function PostDetailPage({
 
     fetchData();
   }, [params]);
+
+  const handleUnlockPost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!post || !unlockPassword.trim()) return;
+
+    setIsUnlocking(true);
+    // 입력한 암호로 해독 시도!
+    const result = await decryptMessage(post.content, unlockPassword);
+    setIsUnlocking(false);
+
+    if (result !== null) {
+      setDecryptedContent(result);
+      setIsLocked(false); // 찰칵! 자물쇠 풀림!
+      setUnlockPassword(''); // 메모리에서 비번 날려버리기
+    } else {
+      alert("접근 거부: 해독 키가 일치하지 않습니다. 🚨");
+      setUnlockPassword('');
+    }
+  };
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,6 +221,7 @@ export default function PostDetailPage({
   }
 
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 md:p-8">
       {/* 배경 요소 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -286,11 +319,50 @@ export default function PostDetailPage({
           </header>
 
           {/* 게시글 본문 */}
-          <div className="prose prose-invert prose-lg max-w-none">
-            <div className="text-gray-200 leading-relaxed whitespace-pre-wrap text-base md:text-lg 
-              bg-gray-900/30 rounded-2xl p-6 md:p-8">
-              {post.content}
-            </div>
+          <div className="prose prose-invert prose-lg max-w-none mb-10">
+            {isLocked ? (
+              // 🔒 잠긴 상태 UI (비밀번호 입력창)
+              <div className="flex flex-col items-center justify-center p-12 bg-gray-900/50 border border-violet-500/30 rounded-3xl backdrop-blur-md shadow-[0_0_50px_rgba(139,92,246,0.1)]">
+                <div className="w-20 h-20 rounded-full bg-violet-900/30 flex items-center justify-center mb-6 shadow-inner">
+                  <Lock className="w-10 h-10 text-violet-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">1급 기밀 문서</h2>
+                <p className="text-gray-400 mb-8 text-center max-w-md">
+                  이 작전 보고서는 작성자가 설정한 E2EE 해독 키가 있어야만 열람할 수 있습니다.
+                </p>
+
+                <form onSubmit={handleUnlockPost} className="w-full max-w-sm">
+                  <div className="relative mb-4">
+                    <input
+                      type="password"
+                      value={unlockPassword}
+                      onChange={(e) => setUnlockPassword(e.target.value)}
+                      placeholder="해독 키를 입력하세요..."
+                      className="w-full bg-black/60 border border-violet-500/50 rounded-xl py-4 px-5 text-center text-white focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all tracking-widest"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isUnlocking || !unlockPassword.trim()}
+                    className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 rounded-xl text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-violet-900/50"
+                  >
+                    {isUnlocking ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Shield className="w-5 h-5" />
+                        보안 해제 시도
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            ) : (
+              // 🔓 풀린 상태 UI (정상 본문 렌더링)
+              <div className="text-gray-200 leading-relaxed whitespace-pre-wrap text-base md:text-lg bg-gray-900/30 rounded-2xl p-6 md:p-8">
+                {decryptedContent}
+              </div>
+            )}
           </div>
 
           {/* 게시글 푸터 부분 */}
