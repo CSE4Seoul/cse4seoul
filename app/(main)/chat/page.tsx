@@ -53,31 +53,72 @@ const encryptMessage = async (message: string, secretKey: string): Promise<strin
   if (!secretKey) return message;
   const encoder = new TextEncoder();
   const data = encoder.encode(message);
+
+  // 1. 매번 다르게 생성되는 랜덤 Salt (16바이트)
+  const salt = crypto.getRandomValues(new Uint8Array(16));
   const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(secretKey), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: encoder.encode('secure-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  
+  // 2. 랜덤 Salt를 넣어 진짜 키 생성
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, 
+    keyMaterial, 
+    { name: 'AES-GCM', length: 256 }, 
+    false, 
+    ['encrypt', 'decrypt']
+  );
+  
+  // 3. 매번 다르게 생성되는 랜덤 IV (12바이트)
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
-  const combined = new Uint8Array(iv.length + encrypted.byteLength);
-  combined.set(iv);
-  combined.set(new Uint8Array(encrypted), iv.length);
-  return 'ENC:' + btoa(String.fromCharCode(...combined));
+  
+  // 4. [Salt(16)] + [IV(12)] + [암호문] 순서로 하나로 합치기!
+  const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+  combined.set(salt, 0);
+  combined.set(iv, salt.length);
+  combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+
+  // 5. 안전한 Base64 인코딩 (긴 문자열도 버그 없이 처리)
+  let binary = '';
+  for (let i = 0; i < combined.byteLength; i++) {
+    binary += String.fromCharCode(combined[i]);
+  }
+  return 'ENC:' + btoa(binary);
 };
 
-const decryptMessage = async (content: string, secretKey: string): Promise<string | null> => {
-  if (!content.startsWith('ENC:') || !secretKey) return content;
+const decryptMessage = async (encryptedData: string, secretKey: string): Promise<string | null> => {
+  if (!secretKey || !encryptedData.startsWith('ENC:')) return encryptedData;
+
   try {
-    const encryptedData = content.replace('ENC:', '');
-    const binaryString = atob(encryptedData);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-    const iv = bytes.slice(0, 12);
-    const encrypted = bytes.slice(12);
+    const base64 = encryptedData.slice(4);
+    const binaryStr = atob(base64);
+    const combined = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      combined[i] = binaryStr.charCodeAt(i);
+    }
+
+    // 1. [Salt(16)], [IV(12)], [암호문] 정확히 썰어서 분리하기
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const data = combined.slice(28);
+
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(secretKey), 'PBKDF2', false, ['deriveKey']);
-    const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: encoder.encode('secure-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
-    return new TextDecoder().decode(decrypted);
-  } catch (e) {
+    
+    // 2. 암호문에 같이 배달 온 Salt를 써서 열쇠 복원
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' }, 
+      keyMaterial, 
+      { name: 'AES-GCM', length: 256 }, 
+      false, 
+      ['encrypt', 'decrypt']
+    );
+
+    // 3. 복호화 짠!
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+    const decoder = new TextDecoder();
+    return decoder.decode(decrypted);
+  } catch (error) {
+    // 🔥 하민님의 완벽한 의도: 키가 틀리면 아예 '없는 메시지' 취급해버리기!
     return null; 
   }
 };

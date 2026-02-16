@@ -276,10 +276,11 @@ Solved Password input and reset button synchronization issue
     1. 프론트엔드: 연속 클릭 방지 (Throttling/Debouncing 처리).
     2. 백엔드(선택): Supabase DB 트리거를 활용한 짧은 시간 내 연속 Insert 제한.
 
+02-16(월)
 ### 🔑 종단간 암호화(E2EE) 키 관리 취약점 점검
-- [ ] **비밀 키 보관 위치 확인**
+- [  완료 ] **비밀 키 보관 위치 확인**
   - XSS 등 탈취 위험을 막기 위해 키를 `localStorage`나 `Cookie`에 평문으로 보관하지 않고, 메모리(React State 등)에만 보관하고 있는지 점검.
-- [ ] **서버 데이터 전송 검증**
+- [ 완료 ] **서버 데이터 전송 검증**
   - 완벽한 E2EE를 위해 사용자가 입력한 '직접 설정 암호키'가 어떠한 경우에도 서버(Supabase DB)로 전송되지 않는지 네트워크 로그 확인.
-- [ ] **표준 암호화 알고리즘 사용 여부**
+- [ 완료 ] **표준 암호화 알고리즘 사용 여부**
   - 자체 제작한 암호화 공식이 아닌, 검증된 라이브러리(예: `crypto-js`의 AES 알고리즘) 또는 Web Crypto API를 사용 중인지 코드 리뷰.
