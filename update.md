@@ -284,3 +284,7 @@ Solved Password input and reset button synchronization issue
   - 완벽한 E2EE를 위해 사용자가 입력한 '직접 설정 암호키'가 어떠한 경우에도 서버(Supabase DB)로 전송되지 않는지 네트워크 로그 확인.
 - [ 완료 ] **표준 암호화 알고리즘 사용 여부**
   - 자체 제작한 암호화 공식이 아닌, 검증된 라이브러리(예: `crypto-js`의 AES 알고리즘) 또는 Web Crypto API를 사용 중인지 코드 리뷰.
+
+  프로필 설정 모드 개발 및 
+
+  미래 채팅 모드 익명모드 일반모드 구분 개발

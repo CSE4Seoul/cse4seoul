@@ -2,7 +2,8 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { getClanInfo } from '@/utils/clash';
 import Link from 'next/link';
-import { Zap, ChevronLeft } from 'lucide-react';
+import { Zap, ChevronLeft, UserCircle } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -90,31 +91,52 @@ export default async function DashboardPage() {
         {/* 메인 대시보드 그리드 (3열) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* 1. 내 프로필 카드 */}
-          <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-blue-500/30 transition-all duration-300 group shadow-xl">
-            <div className="flex justify-between items-start mb-6">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-xl font-bold shadow-lg">
-                {profile?.full_name ? profile.full_name[0] : 'U'}
-              </div>
-              <span className="text-xs font-mono text-gray-500 border border-gray-800 px-2 py-1 rounded">
-                UID: {user.id.slice(0, 4)}...
-              </span>
-            </div>
+<div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-blue-500/30 transition-all duration-300 group shadow-xl relative">
+  
+  {/* 🔥 개선된 프로필 수정 버튼 (우측 상단 톱니바퀴) */}
+  <Link 
+    href="/profile-setup" 
+    className="absolute top-6 right-6 p-2 bg-gray-800/50 hover:bg-emerald-600/20 text-gray-400 hover:text-emerald-400 rounded-lg transition-colors border border-transparent hover:border-emerald-500/30"
+    title="프로필 설정"
+  >
+    <Settings className="w-5 h-5" />
+  </Link>
 
-            <h3 className="text-gray-500 text-xs font-bold tracking-wider mb-1">OPERATOR IDENTITY</h3>
-            <div className="text-2xl font-bold text-white mb-1">{profile?.full_name || 'Unknown Agent'}</div>
-            <div className="text-blue-400 text-sm font-medium mb-4">{profile?.role || 'Member'}</div>
+  {/* 아바타 & UID 영역 */}
+  <div className="flex items-center gap-4 mb-6">
+    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-2xl font-bold shadow-lg text-white">
+      {profile?.full_name ? profile.full_name[0].toUpperCase() : 'U'}
+    </div>
+    <div className="flex flex-col">
+      <span className="text-xs font-mono text-gray-500 bg-black/40 px-2 py-1 rounded border border-gray-800 w-fit">
+        UID: {user?.id ? `${user.id.slice(0, 8)}...` : 'Loading...'}
+      </span>
+    </div>
+  </div>
 
-            <div className="space-y-2 pt-4 border-t border-gray-800">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">University</span>
-                <span className="text-gray-300">{profile?.university || 'Not Set'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Email</span>
-                <span className="text-gray-300">{user.email}</span>
-              </div>
-            </div>
-          </div>
+  <h3 className="text-gray-500 text-xs font-bold tracking-wider mb-1">OPERATOR IDENTITY</h3>
+  <div className="text-2xl font-bold text-white mb-1">{profile?.full_name || 'Unknown Agent'}</div>
+  <div className="text-blue-400 text-sm font-medium mb-6">{profile?.role || 'No Role Assigned'}</div>
+
+  {/* 하단 상세 정보 리스트 */}
+  <div className="space-y-3 pt-4 border-t border-gray-800/50">
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-gray-500">University</span>
+      <span className="text-gray-300">{profile?.university || '-'}</span>
+    </div>
+    <div className="flex justify-between items-center text-sm">
+      <span className="text-gray-500">Email</span>
+      <span className="text-gray-300">{profile?.email || '-'}</span>
+    </div>
+    {/* Clash Royale Tag 영역 (있을 때만 보여주기) */}
+    {profile?.clash_royale_tag && (
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-gray-500">CR Tag</span>
+        <span className="text-yellow-400 font-mono">{profile.clash_royale_tag}</span>
+      </div>
+    )}
+  </div>
+</div>
 
           {/* 2. 클랜 상태 카드 */}
           <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 p-8 rounded-2xl hover:border-purple-500/30 transition-all duration-300 group shadow-xl">
