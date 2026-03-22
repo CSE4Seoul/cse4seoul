@@ -94,10 +94,12 @@ export default function Home() {
             우리들의 공간
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 md:text-xl">
-            암호화된 채팅과 게시판으로 안전하게 소통해요.
-            <br />
-            클랜원이라면 누구나 참여할 수 있습니다.
-          </p>
+  Computer Science &amp;&amp; Engineering for Seoul (CSE4Seoul) 커뮤니티는{' '}
+  <span className="font-semibold text-cyan-300"><br />클래시로얄 클랜</span>을
+  기반으로 한 개발자 &amp; 게이머 그룹입니다.
+  <br />
+  사이트 내에 구현된 암호화된 채팅과 게시판으로 안전하게 소통하며, <br />회원가입한 구성원이라면 누구나 참여할 수 있습니다.
+</p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             {/* 로그인 안 된 유저를 무조건 로그인 창으로! */}
             <Link
@@ -195,21 +197,31 @@ export default function Home() {
 
         {/* 설립자 정보 */}
         <motion.div
-          variants={fadeInUp}
-          className="mt-20 text-center text-sm text-gray-500 pb-10"
-        >
-          <p>
-            Founder: 조하민 (Developer) · {' '}
-            <a
-              href="https://hamin-portfolio.vercel.app/"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
-            >
-              포트폴리오 방문하기 ↗
-            </a>
-          </p>
-        </motion.div>
+  variants={fadeInUp}
+  className="mt-20 text-center text-sm text-gray-500 pb-10"
+>
+  <p>
+    Founder: 조하민 (Developer) ·{' '}
+    <a
+      href="https://hamin-portfolio.vercel.app/"
+      target="_blank"
+      rel="noreferrer"
+      className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
+    >
+      포트폴리오 방문하기 ↗
+    </a>
+  </p>
+  <p className="mt-2">
+    <a
+      href="https://royaleapi.com/clan/RRG9U0C9"
+      target="_blank"
+      rel="noreferrer"
+      className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
+    >
+      Clash Royale - CSE4seoul(Royaleapi) ↗
+    </a>
+  </p>
+</motion.div>
       </motion.div>
     </main>
   );
