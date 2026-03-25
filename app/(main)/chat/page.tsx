@@ -3,11 +3,8 @@
 import { useEffect, useState, useRef, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock } from 'lucide-react';
+import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wifi, AlertCircle, KeyRound, Lock, Unlock, Users } from 'lucide-react'; // Users 아이콘 추가
 
-
-
-// 🔥 방금 만든 유틸 파일에서 암호화/복호화 함수를 불러옵니다!
 import { encryptMessage, decryptMessage } from '@/utils/encryption';
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -65,7 +62,6 @@ const containsSensitivePattern = (message: string) => {
 };
 
 const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
-  // ✨ 성능 고정 1: SystemStatus 내부의 클라이언트도 재생성 방지
   const [supabase] = useState(() => createClient());
   const [serverLatency, setServerLatency] = useState(0);
   const [bandwidth, setBandwidth] = useState('안정적');
@@ -171,13 +167,13 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
 export default function ChatPage() {
   const router = useRouter();
   
-  // ✨ 성능 고정 2: 타이핑할 때마다 통신망 끊기는 현상 원천 차단!
   const [supabase] = useState(() => createClient());
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [userAgentName, setUserAgentName] = useState<string>('');
+  const [realName, setRealName] = useState<string>(''); // 실제 이름 (프로필)
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -187,6 +183,9 @@ export default function ChatPage() {
   const [isJoined, setIsJoined] = useState<boolean>(false);
   
   const isPublicMode = activeKey === DEFAULT_KEY;
+
+  // 닉네임 모드 (true: 실제 이름, false: 익명 요원명)
+  const [isNicknameMode, setIsNicknameMode] = useState<boolean>(false);
 
   const handleJoin = (e: FormEvent) => {
     e.preventDefault();
@@ -202,6 +201,22 @@ export default function ChatPage() {
     if (!isJoined || !activeKey) return;
 
     setUserAgentName(generateAgentName());
+
+    // 프로필에서 실제 이름 가져오기
+    const fetchRealName = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        if (profile?.full_name) {
+          setRealName(profile.full_name);
+        }
+      }
+    };
+    fetchRealName();
 
     const loadMessages = async () => {
       try {
@@ -228,7 +243,6 @@ export default function ChatPage() {
 
     loadMessages();
 
-    // 이제 타이핑을 해도 이 통신망은 절대 끊어지지 않습니다.
     const channel = supabase
       .channel('realtime:messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -288,14 +302,16 @@ export default function ChatPage() {
 
       const encrypted = await encryptMessage(sanitized, activeKey);
       const expiresAt = new Date();
-      
-expiresAt.setDate(expiresAt.getDate() + 7);
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // 🔥 닉네임 모드에 따라 author_name 결정
+      const authorName = isNicknameMode && realName ? realName : userAgentName;
 
       const { error } = await supabase.from('messages').insert({
         content: encrypted,
         author_id: user.id,
-        author_name: userAgentName,
-        is_anonymous: true,
+        author_name: authorName,
+        is_anonymous: true, // 여전히 익명 여부 플래그는 true로 두되, 표시 이름은 author_name으로 결정됨
         expires_at: expiresAt.toISOString(),
         is_deleted: false,
       });
@@ -396,7 +412,7 @@ expiresAt.setDate(expiresAt.getDate() + 7);
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-yellow-400" />
                   <span suppressHydrationWarning className="text-xs font-mono text-yellow-300 truncate max-w-[120px]">
-                    {userAgentName || '요원 배정 중...'}
+                    {isNicknameMode && realName ? realName : userAgentName}
                   </span>
                 </div>
               </div>
@@ -431,7 +447,7 @@ expiresAt.setDate(expiresAt.getDate() + 7);
                   {messages.map((msg) => {
                     if (msg.decryptedContent === null) return null;
 
-                    const isCurrentUser = msg.author_name === userAgentName;
+                    const isCurrentUser = msg.author_name === (isNicknameMode && realName ? realName : userAgentName);
                     return (
                       <div key={msg.id} className={`flex flex-col gap-1.5 ${isCurrentUser ? 'items-end' : 'items-start'}`}>
                         <div className="flex items-center gap-2">
@@ -441,7 +457,7 @@ expiresAt.setDate(expiresAt.getDate() + 7);
                             </div>
                           )}
                           <span className={`text-xs font-bold ${isCurrentUser ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                            {msg.is_anonymous ? msg.author_name : `${msg.author_name}`}
+                            {msg.author_name}
                           </span>
                           <span className="text-[10px] text-gray-500 flex items-center gap-1">
                             <Clock className="w-2.5 h-2.5" />
@@ -500,8 +516,29 @@ expiresAt.setDate(expiresAt.getDate() + 7);
                       {isPublicMode ? '공개망 접속 중' : '비밀망 접속 중'}
                     </span>
                   </div>
+                  {/* 🔥 닉네임 모드 토글 버튼 */}
+                  <button
+                    type="button"
+                    onClick={() => setIsNicknameMode(prev => !prev)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                      isNicknameMode 
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' 
+                        : 'bg-gray-800/50 text-gray-400 hover:text-gray-300 border border-gray-700'
+                    }`}
+                  >
+                    <Users className="w-3 h-3" />
+                    {isNicknameMode ? '닉네임 모드' : '익명 모드'}
+                  </button>
                 </div>
-                <button type="button" onClick={() => setUserAgentName(generateAgentName())} className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                {/* 🔥 요원명 변경 버튼 (익명 모드에서만 활성화) */}
+                <button
+                  type="button"
+                  onClick={() => setUserAgentName(generateAgentName())}
+                  disabled={isNicknameMode}
+                  className={`text-xs flex items-center gap-1 transition-colors ${
+                    isNicknameMode ? 'text-gray-600 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300'
+                  }`}
+                >
                   <Bot className="w-3 h-3" /> 요원명 변경
                 </button>
               </div>
