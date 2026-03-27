@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, Variants } from 'framer-motion';
+import { motion, Variants, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import { 
@@ -9,7 +9,9 @@ import {
   RiFileList3Line, 
   RiGroupLine, 
   RiLock2Line,
-  RiFlashlightLine 
+  RiFlashlightLine,
+  RiInformationLine,
+  RiCloseLine
 } from 'react-icons/ri';
 
 // DB에서 가져올 게시글 타입 정의
@@ -23,6 +25,7 @@ interface Post {
 export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false); // 팝업 상태
   const supabase = createClient();
 
   const fadeInUp: Variants = {
@@ -71,6 +74,9 @@ export default function Home() {
     fetchRecentPosts();
   }, []);
 
+  // 팝업 닫기 함수
+  const closeModal = () => setIsModalOpen(false);
+
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-black px-4 text-white">
       {/* 배경 그라디언트 & 그리드 */}
@@ -94,12 +100,12 @@ export default function Home() {
             우리들의 공간
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 md:text-xl">
-  Computer Science &amp;&amp; Engineering for Seoul (CSE4Seoul) 커뮤니티는{' '}
-  <span className="font-semibold text-cyan-300"><br />클래시로얄 클랜</span>을
-  기반으로 한 개발자 &amp; 게이머 그룹입니다.
-  <br />
-  사이트 내에 구현된 암호화된 채팅과 게시판으로 안전하게 소통하며, <br />회원가입한 구성원이라면 누구나 참여할 수 있습니다.
-</p>
+            Computer Science &amp;&amp; Engineering for Seoul (CSE4Seoul) 커뮤니티는{' '}
+            <span className="font-semibold text-cyan-300"><br />클래시로얄 클랜</span>을
+            기반으로 한 개발자 &amp; 게이머 그룹입니다.
+            <br />
+            사이트 내에 구현된 암호화된 채팅과 게시판으로 안전하게 소통하며, <br />회원가입한 구성원이라면 누구나 참여할 수 있습니다.
+          </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             {/* 로그인 안 된 유저를 무조건 로그인 창으로! */}
             <Link
@@ -108,6 +114,14 @@ export default function Home() {
             >
               시스템 접속하기
             </Link>
+            {/* 🔥 추가: 기능 소개 팝업 열기 버튼 */}
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-4 font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+            >
+              <RiInformationLine className="text-xl" />
+              자세한 기능 소개
+            </button>
           </div>
         </motion.div>
 
@@ -197,32 +211,128 @@ export default function Home() {
 
         {/* 설립자 정보 */}
         <motion.div
-  variants={fadeInUp}
-  className="mt-20 text-center text-sm text-gray-500 pb-10"
->
-  <p>
-    Founder: 조하민 (Developer) ·{' '}
-    <a
-      href="https://hamin-portfolio.vercel.app/"
-      target="_blank"
-      rel="noreferrer"
-      className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
-    >
-      포트폴리오 방문하기 ↗
-    </a>
-  </p>
-  <p className="mt-2">
-    <a
-      href="https://royaleapi.com/clan/RRG9U0C9"
-      target="_blank"
-      rel="noreferrer"
-      className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
-    >
-      Clash Royale - CSE4seoul(Royaleapi) ↗
-    </a>
-  </p>
-</motion.div>
+          variants={fadeInUp}
+          className="mt-20 text-center text-sm text-gray-500 pb-10"
+        >
+          <p>
+            Founder: 조하민 (Developer) ·{' '}
+            <a
+              href="https://hamin-portfolio.vercel.app/"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
+            >
+              포트폴리오 방문하기 ↗
+            </a>
+          </p>
+          <p className="mt-2">
+            <a
+              href="https://royaleapi.com/clan/RRG9U0C9"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
+            >
+              Clash Royale - CSE4seoul(Royaleapi) ↗
+            </a>
+          </p>
+        </motion.div>
       </motion.div>
+
+      {/* 🔥 기능 소개 팝업 모달 */}
+      <AnimatePresence>
+  {isModalOpen && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={closeModal}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-w-2xl w-full bg-gradient-to-b from-gray-900 to-black border border-gray-700 rounded-2xl shadow-2xl p-6 md:p-8"
+      >
+        {/* 닫기 버튼 */}
+        <button
+          onClick={closeModal}
+          className="absolute right-4 top-4 p-1 rounded-full hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+        >
+          <RiCloseLine className="text-2xl" />
+        </button>
+
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-6">
+          ✨ CSE4Seoul 주요 기능
+        </h2>
+
+        <div className="space-y-6">
+          {/* 채팅 기능 상세 */}
+          <div className="border-l-4 border-cyan-500 pl-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <RiChat3Line className="text-cyan-400" /> 암호화 채팅
+            </h3>
+            <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+              <li>• <strong className="text-cyan-300">AES-256 암호화</strong>로 모든 메시지를 안전하게 보호합니다.</li>
+              <li>• 사용자가 입력한 <strong className="text-cyan-300">비밀키(암호)</strong>를 암·복호화 키로 사용합니다.</li>
+              <li>• 같은 암호를 입력한 사용자끼리만 메시지를 볼 수 있습니다.</li>
+              <li>• 메시지는 <strong className="text-cyan-300">24시간 후 자동 삭제</strong>되어 보안성을 높입니다.</li>
+              <li>• 익명 모드와 닉네임 모드를 자유롭게 전환할 수 있습니다.</li>
+            </ul>
+          </div>
+
+          {/* 게시판 기능 상세 */}
+          <div className="border-l-4 border-violet-500 pl-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <RiFileList3Line className="text-violet-400" /> 게시판
+            </h3>
+            <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+              <li>• 프로젝트 모집, 기술 공유, 자유 주제 등 다양한 글을 작성할 수 있습니다.</li>
+              <li>• 실시간으로 게시글이 업데이트되며, 댓글 기능을 통해 소통할 수 있습니다.</li>
+              <li>• 최신 글은 메인 화면에서 바로 확인 가능합니다.</li>
+            </ul>
+          </div>
+
+          {/* 추가 보안 정보 */}
+          <div className="border-l-4 border-pink-500 pl-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <RiLock2Line className="text-pink-400" /> 보안 및 익명성
+            </h3>
+            <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+              <li>• 채팅 메시지는 데이터베이스에 암호화된 상태로 저장됩니다.</li>
+              <li>• 24시간이 지나면 메시지는 완전히 삭제되어 흔적이 남지 않습니다.</li>
+              <li>• 사용자는 원할 때 익명 모드로 전환해 실제 이름을 숨길 수 있습니다.</li>
+            </ul>
+          </div>
+
+          {/* 🔥 새로 추가: 가입 및 문의 안내 */}
+          <div className="border-l-4 border-yellow-500 pl-4">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <RiGroupLine className="text-yellow-400" /> 가입 및 문의
+            </h3>
+            <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+              <li>• <strong className="text-yellow-300">이메일 인증</strong>을 통해 회원가입할 수 있습니다. (Supabase Auth 사용)</li>
+              <li>• 비밀번호는 안전하게 암호화되어 저장되며, <strong className="text-yellow-300">다른 사이트와 동일한 비밀번호를 사용하지 않는 것을 권장</strong>합니다.</li>
+              <li>• 클랜원이 아니더라도 누구나 가입할 수 있습니다.</li>
+              <li>• 클랜에 관한 문의가 필요하다면, 로그인 후 <strong className="text-yellow-300">암호 없이 접속하는 기본 채팅</strong>에서 메시지를 남겨주세요. (기본 채팅은 누구나 볼 수 있는 공개 공간입니다)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <button
+            onClick={closeModal}
+            className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl text-white hover:from-gray-600 hover:to-gray-700 transition-colors"
+          >
+            닫기
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
     </main>
   );
 }
