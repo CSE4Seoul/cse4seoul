@@ -59,6 +59,13 @@ export default function Home() {
   const [isLobbyLoading, setIsLobbyLoading] = useState(true);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [nickname, setNickname] = useState(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('lobby_nickname');
+    return saved && saved.trim() ? saved.trim() : '익명의 요원';
+  }
+  return '익명의 요원';
+});
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 30 },
@@ -68,6 +75,20 @@ export default function Home() {
   const stagger: Variants = {
     visible: { transition: { staggerChildren: 0.15 } },
   };
+
+  // 닉네임 변경 함수
+const changeNickname = () => {
+  const newName = prompt('새 닉네임을 입력하세요 (최대 20자)', nickname);
+  if (newName && newName.trim()) {
+    const trimmed = newName.trim().slice(0, 20);
+    setNickname(trimmed);
+    localStorage.setItem('lobby_nickname', trimmed);
+  } else if (newName === '') {
+    // 빈 문자열이면 기본값으로
+    setNickname('익명의 요원');
+    localStorage.setItem('lobby_nickname', '익명의 요원');
+  }
+};
 
   // 시간 표시 함수
   const timeAgo = (dateString: string) => {
@@ -162,36 +183,36 @@ export default function Home() {
 
   // 로비 메시지 전송 (필터링 적용)
   const sendLobbyMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = lobbyMessageText.trim();
-    if (!trimmed || isLobbySending) return;
+  e.preventDefault();
+  const trimmed = lobbyMessageText.trim();
+  if (!trimmed || isLobbySending) return;
 
-    // 필터링 체크
-    if (containsBadWord(trimmed)) {
-      setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
-      return;
-    }
+  // 필터링 체크 (기존 코드와 동일)
+  if (containsBadWord(trimmed)) {
+    setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
+    return;
+  }
 
-    setIsLobbySending(true);
-    try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1); // 24시간 후
+  setIsLobbySending(true);
+  try {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1);
 
-      const { error } = await supabase.from('lobby_messages').insert({
-        content: trimmed,
-        author_name: '익명의 요원',
-        expires_at: expiresAt.toISOString(),
-      });
+    const { error } = await supabase.from('lobby_messages').insert({
+      content: trimmed,
+      author_name: nickname,  // ✅ 저장된 닉네임 사용
+      expires_at: expiresAt.toISOString(),
+    });
 
-      if (error) throw error;
-      setLobbyMessageText('');
-    } catch (err) {
-      console.error('로비 메시지 전송 실패:', err);
-      alert('메시지 전송에 실패했습니다.');
-    } finally {
-      setIsLobbySending(false);
-    }
-  };
+    if (error) throw error;
+    setLobbyMessageText('');
+  } catch (err) {
+    console.error('로비 메시지 전송 실패:', err);
+    alert('메시지 전송에 실패했습니다.');
+  } finally {
+    setIsLobbySending(false);
+  }
+};
 
   const closeModal = () => setIsModalOpen(false);
 
@@ -326,18 +347,31 @@ export default function Home() {
         </motion.div>
 
         {/* 🔥 로비 채팅 (익명 공개 채팅) */}
-       {/* 🔥 로비 채팅 (익명 공개 채팅) - UI 개선 */}
 <motion.div variants={fadeInUp} className="mt-24">
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-2xl font-bold flex items-center gap-2">
+  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <div className="flex items-center gap-2">
       <RiChat3Line className="text-cyan-400" />
-      실시간 로비 채팅
+      <h2 className="text-2xl font-bold">실시간 로비 채팅</h2>
       <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">익명</span>
-    </h2>
-    <span className="text-xs text-gray-500 flex items-center gap-1">
-      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-      LIVE
-    </span>
+    </div>
+    <div className="flex items-center gap-2">
+      {/* 현재 닉네임 표시 */}
+      <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
+        <span className="text-gray-400">👤</span>
+        <span className="text-cyan-300 font-mono">{nickname}</span>
+        <button
+          onClick={changeNickname}
+          className="ml-1 text-gray-500 hover:text-cyan-400 transition-colors"
+          title="닉네임 변경"
+        >
+          ✏️
+        </button>
+      </div>
+      <span className="text-xs text-gray-500 flex items-center gap-1">
+        <span className="w-2 h-2 bg-green-500 rounded-full aㅎnimate-pulse"></span>
+        LIVE
+      </span>
+    </div>
   </div>
 
   <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-gray-900/50 to-black/50 backdrop-blur-sm overflow-hidden shadow-xl">
