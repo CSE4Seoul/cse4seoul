@@ -4,6 +4,7 @@ import { getClanInfo } from '@/utils/clash';
 import Link from 'next/link';
 import { Zap, ChevronLeft, UserCircle } from 'lucide-react';
 import { Settings } from 'lucide-react';
+import LobbyChatWidget from '@/components/LobbyChatWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -233,6 +234,10 @@ export default async function DashboardPage() {
             </div>
           </Link>
         </div>
+
+        <div className="mt-8">
+  <LobbyChatWidget />
+</div>
 
         {/* 멤버 목록 테이블 */}
         <div className="mt-8 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
