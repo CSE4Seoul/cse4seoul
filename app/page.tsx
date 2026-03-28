@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, Variants, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
@@ -11,10 +11,9 @@ import {
   RiLock2Line,
   RiFlashlightLine,
   RiInformationLine,
-  RiCloseLine,
-  RiSendPlaneLine,
-  RiAlertLine
+  RiCloseLine
 } from 'react-icons/ri';
+import LobbyChatWidget from '@/components/LobbyChatWidget'; // 🔥 컴포넌트 임포트
 
 // DB에서 가져올 게시글 타입 정의
 interface Post {
@@ -24,48 +23,11 @@ interface Post {
   created_at: string;
 }
 
-// 로비 채팅 메시지 타입
-interface LobbyMessage {
-  id: string;
-  content: string;
-  author_name: string;
-  created_at: string;
-  expires_at: string;
-}
-
-// 비속어 필터링용 금칙어 목록
-const BANNED_WORDS = [
-  '시발', '씨발', '개새끼', '병신', '미친', 'ㅅㅂ', 'ㅄ', 'ㅂㅅ',
-  'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'nigger',
-  // 필요에 따라 추가
-];
-
-// 필터링 함수: 텍스트에 금칙어가 포함되어 있으면 true 반환
-const containsBadWord = (text: string): boolean => {
-  const lowerText = text.toLowerCase();
-  return BANNED_WORDS.some(word => lowerText.includes(word.toLowerCase()));
-};
-
 export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const supabase = createClient();
-
-  // 로비 채팅 상태
-  const [lobbyMessages, setLobbyMessages] = useState<LobbyMessage[]>([]);
-  const [lobbyMessageText, setLobbyMessageText] = useState('');
-  const [isLobbySending, setIsLobbySending] = useState(false);
-  const [isLobbyLoading, setIsLobbyLoading] = useState(true);
-  const [filterWarning, setFilterWarning] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [nickname, setNickname] = useState(() => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('lobby_nickname');
-    return saved && saved.trim() ? saved.trim() : '익명의 요원';
-  }
-  return '익명의 요원';
-});
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 30 },
@@ -75,20 +37,6 @@ export default function Home() {
   const stagger: Variants = {
     visible: { transition: { staggerChildren: 0.15 } },
   };
-
-  // 닉네임 변경 함수
-const changeNickname = () => {
-  const newName = prompt('새 닉네임을 입력하세요 (최대 20자)', nickname);
-  if (newName && newName.trim()) {
-    const trimmed = newName.trim().slice(0, 20);
-    setNickname(trimmed);
-    localStorage.setItem('lobby_nickname', trimmed);
-  } else if (newName === '') {
-    // 빈 문자열이면 기본값으로
-    setNickname('익명의 요원');
-    localStorage.setItem('lobby_nickname', '익명의 요원');
-  }
-};
 
   // 시간 표시 함수
   const timeAgo = (dateString: string) => {
@@ -126,93 +74,6 @@ const changeNickname = () => {
 
     fetchRecentPosts();
   }, []);
-
-  // 로비 채팅 메시지 로드 및 실시간 구독
-  useEffect(() => {
-    const loadLobbyMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .select('*')
-          .gte('expires_at', new Date().toISOString()) // 만료되지 않은 메시지만
-          .order('created_at', { ascending: true }) // 오름차순(오래된 순)
-          .limit(50);
-
-        if (error) throw error;
-        setLobbyMessages(data || []);
-      } catch (err) {
-        console.error('로비 채팅 로드 실패:', err);
-      } finally {
-        setIsLobbyLoading(false);
-      }
-    };
-
-    loadLobbyMessages();
-
-    // Realtime 구독
-    const subscription = supabase
-      .channel('lobby-changes')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, 
-        (payload) => {
-          const newMsg = payload.new as LobbyMessage;
-          // 만료된 메시지는 무시
-          if (newMsg.expires_at && new Date(newMsg.expires_at) < new Date()) return;
-          setLobbyMessages(prev => [...prev, newMsg]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [supabase]);
-
-  // 스크롤 자동 이동
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [lobbyMessages]);
-
-  // 필터링 경고 자동 사라짐
-  useEffect(() => {
-    if (filterWarning) {
-      const timer = setTimeout(() => setFilterWarning(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [filterWarning]);
-
-  // 로비 메시지 전송 (필터링 적용)
-  const sendLobbyMessage = async (e: FormEvent) => {
-  e.preventDefault();
-  const trimmed = lobbyMessageText.trim();
-  if (!trimmed || isLobbySending) return;
-
-  // 필터링 체크 (기존 코드와 동일)
-  if (containsBadWord(trimmed)) {
-    setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
-    return;
-  }
-
-  setIsLobbySending(true);
-  try {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
-
-    const { error } = await supabase.from('lobby_messages').insert({
-      content: trimmed,
-      author_name: nickname,  // ✅ 저장된 닉네임 사용
-      expires_at: expiresAt.toISOString(),
-    });
-
-    if (error) throw error;
-    setLobbyMessageText('');
-  } catch (err) {
-    console.error('로비 메시지 전송 실패:', err);
-    alert('메시지 전송에 실패했습니다.');
-  } finally {
-    setIsLobbySending(false);
-  }
-};
 
   const closeModal = () => setIsModalOpen(false);
 
@@ -346,112 +207,11 @@ const changeNickname = () => {
           </div>
         </motion.div>
 
-        {/* 🔥 로비 채팅 (익명 공개 채팅) */}
-<motion.div variants={fadeInUp} className="mt-24">
-  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-    <div className="flex items-center gap-2">
-      <RiChat3Line className="text-cyan-400" />
-      <h2 className="text-2xl font-bold">실시간 로비 채팅</h2>
-      <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">익명</span>
-    </div>
-    <div className="flex items-center gap-2">
-      {/* 현재 닉네임 표시 */}
-      <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
-        <span className="text-gray-400">👤</span>
-        <span className="text-cyan-300 font-mono">{nickname}</span>
-        <button
-          onClick={changeNickname}
-          className="ml-1 text-gray-500 hover:text-cyan-400 transition-colors"
-          title="닉네임 변경"
-        >
-          ✏️
-        </button>
-      </div>
-      <span className="text-xs text-gray-500 flex items-center gap-1">
-        <span className="w-2 h-2 bg-green-500 rounded-full aㅎnimate-pulse"></span>
-        LIVE
-      </span>
-    </div>
-  </div>
+        {/* 🔥 로비 채팅 위젯 (임포트된 컴포넌트 사용) */}
+        <motion.div variants={fadeInUp} className="mt-24">
+          <LobbyChatWidget />
+        </motion.div>
 
-  <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-gray-900/50 to-black/50 backdrop-blur-sm overflow-hidden shadow-xl">
-    {/* 메시지 영역 */}
-    <div className="h-96 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-      {isLobbyLoading ? (
-        <div className="flex justify-center items-center h-full text-gray-400">
-          <div className="animate-pulse">메시지 로딩 중...</div>
-        </div>
-      ) : lobbyMessages.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-2">
-          <RiChat3Line className="text-4xl opacity-30" />
-          <p className="text-sm">아직 메시지가 없습니다. 첫 메시지를 남겨보세요!</p>
-        </div>
-      ) : (
-        lobbyMessages.map((msg) => (
-          <div key={msg.id} className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
-            <div className="flex-shrink-0 mt-1">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/50 flex items-center justify-center">
-                <span className="text-xs font-bold text-cyan-300">?</span>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-cyan-300">
-                  {msg.author_name}
-                </span>
-                <span className="text-[10px] text-gray-500">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">
-                {msg.content}
-              </p>
-            </div>
-          </div>
-        ))
-      )}
-      <div ref={messagesEndRef} />
-    </div>
-
-    {/* 입력 영역 */}
-    <form onSubmit={sendLobbyMessage} className="border-t border-white/10 p-4 bg-black/30">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={lobbyMessageText}
-          onChange={(e) => setLobbyMessageText(e.target.value)}
-          placeholder="익명으로 메시지 보내기..."
-          className="flex-1 bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
-          disabled={isLobbySending}
-        />
-        <button
-          type="submit"
-          disabled={isLobbySending || !lobbyMessageText.trim()}
-          className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
-        >
-          <RiSendPlaneLine className="text-white w-5 h-5" />
-        </button>
-      </div>
-
-      {/* 필터 경고 */}
-      {filterWarning && (
-        <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800/30 rounded-lg px-3 py-1.5">
-          <RiAlertLine className="w-3.5 h-3.5" />
-          {filterWarning}
-        </div>
-      )}
-
-      <div className="flex justify-between items-center mt-2 px-1">
-        <p className="text-[10px] text-gray-500">
-          ⚡ 모든 메시지는 24시간 후 자동 삭제됩니다.
-        </p>
-        <p className="text-[10px] text-gray-600">
-          #{lobbyMessages.length} messages
-        </p>
-      </div>
-    </form>
-  </div>
-</motion.div>
         {/* 설립자 정보 */}
         <motion.div
           variants={fadeInUp}
@@ -530,18 +290,18 @@ const changeNickname = () => {
                   </div>
 
                   {/* 로비 채팅 기능 상세 */}
-<div className="border-l-4 border-green-500 pl-4">
-  <h3 className="text-xl font-semibold flex items-center gap-2">
-    <RiChat3Line className="text-green-400" /> 익명 로비 채팅
-  </h3>
-  <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-    <li>• 로그인 없이 누구나 참여할 수 있는 <strong className="text-green-300">공개 채팅 공간</strong>입니다.</li>
-    <li>• 닉네임을 설정하여 대화할 수 있으며, 설정하지 않으면 <strong className="text-green-300">'익명의 요원'</strong>으로 표시됩니다.</li>
-    <li>• 메시지는 <strong className="text-green-300">24시간 후 자동 삭제</strong>되어 프라이버시를 보호합니다.</li>
-    <li>• 부적절한 표현은 자동 필터링되어 전송이 차단됩니다.</li>
-    <li>• 메인 화면에서 바로 실시간 대화를 즐길 수 있습니다.</li>
-  </ul>
-</div>
+                  <div className="border-l-4 border-green-500 pl-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <RiChat3Line className="text-green-400" /> 익명 로비 채팅
+                    </h3>
+                    <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+                      <li>• 로그인 없이 누구나 참여할 수 있는 <strong className="text-green-300">공개 채팅 공간</strong>입니다.</li>
+                      <li>• 닉네임을 설정하여 대화할 수 있으며, 설정하지 않으면 <strong className="text-green-300">'익명의 요원'</strong>으로 표시됩니다.</li>
+                      <li>• 메시지는 <strong className="text-green-300">24시간 후 자동 삭제</strong>되어 프라이버시를 보호합니다.</li>
+                      <li>• 부적절한 표현은 자동 필터링되어 전송이 차단됩니다.</li>
+                      <li>• 메인 화면에서 바로 실시간 대화를 즐길 수 있습니다.</li>
+                    </ul>
+                  </div>
 
                   {/* 게시판 기능 상세 */}
                   <div className="border-l-4 border-violet-500 pl-4">
