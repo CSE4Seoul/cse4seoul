@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, Variants, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
@@ -11,22 +11,54 @@ import {
   RiLock2Line,
   RiFlashlightLine,
   RiInformationLine,
-  RiCloseLine
+  RiCloseLine,
+  RiSendPlaneLine,
+  RiAlertLine
 } from 'react-icons/ri';
 
 // DB에서 가져올 게시글 타입 정의
 interface Post {
   id: string | number;
   title: string;
-  author_name: string; // DB 컬럼명에 따라 수정 필요
+  author_name: string;
   created_at: string;
 }
+
+// 로비 채팅 메시지 타입
+interface LobbyMessage {
+  id: string;
+  content: string;
+  author_name: string;
+  created_at: string;
+  expires_at: string;
+}
+
+// 비속어 필터링용 금칙어 목록
+const BANNED_WORDS = [
+  '시발', '씨발', '개새끼', '병신', '미친', 'ㅅㅂ', 'ㅄ', 
+  'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'nigger',
+  // 필요에 따라 추가
+];
+
+// 필터링 함수: 텍스트에 금칙어가 포함되어 있으면 true 반환
+const containsBadWord = (text: string): boolean => {
+  const lowerText = text.toLowerCase();
+  return BANNED_WORDS.some(word => lowerText.includes(word.toLowerCase()));
+};
 
 export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false); // 팝업 상태
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const supabase = createClient();
+
+  // 로비 채팅 상태
+  const [lobbyMessages, setLobbyMessages] = useState<LobbyMessage[]>([]);
+  const [lobbyMessageText, setLobbyMessageText] = useState('');
+  const [isLobbySending, setIsLobbySending] = useState(false);
+  const [isLobbyLoading, setIsLobbyLoading] = useState(true);
+  const [filterWarning, setFilterWarning] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 30 },
@@ -37,7 +69,7 @@ export default function Home() {
     visible: { transition: { staggerChildren: 0.15 } },
   };
 
-  // 1. 작성 시간을 'N시간 전', '어제' 형태로 예쁘게 바꿔주는 마법의 함수!
+  // 시간 표시 함수
   const timeAgo = (dateString: string) => {
     const now = new Date();
     const past = new Date(dateString);
@@ -52,12 +84,12 @@ export default function Home() {
     return `${diffDays}일 전`;
   };
 
-  // 2. Supabase에서 최신 글 3개 땡겨오기
+  // 최신 게시글 불러오기
   useEffect(() => {
     const fetchRecentPosts = async () => {
       try {
         const { data, error } = await supabase
-          .from('posts') // 🚨 주의: 게시판 테이블 이름('posts'나 'board' 등)으로 꼭 맞춰주세요!
+          .from('posts')
           .select('id, title, author_name, created_at')
           .order('created_at', { ascending: false })
           .limit(3);
@@ -74,7 +106,93 @@ export default function Home() {
     fetchRecentPosts();
   }, []);
 
-  // 팝업 닫기 함수
+  // 로비 채팅 메시지 로드 및 실시간 구독
+  useEffect(() => {
+    const loadLobbyMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lobby_messages')
+          .select('*')
+          .gte('expires_at', new Date().toISOString()) // 만료되지 않은 메시지만
+          .order('created_at', { ascending: true }) // 오름차순(오래된 순)
+          .limit(50);
+
+        if (error) throw error;
+        setLobbyMessages(data || []);
+      } catch (err) {
+        console.error('로비 채팅 로드 실패:', err);
+      } finally {
+        setIsLobbyLoading(false);
+      }
+    };
+
+    loadLobbyMessages();
+
+    // Realtime 구독
+    const subscription = supabase
+      .channel('lobby-changes')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, 
+        (payload) => {
+          const newMsg = payload.new as LobbyMessage;
+          // 만료된 메시지는 무시
+          if (newMsg.expires_at && new Date(newMsg.expires_at) < new Date()) return;
+          setLobbyMessages(prev => [...prev, newMsg]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [supabase]);
+
+  // 스크롤 자동 이동
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [lobbyMessages]);
+
+  // 필터링 경고 자동 사라짐
+  useEffect(() => {
+    if (filterWarning) {
+      const timer = setTimeout(() => setFilterWarning(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [filterWarning]);
+
+  // 로비 메시지 전송 (필터링 적용)
+  const sendLobbyMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = lobbyMessageText.trim();
+    if (!trimmed || isLobbySending) return;
+
+    // 필터링 체크
+    if (containsBadWord(trimmed)) {
+      setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
+      return;
+    }
+
+    setIsLobbySending(true);
+    try {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1); // 24시간 후
+
+      const { error } = await supabase.from('lobby_messages').insert({
+        content: trimmed,
+        author_name: '익명의 요원',
+        expires_at: expiresAt.toISOString(),
+      });
+
+      if (error) throw error;
+      setLobbyMessageText('');
+    } catch (err) {
+      console.error('로비 메시지 전송 실패:', err);
+      alert('메시지 전송에 실패했습니다.');
+    } finally {
+      setIsLobbySending(false);
+    }
+  };
+
   const closeModal = () => setIsModalOpen(false);
 
   return (
@@ -107,14 +225,12 @@ export default function Home() {
             사이트 내에 구현된 암호화된 채팅과 게시판으로 안전하게 소통하며, <br />회원가입한 구성원이라면 누구나 참여할 수 있습니다.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            {/* 로그인 안 된 유저를 무조건 로그인 창으로! */}
             <Link
               href="/login"
               className="rounded-xl bg-white px-8 py-4 font-bold text-black transition-colors hover:bg-gray-200 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
             >
               시스템 접속하기
             </Link>
-            {/* 🔥 추가: 기능 소개 팝업 열기 버튼 */}
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-4 font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
@@ -150,7 +266,7 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* 최근 활동 미리보기 (게시판 DB 연동!) */}
+        {/* 최근 활동 미리보기 (게시판 DB 연동) */}
         <motion.div variants={fadeInUp} className="mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">📢 최근 게시글</h2>
@@ -167,7 +283,7 @@ export default function Home() {
             ) : (
               recentPosts.map((post) => (
                 <Link 
-                  href="/login" // 👈 클릭 시 무조건 로그인 창으로 납치!
+                  href="/login"
                   key={post.id} 
                   className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer"
                 >
@@ -209,6 +325,99 @@ export default function Home() {
           </div>
         </motion.div>
 
+        {/* 🔥 로비 채팅 (익명 공개 채팅) */}
+       {/* 🔥 로비 채팅 (익명 공개 채팅) - UI 개선 */}
+<motion.div variants={fadeInUp} className="mt-24">
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-2xl font-bold flex items-center gap-2">
+      <RiChat3Line className="text-cyan-400" />
+      실시간 로비 채팅
+      <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">익명</span>
+    </h2>
+    <span className="text-xs text-gray-500 flex items-center gap-1">
+      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+      LIVE
+    </span>
+  </div>
+
+  <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-gray-900/50 to-black/50 backdrop-blur-sm overflow-hidden shadow-xl">
+    {/* 메시지 영역 */}
+    <div className="h-96 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+      {isLobbyLoading ? (
+        <div className="flex justify-center items-center h-full text-gray-400">
+          <div className="animate-pulse">메시지 로딩 중...</div>
+        </div>
+      ) : lobbyMessages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-2">
+          <RiChat3Line className="text-4xl opacity-30" />
+          <p className="text-sm">아직 메시지가 없습니다. 첫 메시지를 남겨보세요!</p>
+        </div>
+      ) : (
+        lobbyMessages.map((msg) => (
+          <div key={msg.id} className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
+            <div className="flex-shrink-0 mt-1">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/50 flex items-center justify-center">
+                <span className="text-xs font-bold text-cyan-300">?</span>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-cyan-300">
+                  {msg.author_name}
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">
+                {msg.content}
+              </p>
+            </div>
+          </div>
+        ))
+      )}
+      <div ref={messagesEndRef} />
+    </div>
+
+    {/* 입력 영역 */}
+    <form onSubmit={sendLobbyMessage} className="border-t border-white/10 p-4 bg-black/30">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={lobbyMessageText}
+          onChange={(e) => setLobbyMessageText(e.target.value)}
+          placeholder="익명으로 메시지 보내기..."
+          className="flex-1 bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
+          disabled={isLobbySending}
+        />
+        <button
+          type="submit"
+          disabled={isLobbySending || !lobbyMessageText.trim()}
+          className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
+        >
+          <RiSendPlaneLine className="text-white w-5 h-5" />
+        </button>
+      </div>
+
+      {/* 필터 경고 */}
+      {filterWarning && (
+        <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800/30 rounded-lg px-3 py-1.5">
+          <RiAlertLine className="w-3.5 h-3.5" />
+          {filterWarning}
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mt-2 px-1">
+        <p className="text-[10px] text-gray-500">
+          ⚡ 모든 메시지는 24시간 후 자동 삭제됩니다.
+        </p>
+        <p className="text-[10px] text-gray-600">
+          #{lobbyMessages.length} messages
+        </p>
+      </div>
+    </form>
+  </div>
+</motion.div>
         {/* 설립자 정보 */}
         <motion.div
           variants={fadeInUp}
@@ -238,108 +447,105 @@ export default function Home() {
         </motion.div>
       </motion.div>
 
-      {/* 🔥 기능 소개 팝업 모달 */}
+      {/* 기능 소개 팝업 모달 */}
       <AnimatePresence>
-  {isModalOpen && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={closeModal}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative max-w-2xl w-full bg-gradient-to-b from-gray-900 to-black border border-gray-700 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
-      >
-        {/* 닫기 버튼 (고정 위치) */}
-        <button
-          onClick={closeModal}
-          className="absolute right-4 top-4 z-10 p-1 rounded-full hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
-        >
-          <RiCloseLine className="text-2xl" />
-        </button>
-
-        {/* 스크롤 가능한 콘텐츠 영역 */}
-        <div
-          className="overflow-y-auto overscroll-contain p-6 md:p-8"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-6">
-            ✨ CSE4Seoul 주요 기능
-          </h2>
-
-          <div className="space-y-6">
-            {/* 채팅 기능 상세 */}
-            <div className="border-l-4 border-cyan-500 pl-4">
-              <h3 className="text-xl font-semibold flex items-center gap-2">
-                <RiChat3Line className="text-cyan-400" /> 암호화 채팅
-              </h3>
-              <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                <li>• <strong className="text-cyan-300">AES-256 암호화</strong>로 모든 메시지를 안전하게 보호합니다.</li>
-                <li>• 사용자가 입력한 <strong className="text-cyan-300">비밀키(암호)</strong>를 암·복호화 키로 사용합니다.</li>
-                <li>• 같은 암호를 입력한 사용자끼리만 메시지를 볼 수 있습니다.</li>
-                <li>• 메시지는 <strong className="text-cyan-300">24시간 후 자동 삭제</strong>되어 보안성을 높입니다.</li>
-                <li>• 익명 모드와 닉네임 모드를 자유롭게 전환할 수 있습니다.</li>
-              </ul>
-            </div>
-
-            {/* 게시판 기능 상세 */}
-            <div className="border-l-4 border-violet-500 pl-4">
-              <h3 className="text-xl font-semibold flex items-center gap-2">
-                <RiFileList3Line className="text-violet-400" /> 게시판
-              </h3>
-              <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                <li>• 프로젝트 모집, 기술 공유, 자유 주제 등 다양한 글을 작성할 수 있습니다.</li>
-                <li>• 실시간으로 게시글이 업데이트되며, 댓글 기능을 통해 소통할 수 있습니다.</li>
-                <li>• 최신 글은 메인 화면에서 바로 확인 가능합니다.</li>
-              </ul>
-            </div>
-
-            {/* 추가 보안 정보 */}
-            <div className="border-l-4 border-pink-500 pl-4">
-              <h3 className="text-xl font-semibold flex items-center gap-2">
-                <RiLock2Line className="text-pink-400" /> 보안 및 익명성
-              </h3>
-              <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                <li>• 채팅 메시지는 데이터베이스에 암호화된 상태로 저장됩니다.</li>
-                <li>• 24시간이 지나면 메시지는 완전히 삭제되어 흔적이 남지 않습니다.</li>
-                <li>• 사용자는 원할 때 익명 모드로 전환해 실제 이름을 숨길 수 있습니다.</li>
-              </ul>
-            </div>
-
-            {/* 가입 및 문의 안내 */}
-            <div className="border-l-4 border-yellow-500 pl-4">
-              <h3 className="text-xl font-semibold flex items-center gap-2">
-                <RiGroupLine className="text-yellow-400" /> 가입 및 문의
-              </h3>
-              <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                <li>• <strong className="text-yellow-300">이메일 인증</strong>을 통해 회원가입할 수 있습니다. (Supabase Auth 사용)</li>
-                <li>• 비밀번호는 안전하게 암호화되어 저장되며, <strong className="text-yellow-300">다른 사이트와 동일한 비밀번호를 사용하지 않는 것을 권장</strong>합니다.</li>
-                <li>• 클랜원이 아니더라도 누구나 가입할 수 있습니다.</li>
-                <li>• 클랜에 관한 문의가 필요하다면, 로그인 후 <strong className="text-yellow-300">암호 없이 접속하는 기본 채팅</strong>에서 메시지를 남겨주세요. (기본 채팅은 누구나 볼 수 있는 공개 공간입니다)</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* 닫기 버튼을 콘텐츠 영역 하단에 배치 (선택) */}
-          <div className="mt-8 flex justify-end">
-            <button
-              onClick={closeModal}
-              className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl text-white hover:from-gray-600 hover:to-gray-700 transition-colors"
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeModal}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-2xl w-full bg-gradient-to-b from-gray-900 to-black border border-gray-700 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]"
             >
-              닫기
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+              <button
+                onClick={closeModal}
+                className="absolute right-4 top-4 z-10 p-1 rounded-full hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+              >
+                <RiCloseLine className="text-2xl" />
+              </button>
+
+              <div
+                className="overflow-y-auto overscroll-contain p-6 md:p-8"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-6">
+                  ✨ CSE4Seoul 주요 기능
+                </h2>
+
+                <div className="space-y-6">
+                  {/* 채팅 기능 상세 */}
+                  <div className="border-l-4 border-cyan-500 pl-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <RiChat3Line className="text-cyan-400" /> 암호화 채팅
+                    </h3>
+                    <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+                      <li>• <strong className="text-cyan-300">AES-256 암호화</strong>로 모든 메시지를 안전하게 보호합니다.</li>
+                      <li>• 사용자가 입력한 <strong className="text-cyan-300">비밀키(암호)</strong>를 암·복호화 키로 사용합니다.</li>
+                      <li>• 같은 암호를 입력한 사용자끼리만 메시지를 볼 수 있습니다.</li>
+                      <li>• 메시지는 <strong className="text-cyan-300">24시간 후 자동 삭제</strong>되어 보안성을 높입니다.</li>
+                      <li>• 익명 모드와 닉네임 모드를 자유롭게 전환할 수 있습니다.</li>
+                    </ul>
+                  </div>
+
+                  {/* 게시판 기능 상세 */}
+                  <div className="border-l-4 border-violet-500 pl-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <RiFileList3Line className="text-violet-400" /> 게시판
+                    </h3>
+                    <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+                      <li>• 프로젝트 모집, 기술 공유, 자유 주제 등 다양한 글을 작성할 수 있습니다.</li>
+                      <li>• 실시간으로 게시글이 업데이트되며, 댓글 기능을 통해 소통할 수 있습니다.</li>
+                      <li>• 최신 글은 메인 화면에서 바로 확인 가능합니다.</li>
+                    </ul>
+                  </div>
+
+                  {/* 추가 보안 정보 */}
+                  <div className="border-l-4 border-pink-500 pl-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <RiLock2Line className="text-pink-400" /> 보안 및 익명성
+                    </h3>
+                    <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+                      <li>• 채팅 메시지는 데이터베이스에 암호화된 상태로 저장됩니다.</li>
+                      <li>• 24시간이 지나면 메시지는 완전히 삭제되어 흔적이 남지 않습니다.</li>
+                      <li>• 사용자는 원할 때 익명 모드로 전환해 실제 이름을 숨길 수 있습니다.</li>
+                    </ul>
+                  </div>
+
+                  {/* 가입 및 문의 안내 */}
+                  <div className="border-l-4 border-yellow-500 pl-4">
+                    <h3 className="text-xl font-semibold flex items-center gap-2">
+                      <RiGroupLine className="text-yellow-400" /> 가입 및 문의
+                    </h3>
+                    <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+                      <li>• <strong className="text-yellow-300">이메일 인증</strong>을 통해 회원가입할 수 있습니다. (Supabase Auth 사용)</li>
+                      <li>• 비밀번호는 안전하게 암호화되어 저장되며, <strong className="text-yellow-300">다른 사이트와 동일한 비밀번호를 사용하지 않는 것을 권장</strong>합니다.</li>
+                      <li>• 클랜원이 아니더라도 누구나 가입할 수 있습니다.</li>
+                      <li>• 클랜에 관한 문의가 필요하다면, 로그인 후 <strong className="text-yellow-300">암호 없이 접속하는 기본 채팅</strong>에서 메시지를 남겨주세요. (기본 채팅은 누구나 볼 수 있는 공개 공간입니다)</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-end">
+                  <button
+                    onClick={closeModal}
+                    className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl text-white hover:from-gray-600 hover:to-gray-700 transition-colors"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
