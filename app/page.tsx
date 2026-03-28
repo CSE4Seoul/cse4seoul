@@ -35,7 +35,7 @@ interface LobbyMessage {
 
 // 비속어 필터링용 금칙어 목록
 const BANNED_WORDS = [
-  '시발', '씨발', '개새끼', '병신', '미친', 'ㅅㅂ', 'ㅄ', 
+  '시발', '씨발', '개새끼', '병신', '미친', 'ㅅㅂ', 'ㅄ', 'ㅂㅅ',
   'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'nigger',
   // 필요에 따라 추가
 ];
@@ -528,6 +528,20 @@ const changeNickname = () => {
                       <li>• 익명 모드와 닉네임 모드를 자유롭게 전환할 수 있습니다.</li>
                     </ul>
                   </div>
+
+                  {/* 로비 채팅 기능 상세 */}
+<div className="border-l-4 border-green-500 pl-4">
+  <h3 className="text-xl font-semibold flex items-center gap-2">
+    <RiChat3Line className="text-green-400" /> 익명 로비 채팅
+  </h3>
+  <ul className="mt-2 space-y-2 text-gray-300 text-sm">
+    <li>• 로그인 없이 누구나 참여할 수 있는 <strong className="text-green-300">공개 채팅 공간</strong>입니다.</li>
+    <li>• 닉네임을 설정하여 대화할 수 있으며, 설정하지 않으면 <strong className="text-green-300">'익명의 요원'</strong>으로 표시됩니다.</li>
+    <li>• 메시지는 <strong className="text-green-300">24시간 후 자동 삭제</strong>되어 프라이버시를 보호합니다.</li>
+    <li>• 부적절한 표현은 자동 필터링되어 전송이 차단됩니다.</li>
+    <li>• 메인 화면에서 바로 실시간 대화를 즐길 수 있습니다.</li>
+  </ul>
+</div>
 
                   {/* 게시판 기능 상세 */}
                   <div className="border-l-4 border-violet-500 pl-4">
