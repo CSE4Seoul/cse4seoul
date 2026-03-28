@@ -155,7 +155,7 @@ export default function LobbyChatWidget() {
           .select('*')
           .gte('expires_at', new Date().toISOString())
           .order('created_at', { ascending: true })
-          .limit(50);
+          .limit(100);
 
         if (error) throw error;
         setMessages(data || []);
