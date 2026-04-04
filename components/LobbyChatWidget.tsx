@@ -3,11 +3,8 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { 
-  RiChat3Line, 
-  RiSendPlaneLine, 
-  RiAlertLine, 
-  RiUserLine, 
-  RiEyeOffLine   // 익명 모드용 아이콘으로 대체
+  RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
+  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine
 } from 'react-icons/ri';
 
 interface LobbyMessage {
@@ -18,14 +15,48 @@ interface LobbyMessage {
   expires_at: string;
 }
 
+// 게임 브로드캐스트 페이로드 타입
+type GameStartPayload = { starter: string; startWord: string };
+type GameJoinPayload = { player: string };
+type GameLeavePayload = { player: string };
+type GameWordPayload = { player: string; word: string; success: boolean; reason?: string };
+type GameEndPayload = { reason: string };
+
 const BANNED_WORDS = [
   '시발', '씨발', '개새끼', '병신', '미친', 'ㅅㅂ', 'ㅄ',
   'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'nigger',
 ];
 
+// 간단한 단어 사전 (Set을 사용하여 O(1) 검색)
+const COMMON_WORDS = new Set<string>([
+  '가나다', '가방', '가을', '나무', '나비', '다리', '다음', '라디오', '마음', '모자',
+  '바다', '바람', '사과', '사랑', '아이', '아침', '자동차', '자전거', '차량', '차례',
+  '카메라', '컴퓨터', '타이어', '파도', '피아노', '하늘', '학교', '한국', '휴지',
+  '기차', '고양이', '강아지', '사자', '호랑이', '토끼', '원숭이', '코끼리', '기린', '펭귄'
+]);
+
 const containsBadWord = (text: string): boolean => {
   const lowerText = text.toLowerCase();
   return BANNED_WORDS.some(word => lowerText.includes(word.toLowerCase()));
+};
+
+const isValidWordChain = (word: string, previousWord: string): boolean => {
+  if (!previousWord) return true;
+  if (word.length < 2) return false;
+  const lastChar = previousWord[previousWord.length - 1];
+  const firstChar = word[0];
+  return lastChar === firstChar;
+};
+
+// 단어 유효성 검증 (로컬 Set + 필요시 DB 연동)
+const isValidWord = async (word: string): Promise<boolean> => {
+  // 로컬 사전에 있으면 true
+  if (COMMON_WORDS.has(word)) return true;
+  // TODO: Supabase words 테이블에서 검색 (선택)
+  // const supabase = createClient();
+  // const { data } = await supabase.from('words').select('word').eq('word', word).single();
+  // return !!data;
+  return false; // 현재는 로컬 사전에 없는 단어는 유효하지 않음
 };
 
 export default function LobbyChatWidget() {
@@ -37,17 +68,27 @@ export default function LobbyChatWidget() {
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 로그인 상태 및 프로필 정보
+  // 로그인 상태
   const [userId, setUserId] = useState<string | null>(null);
   const [realName, setRealName] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // 닉네임 관련 상태
+  // 닉네임 관련
   const [nickname, setNickname] = useState<string | null>(null);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
   const [randomAgentName, setRandomAgentName] = useState('');
 
-  // 랜덤 에이전트명 생성 (익명 모드용)
+  // 끝말잇기 게임 상태
+  const [gameActive, setGameActive] = useState(false);
+  const [currentWord, setCurrentWord] = useState<string>('');
+  const [currentPlayer, setCurrentPlayer] = useState<string>('');
+  const [players, setPlayers] = useState<string[]>([]);
+  const [gameMessage, setGameMessage] = useState<string>('');
+  const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
+
+  const gameChannel = useRef<any>(null);
+  const gameChannelReady = useRef(false);
+
   const generateRandomName = () => {
     const prefixes = ['어둠의', '빛의', '전략의', '신속한', '정밀한', '신비로운', '침묵의', '폭풍의'];
     const suffixes = ['매', '호랑이', '독수리', '늑대', '고스트', '팬텀', '나이트', '로드'];
@@ -57,7 +98,6 @@ export default function LobbyChatWidget() {
     return `${prefix} ${suffix} #${numbers.toString().padStart(3, '0')}`;
   };
 
-  // 로그인 사용자 정보 및 프로필 조회
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -81,14 +121,11 @@ export default function LobbyChatWidget() {
     fetchUser();
   }, [supabase]);
 
-  // 닉네임 초기화 (로그인 여부에 따라)
   useEffect(() => {
     if (isLoggedIn && realName) {
-      // 로그인 + 프로필 이름 있으면 그걸 기본으로
       setNickname(realName);
       setIsAnonymousMode(false);
     } else if (isLoggedIn && !realName) {
-      // 로그인했지만 프로필 이름 없음 → 로컬스토리지에서 불러오거나 기본값
       const saved = localStorage.getItem('lobby_nickname');
       if (saved && saved.trim()) {
         setNickname(saved.trim());
@@ -97,20 +134,17 @@ export default function LobbyChatWidget() {
       }
       setIsAnonymousMode(false);
     } else {
-      // 비로그인 → 로컬스토리지 또는 기본값
       const saved = localStorage.getItem('lobby_nickname');
       if (saved && saved.trim()) {
         setNickname(saved.trim());
       } else {
         setNickname('익명의 요원');
       }
-      setIsAnonymousMode(true); // 비로그인은 강제 익명
+      setIsAnonymousMode(true);
     }
-    // 익명 모드용 랜덤 이름 미리 생성
     setRandomAgentName(generateRandomName());
   }, [isLoggedIn, realName]);
 
-  // 닉네임 변경 (로그인 유저도 변경 가능하지만, 저장은 localStorage에만)
   const changeNickname = () => {
     if (isAnonymousMode) {
       alert('익명 모드에서는 닉네임을 변경할 수 없습니다.');
@@ -127,26 +161,17 @@ export default function LobbyChatWidget() {
     }
   };
 
-  // 익명 모드 전환
   const toggleAnonymousMode = () => {
     if (!isLoggedIn) {
       alert('로그인하지 않은 상태에서는 익명 모드만 가능합니다.');
       return;
     }
     setIsAnonymousMode(prev => !prev);
-    if (!isAnonymousMode) {
-      // 익명 모드로 전환 시, 현재 닉네임을 저장해두고 익명 이름 사용
-      // 기존 nickname은 localStorage에 그대로 두고, 보낼 때는 randomAgentName 사용
-    } else {
-      // 실명 모드로 돌아갈 때는 기존 nickname(realName) 사용
-      if (realName) setNickname(realName);
-    }
   };
 
-  // 실제 채팅에 보여질 표시 이름 (익명 모드면 랜덤, 아니면 nickname)
   const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
 
-  // 메시지 로드 및 실시간 구독
+  // 메시지 로드 및 구독
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -154,11 +179,11 @@ export default function LobbyChatWidget() {
           .from('lobby_messages')
           .select('*')
           .gte('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: true })
-          .limit(100);
+          .order('created_at', { ascending: false })
+          .limit(50);
 
         if (error) throw error;
-        setMessages(data || []);
+        setMessages((data || []).reverse());
       } catch (err) {
         console.error('로비 채팅 로드 실패:', err);
       } finally {
@@ -173,7 +198,11 @@ export default function LobbyChatWidget() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
         const newMsg = payload.new as LobbyMessage;
         if (newMsg.expires_at && new Date(newMsg.expires_at) < new Date()) return;
-        setMessages(prev => [...prev, newMsg]);
+        setMessages((prev: LobbyMessage[]) => {
+          const newList = [...prev, newMsg];
+          if (newList.length > 50) newList.shift();
+          return newList;
+        });
       })
       .subscribe();
 
@@ -182,25 +211,234 @@ export default function LobbyChatWidget() {
     };
   }, [supabase]);
 
-  // 스크롤 자동 이동
+  // 게임 브로드캐스트 채널 구독
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!supabase) return;
 
-  // 경고 메시지 자동 사라짐
+    const channel = supabase.channel('game:lobby', {
+      config: { broadcast: { ack: false } }
+    });
+
+    channel
+      .on('broadcast', { event: 'game_start' }, ({ payload }: { payload: GameStartPayload }) => {
+        setGameActive(true);
+        setCurrentWord(payload.startWord);
+        setPlayers([payload.starter]);
+        setCurrentPlayer(payload.starter);
+        setUsedWords(new Set());
+        setGameMessage(`🎮 게임이 시작되었습니다! 시작 단어: "${payload.startWord}"`);
+      })
+      .on('broadcast', { event: 'game_join' }, ({ payload }: { payload: GameJoinPayload }) => {
+        setPlayers(prev => {
+          if (prev.includes(payload.player)) return prev;
+          return [...prev, payload.player];
+        });
+        setGameMessage(`✨ ${payload.player}님이 게임에 참가했습니다!`);
+      })
+      .on('broadcast', { event: 'game_leave' }, ({ payload }: { payload: GameLeavePayload }) => {
+        setPlayers(prev => prev.filter(p => p !== payload.player));
+        setGameMessage(`👋 ${payload.player}님이 게임을 떠났습니다.`);
+      })
+      .on('broadcast', { event: 'game_word' }, ({ payload }: { payload: GameWordPayload }) => {
+        if (payload.success) {
+          setCurrentWord(payload.word);
+          setUsedWords(prev => new Set(prev).add(payload.word));
+          setPlayers(prevPlayers => {
+            const currentIdx = prevPlayers.findIndex(p => p === payload.player);
+            if (currentIdx === -1) return prevPlayers;
+            const nextIdx = (currentIdx + 1) % prevPlayers.length;
+            const nextPlayer = prevPlayers[nextIdx];
+            setCurrentPlayer(nextPlayer);
+            setGameMessage(`✅ ${payload.player}님이 "${payload.word}" (으)로 이어갑니다! 다음은 ${nextPlayer}님 차례입니다.`);
+            return prevPlayers;
+          });
+        } else {
+          setGameMessage(`❌ ${payload.player}님의 단어 "${payload.word}" (은)는 잘못되었습니다. (${payload.reason})`);
+        }
+      })
+      .on('broadcast', { event: 'game_end' }, ({ payload }: { payload: GameEndPayload }) => {
+        setGameActive(false);
+        setCurrentWord('');
+        setCurrentPlayer('');
+        setPlayers([]);
+        setUsedWords(new Set());
+        setGameMessage(`🏁 게임이 종료되었습니다. ${payload.reason || '종료되었습니다.'}`);
+      });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        gameChannelReady.current = true;
+      }
+    });
+
+    gameChannel.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+      gameChannel.current = null;
+      gameChannelReady.current = false;
+    };
+  }, [supabase]);
+
+  // players 변경 시 currentPlayer 유효성 검사
   useEffect(() => {
-    if (filterWarning) {
-      const timer = setTimeout(() => setFilterWarning(null), 3000);
-      return () => clearTimeout(timer);
+    if (!gameActive) return;
+    if (players.length === 0) {
+      setGameActive(false);
+      setGameMessage('게임에 참여한 사람이 없어 종료됩니다.');
+      return;
     }
-  }, [filterWarning]);
+    if (!players.includes(currentPlayer)) {
+      setCurrentPlayer(players[0]);
+      setGameMessage(`🔄 턴이 ${players[0]}님으로 자동 조정되었습니다.`);
+    }
+  }, [players, currentPlayer, gameActive]);
 
-  // 메시지 전송
+  const startGame = async () => {
+    if (gameActive) {
+      setGameMessage('이미 진행 중인 게임이 있습니다.');
+      return;
+    }
+    const startWordRaw = prompt('시작 단어를 입력하세요 (2글자 이상)', '가나다');
+    if (!startWordRaw || startWordRaw.trim().length < 2) {
+      setGameMessage('시작 단어는 2글자 이상이어야 합니다.');
+      return;
+    }
+    const startWord = startWordRaw.trim();
+    const isValid = await isValidWord(startWord);
+    if (!isValid) {
+      setGameMessage(`"${startWord}" 은(는) 사전에 없는 단어입니다. 다른 단어를 선택하세요.`);
+      return;
+    }
+    if (!gameChannel.current || !gameChannelReady.current) {
+      setGameMessage('게임 채널이 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    gameChannel.current.send({
+      type: 'broadcast',
+      event: 'game_start',
+      payload: { starter: displayName, startWord }
+    });
+  };
+
+  const joinGame = () => {
+    if (!gameActive) {
+      setGameMessage('먼저 게임을 시작해주세요. (게임시작 버튼 또는 /끝말잇기 시작)');
+      return;
+    }
+    if (players.includes(displayName)) {
+      setGameMessage('이미 참가 중입니다.');
+      return;
+    }
+    if (!gameChannel.current || !gameChannelReady.current) return;
+    gameChannel.current.send({
+      type: 'broadcast',
+      event: 'game_join',
+      payload: { player: displayName }
+    });
+  };
+
+  const leaveGame = () => {
+    if (!gameActive) return;
+    if (!gameChannel.current || !gameChannelReady.current) return;
+    gameChannel.current.send({
+      type: 'broadcast',
+      event: 'game_leave',
+      payload: { player: displayName }
+    });
+  };
+
+  const endGame = () => {
+    if (!gameActive) return;
+    if (!gameChannel.current || !gameChannelReady.current) return;
+    gameChannel.current.send({
+      type: 'broadcast',
+      event: 'game_end',
+      payload: { reason: `${displayName}님이 게임을 종료했습니다.` }
+    });
+  };
+
+  const submitWord = async (word: string) => {
+    if (!gameActive) {
+      setGameMessage('현재 활성화된 게임이 없습니다.');
+      return false;
+    }
+    if (currentPlayer !== displayName) {
+      setGameMessage(`지금은 ${currentPlayer}님의 차례입니다.`);
+      return false;
+    }
+    if (usedWords.has(word)) {
+      if (!gameChannel.current) return false;
+      gameChannel.current.send({
+        type: 'broadcast',
+        event: 'game_word',
+        payload: { player: displayName, word, success: false, reason: '이미 사용된 단어입니다.' }
+      });
+      return false;
+    }
+    if (!isValidWordChain(word, currentWord)) {
+      if (!gameChannel.current) return false;
+      gameChannel.current.send({
+        type: 'broadcast',
+        event: 'game_word',
+        payload: { player: displayName, word, success: false, reason: `'${currentWord}'의 끝 글자와 맞지 않습니다.` }
+      });
+      return false;
+    }
+    // 사전 검증
+    const isValid = await isValidWord(word);
+    if (!isValid) {
+      if (!gameChannel.current) return false;
+      gameChannel.current.send({
+        type: 'broadcast',
+        event: 'game_word',
+        payload: { player: displayName, word, success: false, reason: '사전에 없는 단어입니다.' }
+      });
+      return false;
+    }
+    // 성공
+    if (!gameChannel.current) return false;
+    gameChannel.current.send({
+      type: 'broadcast',
+      event: 'game_word',
+      payload: { player: displayName, word, success: true }
+    });
+    return true;
+  };
+
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = newMessage.trim();
     if (!trimmed || isSending) return;
 
+    // 명령어 처리 (게임 모드와 무관하게 우선 처리)
+    if (trimmed === '/끝말잇기 시작') {
+      await startGame();
+      setNewMessage('');
+      return;
+    }
+
+    if (gameActive) {
+      if (trimmed === '/끝말잇기 참여') {
+        joinGame();
+        setNewMessage('');
+        return;
+      } else if (trimmed === '/끝말잇기 나가기') {
+        leaveGame();
+        setNewMessage('');
+        return;
+      } else if (trimmed === '/끝말잇기 종료') {
+        endGame();
+        setNewMessage('');
+        return;
+      } else {
+        await submitWord(trimmed);
+        setNewMessage('');
+        return;
+      }
+    }
+
+    // 일반 채팅 (게임 미활성 시)
     if (containsBadWord(trimmed)) {
       setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
       return;
@@ -210,13 +448,11 @@ export default function LobbyChatWidget() {
     try {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
-
       const { error } = await supabase.from('lobby_messages').insert({
         content: trimmed,
-        author_name: displayName,  // 현재 모드에 따라 결정된 이름
+        author_name: displayName,
         expires_at: expiresAt.toISOString(),
       });
-
       if (error) throw error;
       setNewMessage('');
     } catch (err) {
@@ -227,6 +463,17 @@ export default function LobbyChatWidget() {
     }
   };
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    if (filterWarning) {
+      const timer = setTimeout(() => setFilterWarning(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [filterWarning]);
+
   return (
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
       <div className="p-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2">
@@ -236,29 +483,65 @@ export default function LobbyChatWidget() {
           <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">
             {isAnonymousMode ? '익명 모드' : (isLoggedIn ? '실명 모드' : '게스트')}
           </span>
+          {gameActive && (
+            <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <RiGamepadLine className="w-3 h-3" /> 끝말잇기 진행중
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {/* 실명/익명 토글 버튼 */}
+          <button
+            onClick={startGame}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              gameActive ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed' : 'bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30'
+            }`}
+            disabled={gameActive}
+            title="끝말잇기 게임 시작"
+          >
+            <RiGamepadLine className="w-3 h-3" /> 게임시작
+          </button>
+          {gameActive && (
+            <>
+              <button
+                onClick={joinGame}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 transition-colors"
+                title="게임 참가"
+              >
+                <RiUserAddLine className="w-3 h-3" /> 참가
+              </button>
+              <button
+                onClick={leaveGame}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30 transition-colors"
+                title="게임 나가기"
+              >
+                <RiLogoutCircleLine className="w-3 h-3" /> 나가기
+              </button>
+              <button
+                onClick={endGame}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-orange-600/20 text-orange-300 border border-orange-500/30 hover:bg-orange-600/30 transition-colors"
+                title="게임 종료"
+              >
+                <RiCloseLine className="w-3 h-3" /> 종료
+              </button>
+            </>
+          )}
           {isLoggedIn && (
             <button
-  onClick={toggleAnonymousMode}
-  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-    isAnonymousMode
-      ? 'bg-gray-800/80 text-gray-400 hover:text-cyan-300'
-      : 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
-  }`}
-  title={isAnonymousMode ? '실명 모드로 전환' : '익명 모드로 전환'}
->
-  {isAnonymousMode ? <RiEyeOffLine className="w-3 h-3" /> : <RiUserLine className="w-3 h-3" />}
-  {isAnonymousMode ? '익명' : '실명'}
-</button>
+              onClick={toggleAnonymousMode}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                isAnonymousMode
+                  ? 'bg-gray-800/80 text-gray-400 hover:text-cyan-300'
+                  : 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
+              }`}
+              title={isAnonymousMode ? '실명 모드로 전환' : '익명 모드로 전환'}
+            >
+              {isAnonymousMode ? <RiEyeOffLine className="w-3 h-3" /> : <RiUserLine className="w-3 h-3" />}
+              {isAnonymousMode ? '익명' : '실명'}
+            </button>
           )}
-
           <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
             <span className="text-gray-400">👤</span>
-            <span className="text-cyan-300 font-mono">
-              {displayName}
-            </span>
+            <span className="text-cyan-300 font-mono">{displayName}</span>
             {!isAnonymousMode && (
               <button
                 onClick={changeNickname}
@@ -276,7 +559,20 @@ export default function LobbyChatWidget() {
         </div>
       </div>
 
-      {/* 메시지 영역 (동일) */}
+      {gameActive && (
+        <div className="bg-purple-900/30 border-b border-purple-800/50 p-2 text-center text-sm">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <span className="text-purple-200">🎮 끝말잇기 중</span>
+            <span className="text-cyan-300 font-mono">현재 단어: <strong>{currentWord || '?'}</strong></span>
+            <span className="text-yellow-200">🎤 차례: {currentPlayer}</span>
+            <span className="text-gray-400">👥 {players.length}명 참여</span>
+          </div>
+          {gameMessage && (
+            <div className="text-xs text-gray-300 mt-1 animate-pulse">{gameMessage}</div>
+          )}
+        </div>
+      )}
+
       <div className="h-80 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         {isLoading ? (
           <div className="flex justify-center items-center h-full text-gray-400">
@@ -310,14 +606,13 @@ export default function LobbyChatWidget() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 입력 폼 (동일) */}
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="익명으로 메시지 보내기..."
+            placeholder={gameActive ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요` : "익명으로 메시지 보내기..."}
             className="flex-1 bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
             disabled={isSending}
           />
@@ -329,14 +624,12 @@ export default function LobbyChatWidget() {
             <RiSendPlaneLine className="text-white w-5 h-5" />
           </button>
         </div>
-
         {filterWarning && (
           <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800/30 rounded-lg px-3 py-1.5">
             <RiAlertLine className="w-3.5 h-3.5" />
             {filterWarning}
           </div>
         )}
-
         <div className="flex justify-between items-center mt-2 px-1">
           <p className="text-[10px] text-gray-500">⚡ 모든 메시지는 24시간 후 자동 삭제됩니다.</p>
           <p className="text-[10px] text-gray-600">#{messages.length} messages</p>
