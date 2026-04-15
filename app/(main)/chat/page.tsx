@@ -64,7 +64,7 @@ const containsSensitivePattern = (message: string) => {
 const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
   const [supabase] = useState(() => createClient());
   const [serverLatency, setServerLatency] = useState(0);
-  const [bandwidth, setBandwidth] = useState('안정적');
+  const bandwidth = '안정적';
 
   useEffect(() => {
     const measureLatency = async () => {
@@ -73,7 +73,7 @@ const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
         await supabase.from('messages').select('id').limit(1);
         const end = performance.now();
         setServerLatency(Math.round(end - start));
-      } catch (error) {
+      } catch {
         setServerLatency(-1);
       }
     };
@@ -176,7 +176,9 @@ export default function ChatPage() {
   const [realName, setRealName] = useState<string>(''); // 실제 이름 (프로필)
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState<boolean>(true);
 
   const [roomKeyInput, setRoomKeyInput] = useState<string>('');
   const [activeKey, setActiveKey] = useState<string>('');
@@ -199,6 +201,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isJoined || !activeKey) return;
+    let isUnmounted = false;
 
     setUserAgentName(generateAgentName());
 
@@ -220,13 +223,21 @@ export default function ChatPage() {
 
     const loadMessages = async () => {
       try {
-        let query = supabase.from('messages').select('*').eq('is_deleted', false).order('created_at', { ascending: true });
+        const query = supabase.from('messages').select('*').eq('is_deleted', false).order('created_at', { ascending: true });
         const { data, error } = await query.limit(100);
 
         if (error) return console.error('메시지 로드 오류', error);
+        if (isUnmounted) return;
 
         const messagesWithDecrypted = await Promise.all(
           (data || []).map(async (row) => {
+            const isExpired = row.expires_at && new Date(row.expires_at).getTime() < Date.now();
+            if (isExpired) {
+              return {
+                ...row,
+                decryptedContent: null,
+              } satisfies ChatMessage;
+            }
             const decrypted = await decryptMessage(row.content, activeKey);
             return {
               ...row,
@@ -235,7 +246,10 @@ export default function ChatPage() {
           })
         );
 
-        setMessages(messagesWithDecrypted);
+        if (!isUnmounted) {
+          const filtered = messagesWithDecrypted.filter((message) => message.decryptedContent !== null);
+          setMessages(filtered);
+        }
       } catch (err) {
         console.error('메시지 초기 로드 실패', err);
       }
@@ -248,18 +262,42 @@ export default function ChatPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
         async (payload) => {
           const newRow = payload.new as ChatMessage;
-          if (newRow.expires_at && new Date(newRow.expires_at) > new Date() && !newRow.is_deleted) {
+          const isExpired = newRow.expires_at && new Date(newRow.expires_at).getTime() < Date.now();
+          if (!isExpired && !newRow.is_deleted) {
             const decrypted = await decryptMessage(newRow.content, activeKey);
-            setMessages((prev) => [...prev, { ...newRow, decryptedContent: decrypted }]);
+            setMessages((prev) => {
+              if (prev.some((message) => message.id === newRow.id)) return prev;
+              return [...prev, { ...newRow, decryptedContent: decrypted }];
+            });
           }
           updateActiveUsers();
         }
-      ).subscribe();
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
+        const updated = payload.new as ChatMessage;
+        const isExpired = updated.expires_at && new Date(updated.expires_at).getTime() < Date.now();
+
+        if (updated.is_deleted || isExpired) {
+          setMessages((prev) => prev.filter((message) => message.id !== updated.id));
+          return;
+        }
+
+        const decrypted = await decryptMessage(updated.content, activeKey);
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === updated.id ? { ...updated, decryptedContent: decrypted } : message
+          )
+        );
+      })
+      .subscribe((status) => {
+        setIsRealtimeConnected(status === 'SUBSCRIBED');
+      });
 
     updateActiveUsers();
     const interval = setInterval(updateActiveUsers, 30000);
 
     return () => {
+      isUnmounted = true;
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
@@ -279,7 +317,7 @@ export default function ChatPage() {
       const { error } = await supabase.from('messages').update({ is_deleted: true }).eq('id', messageId);
       if (error) throw error;
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-    } catch (err) {
+    } catch {
       alert('삭제 중 오류가 발생했습니다.');
     } finally {
       setDeletingId(null); 
@@ -288,7 +326,10 @@ export default function ChatPage() {
 
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || isSending) return;
+    if (!newMessage.trim() || isSending) {
+      chatInputRef.current?.focus();
+      return;
+    }
 
     const sanitized = sanitizeMessage(newMessage);
     if (!sanitized) return alert('메시지가 비어있거나 유효하지 않습니다.');
@@ -318,10 +359,11 @@ export default function ChatPage() {
 
       if (error) throw error;
       setNewMessage('');
-    } catch (err) {
+    } catch {
       alert('전송 중 오류가 발생했습니다.');
     } finally {
       setIsSending(false);
+      requestAnimationFrame(() => chatInputRef.current?.focus());
     }
   };
 
@@ -489,6 +531,7 @@ export default function ChatPage() {
             <form onSubmit={sendMessage} className="mt-4 relative group backdrop-blur-sm">
               <div className="relative">
                 <input
+                  ref={chatInputRef}
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
@@ -510,6 +553,9 @@ export default function ChatPage() {
               </div>
               <div className="flex justify-between items-center mt-2 px-2">
                 <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span className={`${isRealtimeConnected ? 'text-green-400' : 'text-red-400'}`}>
+                    {isRealtimeConnected ? '실시간 연결 정상' : '실시간 연결 재시도 중'}
+                  </span>
                   <div className="flex items-center gap-1">
                     {isPublicMode ? <Unlock className="w-3 h-3 text-yellow-400" /> : <Lock className="w-3 h-3 text-green-400" />}
                     <span className={isPublicMode ? "text-yellow-400" : "text-green-400"}>
@@ -550,6 +596,7 @@ export default function ChatPage() {
               <h3 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
                 <User className="w-4 h-4" />
                 접속 중인 요원
+                <span className="text-[10px] text-green-400 ml-auto">{activeUsers}명 감지</span>
               </h3>
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, i) => (
