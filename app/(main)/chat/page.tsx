@@ -64,7 +64,9 @@ const containsSensitivePattern = (message: string) => {
 const SystemStatus = ({ isPublicMode }: { isPublicMode: boolean }) => {
   const [supabase] = useState(() => createClient());
   const [serverLatency, setServerLatency] = useState(0);
-  const bandwidth = '안정적';
+type Bandwidth = '안정적' | '보통' | '불안정';
+
+const [bandwidth, setBandwidth] = useState<Bandwidth>('안정적');
 
   useEffect(() => {
     const measureLatency = async () => {
