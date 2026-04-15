@@ -67,6 +67,8 @@ export default function LobbyChatWidget() {
   const [isLoading, setIsLoading] = useState(true);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 로그인 상태
   const [userId, setUserId] = useState<string | null>(null);
@@ -171,45 +173,61 @@ export default function LobbyChatWidget() {
 
   const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
 
-  // 메시지 로드 및 구독
-  useEffect(() => {
-    const loadMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .select('*')
-          .gte('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(50);
 
-        if (error) throw error;
-        setMessages((data || []).reverse());
-      } catch (err) {
-        console.error('로비 채팅 로드 실패:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const MAX_MESSAGES = 100;
 
-    loadMessages();
+// 메시지 로드 및 구독
+useEffect(() => {
+  const loadMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lobby_messages')
+        .select('*')
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(MAX_MESSAGES);
 
-    const subscription = supabase
-      .channel('lobby-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
+      if (error) throw error;
+
+      setMessages((data || []).reverse());
+    } catch (err) {
+      console.error('로비 채팅 로드 실패:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  loadMessages();
+
+  const subscription = supabase
+    .channel('lobby-changes')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'lobby_messages' },
+      (payload) => {
         const newMsg = payload.new as LobbyMessage;
+
+        // 만료된 메시지 무시
         if (newMsg.expires_at && new Date(newMsg.expires_at) < new Date()) return;
+
         setMessages((prev: LobbyMessage[]) => {
           const newList = [...prev, newMsg];
-          if (newList.length > 50) newList.shift();
+
+          // 최신 MAX_MESSAGES개만 유지
+          if (newList.length > MAX_MESSAGES) {
+            newList.shift();
+          }
+
           return newList;
         });
-      })
-      .subscribe();
+      }
+    )
+    .subscribe();
 
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [supabase]);
+  return () => {
+    supabase.removeChannel(subscription);
+  };
+}, [supabase]);
 
   // 게임 브로드캐스트 채널 구독
   useEffect(() => {
@@ -409,43 +427,46 @@ export default function LobbyChatWidget() {
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = newMessage.trim();
-    if (!trimmed || isSending) return;
-
-    // 명령어 처리 (게임 모드와 무관하게 우선 처리)
-    if (trimmed === '/끝말잇기 시작') {
-      await startGame();
-      setNewMessage('');
+    if (!trimmed || isSending) {
+      chatInputRef.current?.focus();
       return;
     }
 
-    if (gameActive) {
-      if (trimmed === '/끝말잇기 참여') {
-        joinGame();
-        setNewMessage('');
-        return;
-      } else if (trimmed === '/끝말잇기 나가기') {
-        leaveGame();
-        setNewMessage('');
-        return;
-      } else if (trimmed === '/끝말잇기 종료') {
-        endGame();
-        setNewMessage('');
-        return;
-      } else {
-        await submitWord(trimmed);
+    try {
+      // 명령어 처리 (게임 모드와 무관하게 우선 처리)
+      if (trimmed === '/끝말잇기 시작') {
+        await startGame();
         setNewMessage('');
         return;
       }
-    }
 
-    // 일반 채팅 (게임 미활성 시)
-    if (containsBadWord(trimmed)) {
-      setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
-      return;
-    }
+      if (gameActive) {
+        if (trimmed === '/끝말잇기 참여') {
+          joinGame();
+          setNewMessage('');
+          return;
+        } else if (trimmed === '/끝말잇기 나가기') {
+          leaveGame();
+          setNewMessage('');
+          return;
+        } else if (trimmed === '/끝말잇기 종료') {
+          endGame();
+          setNewMessage('');
+          return;
+        } else {
+          await submitWord(trimmed);
+          setNewMessage('');
+          return;
+        }
+      }
 
-    setIsSending(true);
-    try {
+      // 일반 채팅 (게임 미활성 시)
+      if (containsBadWord(trimmed)) {
+        setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
+        return;
+      }
+
+      setIsSending(true);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
       const { error } = await supabase.from('lobby_messages').insert({
@@ -460,6 +481,10 @@ export default function LobbyChatWidget() {
       alert('메시지 전송에 실패했습니다.');
     } finally {
       setIsSending(false);
+      requestAnimationFrame(() => chatInputRef.current?.focus());
+      if (textareaRef.current) {
+  textareaRef.current.style.height = 'auto';
+}
     }
   };
 
@@ -608,14 +633,34 @@ export default function LobbyChatWidget() {
 
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={gameActive ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요` : "익명으로 메시지 보내기..."}
-            className="flex-1 bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
-            disabled={isSending}
-          />
+          <textarea
+  ref={(el) => {
+    textareaRef.current = el;
+    (chatInputRef as any).current = el;
+  }}
+  value={newMessage}
+  onChange={(e) => setNewMessage(e.target.value)}
+  onInput={(e) => {
+    const el = e.currentTarget;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) form.requestSubmit();
+    }
+  }}
+  rows={1}
+  placeholder={
+    gameActive
+      ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요`
+      : "익명으로 메시지 보내기..."
+  }
+  className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
+  disabled={isSending}
+/>
           <button
             type="submit"
             disabled={isSending || !newMessage.trim()}
