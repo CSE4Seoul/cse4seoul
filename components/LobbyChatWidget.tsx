@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { 
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
-  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine
+  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiRefreshLine
 } from 'react-icons/ri';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -55,27 +55,28 @@ const isValidWord = async (word: string): Promise<boolean> => {
 
 export default function LobbyChatWidget() {
   const [supabase] = useState(() => createClient());
-const [messages, setMessages] = useState<LobbyMessage[]>([]);
-const [newMessage, setNewMessage] = useState('');
-const [isSending, setIsSending] = useState(false);
-const isSendingRef = useRef(false);
-const [isLoading, setIsLoading] = useState(true);
-const [filterWarning, setFilterWarning] = useState<string | null>(null);
-const messagesEndRef = useRef<HTMLDivElement>(null);
-const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [messages, setMessages] = useState<LobbyMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filterWarning, setFilterWarning] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-const chatChannel = useRef<RealtimeChannel | null>(null);
-const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const chatEffectEpochRef = useRef(0);
+  const chatChannel = useRef<RealtimeChannel | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chatEffectEpochRef = useRef(0);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
 
-const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
-const [userId, setUserId] = useState<string | null>(null);
-const [realName, setRealName] = useState<string | null>(null);
-const [isLoggedIn, setIsLoggedIn] = useState(false);
-const [reconnectTrigger, setReconnectTrigger] = useState(0);
-const [nickname, setNickname] = useState<string | null>(null);
-const [isAnonymousMode, setIsAnonymousMode] = useState(false);
-const [randomAgentName, setRandomAgentName] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [realName, setRealName] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [reconnectTrigger, setReconnectTrigger] = useState(0);
+  const [nickname, setNickname] = useState<string | null>(null);
+  const [isAnonymousMode, setIsAnonymousMode] = useState(false);
+  const [randomAgentName, setRandomAgentName] = useState('');
 
   // 끝말잇기 게임 상태
   const [gameActive, setGameActive] = useState(false);
@@ -85,10 +86,10 @@ const [randomAgentName, setRandomAgentName] = useState('');
   const [gameMessage, setGameMessage] = useState<string>('');
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
 
-  const gameChannel = useRef<any>(null);
+  const gameChannel = useRef<RealtimeChannel | null>(null);
   const gameChannelReady = useRef(false);
   const afkTimerRef = useRef<NodeJS.Timeout | null>(null);
- const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
+  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
   const MAX_MESSAGES = 100;
 
   const generateRandomName = () => {
@@ -101,237 +102,137 @@ const [randomAgentName, setRandomAgentName] = useState('');
   };
 
   // 유저/닉네임 초기화
-useEffect(() => {
-  const fetchUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      setIsLoggedIn(true);
-      setUserId(user.id);
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user.id)
-        .single();
-
-      if (profile?.full_name) {
-        setRealName(profile.full_name);
-      }
-    } else {
-      setIsLoggedIn(false);
-      setUserId(null);
-      setRealName(null);
-    }
-  };
-
-  fetchUser();
-}, [supabase]);
-
-useEffect(() => {
-  if (isLoggedIn && realName) {
-    setNickname(realName);
-    setIsAnonymousMode(false);
-  } else if (isLoggedIn && !realName) {
-    const saved = localStorage.getItem('lobby_nickname');
-    setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
-    setIsAnonymousMode(false);
-  } else {
-    const saved = localStorage.getItem('lobby_nickname');
-    setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
-    setIsAnonymousMode(true);
-  }
-
-  setRandomAgentName(generateRandomName());
-}, [isLoggedIn, realName]);
-
-const changeNickname = () => {
-  if (isAnonymousMode) {
-    alert('익명 모드에서는 닉네임을 변경할 수 없습니다.');
-    return;
-  }
-
-  const newName = prompt('새 닉네임을 입력하세요 (최대 20자)', nickname || '익명의 요원');
-
-  if (newName && newName.trim()) {
-    const trimmed = newName.trim().slice(0, 20);
-    setNickname(trimmed);
-    localStorage.setItem('lobby_nickname', trimmed);
-  } else if (newName === '') {
-    setNickname('익명의 요원');
-    localStorage.setItem('lobby_nickname', '익명의 요원');
-  }
-};
-
-const toggleAnonymousMode = () => {
-  if (!isLoggedIn) {
-    alert('로그인하지 않은 상태에서는 익명 모드만 가능합니다.');
-    return;
-  }
-  setIsAnonymousMode(prev => !prev);
-};
-
-  // AFK 타이머 관리
   useEffect(() => {
-    if (afkTimerRef.current) clearTimeout(afkTimerRef.current);
-    if (gameActive && currentPlayer === displayName && players.length > 0) {
-      afkTimerRef.current = setTimeout(() => {
-        if (gameActive && currentPlayer === displayName) {
-          // 시간 초과로 턴 넘기기
-          if (gameChannel.current && gameChannelReady.current) {
-            gameChannel.current.send({
-              type: 'broadcast',
-              event: 'game_word',
-              payload: { player: displayName, word: '', success: false, reason: '시간 초과로 턴이 넘어갑니다.' }
-            });
-          }
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        setIsLoggedIn(true);
+        setUserId(user.id);
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.full_name) {
+          setRealName(profile.full_name);
         }
-      }, 30000);
-    }
-    return () => {
-      if (afkTimerRef.current) clearTimeout(afkTimerRef.current);
+      } else {
+        setIsLoggedIn(false);
+        setUserId(null);
+        setRealName(null);
+      }
     };
-  }, [gameActive, currentPlayer, displayName, players]);
 
-  // 실시간 채팅 구독 (Strict Mode / Zombie Channel 안전 버전)
-useEffect(() => {
-  const epoch = ++chatEffectEpochRef.current;
-  let disposed = false;
-  let retryCount = 0;
-  const MAX_RETRIES = 6;
+    fetchUser();
+  }, [supabase]);
 
-  const isStale = () => disposed || chatEffectEpochRef.current !== epoch;
+  useEffect(() => {
+    if (isLoggedIn && realName) {
+      setNickname(realName);
+      setIsAnonymousMode(false);
+    } else if (isLoggedIn && !realName) {
+      const saved = localStorage.getItem('lobby_nickname');
+      setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
+      setIsAnonymousMode(false);
+    } else {
+      const saved = localStorage.getItem('lobby_nickname');
+      setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
+      setIsAnonymousMode(true);
+    }
 
-  const clearReconnectTimer = () => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
+    setRandomAgentName(generateRandomName());
+  }, [isLoggedIn, realName]);
+
+  const changeNickname = () => {
+    if (isAnonymousMode) {
+      alert('익명 모드에서는 닉네임을 변경할 수 없습니다.');
+      return;
+    }
+
+    const newName = prompt('새 닉네임을 입력하세요 (최대 20자)', nickname || '익명의 요원');
+
+    if (newName && newName.trim()) {
+      const trimmed = newName.trim().slice(0, 20);
+      setNickname(trimmed);
+      localStorage.setItem('lobby_nickname', trimmed);
+    } else if (newName === '') {
+      setNickname('익명의 요원');
+      localStorage.setItem('lobby_nickname', '익명의 요원');
     }
   };
 
-  const teardownChatChannel = async () => {
-    clearReconnectTimer();
-    const channel = chatChannel.current;
-    if (!channel) return;
-    chatChannel.current = null;
-    await supabase.removeChannel(channel);
-  };
-
-  
-
-  
-
-  const loadMessages = async () => {
-    if (isStale()) return;
-    try {
-      const { data, error } = await supabase
-        .from('lobby_messages')
-        .select('*')
-        .gte('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(MAX_MESSAGES);
-
-      if (error) throw error;
-      if (!isStale()) setMessages((data || []).reverse());
-    } catch (err) {
-      console.error('로비 채팅 로드 실패:', err);
-    } finally {
-      if (!isStale()) setIsLoading(false);
+  const toggleAnonymousMode = () => {
+    if (!isLoggedIn) {
+      alert('로그인하지 않은 상태에서는 익명 모드만 가능합니다.');
+      return;
     }
+    setIsAnonymousMode(prev => !prev);
   };
 
-  const scheduleReconnect = () => {
-    if (isStale()) return;
-    if (retryCount >= MAX_RETRIES) return;
+  // AFK 타이머 관리 (개선: 네트워크 지연 고려, 중복 방지)
+  const resetAfkTimer = useCallback(() => {
+    if (afkTimerRef.current) {
+      clearTimeout(afkTimerRef.current);
+      afkTimerRef.current = null;
+    }
 
-    retryCount += 1;
-    const backoffMs = Math.min(30000, Math.pow(2, retryCount) * 1000);
-
-    clearReconnectTimer();
-    reconnectTimerRef.current = setTimeout(() => {
-      if (!isStale()) void subscribeToChat();
-    }, backoffMs);
-  };
-
-  const subscribeToChat = async () => {
-    if (isStale()) return;
-
-    // 항상 기존 채널 제거 후 단일 채널만 유지
-    await teardownChatChannel();
-    if (isStale()) return;
-
-    setConnectionStatus('connecting');
-
-    const newChannel = supabase
-      .channel('lobby:messages:realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'lobby_messages' },
-        (payload) => {
-          if (isStale()) return;
-          const newMsg = payload.new as LobbyMessage;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg].slice(-MAX_MESSAGES);
+    if (gameActive && currentPlayer === displayName && players.length > 0) {
+      // 네트워크 지연을 고려하여 35초로 증가 (기존 30초)
+      afkTimerRef.current = setTimeout(() => {
+        if (gameActive && currentPlayer === displayName && gameChannel.current && gameChannelReady.current) {
+          // AFK 타임아웃 발생 시 game_word 이벤트 전송 (턴 넘기기)
+          gameChannel.current.send({
+            type: 'broadcast',
+            event: 'game_word',
+            payload: { player: displayName, word: '', success: false, reason: '시간 초과로 턴이 넘어갑니다.' }
           });
         }
-      )
-      .subscribe((status) => {
-        if (isStale()) return;
-        if (chatChannel.current !== newChannel) return;
-
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ 실시간 채팅 연결 성공');
-          setConnectionStatus('connected');
-          retryCount = 0;
-          return;
-        }
-
-        if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
-          console.warn(`⚠️ 연결 끊김 (${status}). 재시도...`);
-          setConnectionStatus('error');
-          void teardownChatChannel().then(scheduleReconnect);
-        }
-      });
-
-    chatChannel.current = newChannel;
-  };
-
-  void loadMessages();
-  void subscribeToChat();
-
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible') {
-      if (!chatChannel.current && !isStale()) {
-        void subscribeToChat();
-      }
+        afkTimerRef.current = null;
+      }, 35000);
     }
-  };
+  }, [gameActive, currentPlayer, displayName, players.length]);
 
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-
-  return () => {
-    disposed = true;
-    clearReconnectTimer();
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    void teardownChatChannel();
-  };
-}, [supabase, reconnectTrigger]);
-
-// 혹시 남아있는 타이머 누수 방지
-useEffect(() => {
-  return () => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-  };
-}, []);
-  // 스마트 폴링 (30초, visible 상태일 때만)
+  // currentPlayer나 gameActive 변경 시 AFK 타이머 재설정
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    const pollMessages = async () => {
-      if (document.visibilityState !== 'visible') return;
+    resetAfkTimer();
+    return () => {
+      if (afkTimerRef.current) {
+        clearTimeout(afkTimerRef.current);
+        afkTimerRef.current = null;
+      }
+    };
+  }, [resetAfkTimer]);
+
+  // 실시간 채팅 구독 (강화된 재연결 및 메시지 동기화)
+  useEffect(() => {
+    const epoch = ++chatEffectEpochRef.current;
+    let disposed = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 8;
+    let isSubscribing = false;
+
+    const isStale = () => disposed || chatEffectEpochRef.current !== epoch;
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    };
+
+    const teardownChatChannel = async () => {
+      clearReconnectTimer();
+      const channel = chatChannel.current;
+      if (!channel) return;
+      chatChannel.current = null;
+      await supabase.removeChannel(channel);
+    };
+
+    const loadMessages = async () => {
+      if (isStale()) return;
       try {
         const { data, error } = await supabase
           .from('lobby_messages')
@@ -339,16 +240,123 @@ useEffect(() => {
           .gte('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false })
           .limit(MAX_MESSAGES);
-        if (!error && data) {
-          setMessages(data.reverse());
-        }
+
+        if (error) throw error;
+        if (!isStale()) setMessages((data || []).reverse());
       } catch (err) {
-        console.error('폴링 오류:', err);
+        console.error('로비 채팅 로드 실패:', err);
+      } finally {
+        if (!isStale()) setIsLoading(false);
       }
     };
-    interval = setInterval(pollMessages, 30000);
-    return () => clearInterval(interval);
-  }, [supabase]);
+
+    const scheduleReconnect = () => {
+      if (isStale()) return;
+      if (retryCount >= MAX_RETRIES) {
+        console.error('최대 재연결 시도 실패, 수동 재연결 필요');
+        setConnectionStatus('error');
+        return;
+      }
+
+      retryCount += 1;
+      // 지수 백오프 최대 10초로 제한 (간헐적 지연 개선)
+      const backoffMs = Math.min(10000, Math.pow(2, retryCount) * 1000);
+      clearReconnectTimer();
+      reconnectTimerRef.current = setTimeout(() => {
+        if (!isStale()) void subscribeToChat();
+      }, backoffMs);
+    };
+
+    const subscribeToChat = async () => {
+      if (isStale() || isSubscribing) return;
+      isSubscribing = true;
+
+      // 기존 채널 제거
+      await teardownChatChannel();
+      if (isStale()) {
+        isSubscribing = false;
+        return;
+      }
+
+      setConnectionStatus('connecting');
+
+      const newChannel = supabase
+        .channel('lobby:messages:realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'lobby_messages' },
+          (payload) => {
+            if (isStale()) return;
+            const newMsg = payload.new as LobbyMessage;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg].slice(-MAX_MESSAGES);
+            });
+          }
+        )
+        .subscribe((status) => {
+          if (isStale()) {
+            isSubscribing = false;
+            return;
+          }
+          if (chatChannel.current !== newChannel) {
+            isSubscribing = false;
+            return;
+          }
+
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ 실시간 채팅 연결 성공');
+            setConnectionStatus('connected');
+            retryCount = 0;
+            isSubscribing = false;
+            return;
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+            console.warn(`⚠️ 연결 끊김 (${status}). 재시도...`);
+            setConnectionStatus('error');
+            void teardownChatChannel().then(() => {
+              isSubscribing = false;
+              scheduleReconnect();
+            });
+          } else {
+            isSubscribing = false;
+          }
+        });
+
+      chatChannel.current = newChannel;
+    };
+
+    // 초기 메시지 로드 및 구독
+    void loadMessages();
+    void subscribeToChat();
+
+    // visibilitychange 핸들러 (탭이 다시 활성화되면 재연결 시도)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if ((!chatChannel.current || connectionStatus !== 'connected') && !isStale()) {
+          retryCount = 0; // 재시도 카운터 리셋
+          void subscribeToChat();
+        }
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    visibilityHandlerRef.current = handleVisibilityChange;
+
+    return () => {
+      disposed = true;
+      clearReconnectTimer();
+      if (visibilityHandlerRef.current) {
+        window.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+        visibilityHandlerRef.current = null;
+      }
+      void teardownChatChannel();
+    };
+  }, [supabase, reconnectTrigger, connectionStatus]);
+
+  // Fallback 폴링 제거 (Realtime에 의존, 연결 끊김 시 자동 재연결로 대체)
+  // 필요시 수동 새로고침 버튼 제공
 
   // 게임 브로드캐스트 채널 구독
   useEffect(() => {
@@ -393,7 +401,7 @@ useEffect(() => {
           });
         } else {
           setGameMessage(`❌ ${payload.player}님의 단어 "${payload.word}" (은)는 잘못되었습니다. (${payload.reason})`);
-          // 턴 넘기기 (실패해도 다음 사람으로)
+          // 실패 시에도 턴 넘기기
           setPlayers(prevPlayers => {
             const currentIdx = prevPlayers.findIndex(p => p === payload.player);
             if (currentIdx === -1) return prevPlayers;
@@ -417,18 +425,21 @@ useEffect(() => {
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         gameChannelReady.current = true;
+      } else {
+        gameChannelReady.current = false;
       }
     });
 
     gameChannel.current = channel;
 
     return () => {
+      gameChannelReady.current = false;
       channel.unsubscribe();
       gameChannel.current = null;
-      gameChannelReady.current = false;
     };
   }, [supabase]);
 
+  // 게임 상태 일관성 유지
   useEffect(() => {
     if (!gameActive) return;
     if (players.length === 0) {
@@ -478,7 +489,10 @@ useEffect(() => {
       setGameMessage('이미 참가 중입니다.');
       return;
     }
-    if (!gameChannel.current || !gameChannelReady.current) return;
+    if (!gameChannel.current || !gameChannelReady.current) {
+      setGameMessage('게임 채널이 준비되지 않았습니다.');
+      return;
+    }
     gameChannel.current.send({
       type: 'broadcast',
       event: 'game_join',
@@ -552,6 +566,7 @@ useEffect(() => {
     return true;
   };
 
+  // 메시지 전송 (재시도 로직 추가)
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = newMessage.trim();
@@ -606,26 +621,40 @@ useEffect(() => {
       textareaRef.current.style.height = 'auto';
     }
 
-    try {
-      const { data: realData, error } = await supabase
-        .from('lobby_messages')
-        .insert({
-          content: trimmed,
-          author_name: displayName,
-          expires_at: expiresAt.toISOString(),
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      setMessages(prev => prev.map(m => m.id === tempId ? (realData as LobbyMessage) : m));
-    } catch (err) {
-      console.error('로비 메시지 전송 실패:', err);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      alert('메시지 전송에 실패했습니다.');
-    } finally {
-      isSendingRef.current = false;
-      setIsSending(false);
+    // 전송 재시도 로직 (최대 2회)
+    let attempt = 0;
+    const maxAttempts = 2;
+    let success = false;
+
+    while (attempt < maxAttempts && !success) {
+      try {
+        const { data: realData, error } = await supabase
+          .from('lobby_messages')
+          .insert({
+            content: trimmed,
+            author_name: displayName,
+            expires_at: expiresAt.toISOString(),
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        setMessages(prev => prev.map(m => m.id === tempId ? (realData as LobbyMessage) : m));
+        success = true;
+      } catch (err) {
+        console.error(`메시지 전송 실패 (시도 ${attempt + 1}):`, err);
+        attempt++;
+        if (attempt === maxAttempts) {
+          setMessages(prev => prev.filter(m => m.id !== tempId));
+          setFilterWarning('⚠️ 메시지 전송에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요.');
+        } else {
+          // 재시도 전 지연 (0.5초)
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
     }
+
+    isSendingRef.current = false;
+    setIsSending(false);
   };
 
   useEffect(() => {
@@ -640,21 +669,18 @@ useEffect(() => {
   }, [filterWarning]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (e.nativeEvent.isComposing) return;
+      const form = e.currentTarget.form;
+      if (form) form.requestSubmit();
+    }
+  };
 
-    // 🌟 추가: 로그인하지 않았다면 엔터 전송 차단
-   /*  도배 차단 방지 로직 
-   if (!isLoggedIn) {
-      setFilterWarning('⚠️ 로그인한 사용자만 채팅을 보낼 수 있습니다.');
-      return;
-    } */
-
-    const form = e.currentTarget.form;
-    if (form) form.requestSubmit();
-  }
-};
+  const manualReconnect = () => {
+    setConnectionStatus('connecting');
+    setReconnectTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
@@ -735,10 +761,7 @@ useEffect(() => {
             )}
           </div>
           <button
-            onClick={() => {
-              setConnectionStatus('connecting');
-              setReconnectTrigger(prev => prev + 1);
-            }}
+            onClick={manualReconnect}
             disabled={connectionStatus === 'connecting'}
             className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 border ${
               connectionStatus === 'connected' 
@@ -749,13 +772,14 @@ useEffect(() => {
             }`}
             title="클릭하여 서버 수동 재연결"
           >
+            <RiRefreshLine className="w-3 h-3 mr-0.5" />
             <span className={`w-2 h-2 rounded-full ${
               connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' :
               connectionStatus === 'error' ? 'bg-red-500' :
               'bg-yellow-500 animate-bounce'
             }`}></span>
             {connectionStatus === 'connected' ? 'LIVE' : 
-             connectionStatus === 'error' ? '연결 끊김 (클릭시 재연결)' : 
+             connectionStatus === 'error' ? '연결 끊김' : 
              '연결 중...'}
           </button>
         </div>
@@ -830,7 +854,7 @@ useEffect(() => {
           />
           <button
             type="submit"
-            disabled={!newMessage.trim()}
+            disabled={!newMessage.trim() || isSending}
             className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
           >
             <RiSendPlaneLine className="text-white w-5 h-5" />
