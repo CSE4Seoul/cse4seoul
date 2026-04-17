@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, FormEvent, useMemo, useCallback } from 're
 import { createClient } from '@/utils/supabase/client';
 import { 
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
-  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine
+  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiImageAddLine
 } from 'react-icons/ri';
 
 interface LobbyMessage {
@@ -52,6 +52,22 @@ const isValidWord = async (word: string): Promise<boolean> => {
   return false;
 };
 
+const IMAGE_MESSAGE_PREFIX = '__LOBBY_IMAGE__::';
+
+const encodeImageMessage = (url: string, caption: string) =>
+  `${IMAGE_MESSAGE_PREFIX}${url}${caption ? `\n${caption}` : ''}`;
+
+const parseImageMessage = (content: string): { imageUrl: string; caption: string } | null => {
+  if (!content.startsWith(IMAGE_MESSAGE_PREFIX)) return null;
+  const payload = content.slice(IMAGE_MESSAGE_PREFIX.length);
+  const [imageUrl, ...captionParts] = payload.split('\n');
+  if (!imageUrl) return null;
+  return {
+    imageUrl: imageUrl.trim(),
+    caption: captionParts.join('\n').trim(),
+  };
+};
+
 export default function LobbyChatWidget() {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<LobbyMessage[]>([]);
@@ -71,6 +87,9 @@ export default function LobbyChatWidget() {
   const [nickname, setNickname] = useState<string | null>(null);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
   const [randomAgentName, setRandomAgentName] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 끝말잇기 게임 상태
   const [gameActive, setGameActive] = useState(false);
@@ -83,7 +102,7 @@ export default function LobbyChatWidget() {
   const gameChannel = useRef<any>(null);
   const gameChannelReady = useRef(false);
   const afkTimerRef = useRef<NodeJS.Timeout | null>(null);
- const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
+  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
   const MAX_MESSAGES = 100;
 
   const generateRandomName = () => {
@@ -506,7 +525,7 @@ export default function LobbyChatWidget() {
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = newMessage.trim();
-    if (!trimmed || isSendingRef.current) return;
+    if ((!trimmed && !selectedImage) || isSendingRef.current || isUploadingImage) return;
 
     // 명령어 처리
     if (trimmed === '/끝말잇기 시작') {
@@ -534,7 +553,7 @@ export default function LobbyChatWidget() {
       }
     }
 
-    if (containsBadWord(trimmed)) {
+    if (trimmed && containsBadWord(trimmed)) {
       setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
       return;
     }
@@ -544,15 +563,52 @@ export default function LobbyChatWidget() {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 1);
     const tempId = crypto.randomUUID();
+    let finalContent = trimmed;
+    let uploadedImageUrl: string | null = null;
+    if (selectedImage) {
+      if (!isLoggedIn) {
+        setFilterWarning('🔒 이미지 전송은 로그인한 사용자만 가능합니다.');
+        isSendingRef.current = false;
+        setIsSending(false);
+        return;
+      }
+      try {
+        setIsUploadingImage(true);
+        const fileExt = selectedImage.name.split('.').pop() || 'jpg';
+        const filePath = `${userId || 'unknown'}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('lobby-images')
+          .upload(filePath, selectedImage, {
+            upsert: false,
+            cacheControl: '3600',
+          });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage.from('lobby-images').getPublicUrl(filePath);
+        uploadedImageUrl = publicData.publicUrl;
+        finalContent = encodeImageMessage(uploadedImageUrl, trimmed);
+      } catch (uploadErr) {
+        console.error('로비 이미지 업로드 실패:', uploadErr);
+        setFilterWarning('이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        isSendingRef.current = false;
+        setIsSending(false);
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
     const optimisticMsg: LobbyMessage = {
       id: tempId,
-      content: trimmed,
+      content: finalContent,
       author_name: displayName,
       created_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString(),
     };
     setMessages(prev => [...prev, optimisticMsg].slice(-MAX_MESSAGES));
     setNewMessage('');
+    setSelectedImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -561,7 +617,7 @@ export default function LobbyChatWidget() {
       const { data: realData, error } = await supabase
         .from('lobby_messages')
         .insert({
-          content: trimmed,
+          content: finalContent,
           author_name: displayName,
           expires_at: expiresAt.toISOString(),
         })
@@ -666,7 +722,14 @@ export default function LobbyChatWidget() {
           )}
           <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
             <span className="text-gray-400">👤</span>
-            <span className="text-cyan-300 font-mono">{displayName}</span>
+            <span
+              className={`font-mono ${isLoggedIn && !isAnonymousMode
+                ? 'bg-gradient-to-r from-yellow-300 via-cyan-300 to-purple-300 bg-clip-text text-transparent animate-pulse'
+                : 'text-cyan-300'
+              }`}
+            >
+              {displayName}
+            </span>
             {!isAnonymousMode && (
               <button
                 onClick={changeNickname}
@@ -743,7 +806,25 @@ export default function LobbyChatWidget() {
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">{msg.content}</p>
+                {(() => {
+                  const parsed = parseImageMessage(msg.content);
+                  if (!parsed) {
+                    return <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">{msg.content}</p>;
+                  }
+                  return (
+                    <div className="mt-1.5 space-y-1.5">
+                      <img
+                        src={parsed.imageUrl}
+                        alt="업로드된 로비 이미지"
+                        className="max-h-64 w-auto rounded-lg border border-white/10 object-contain bg-black/30"
+                        loading="lazy"
+                      />
+                      {parsed.caption && (
+                        <p className="text-gray-200 text-sm break-words leading-relaxed">{parsed.caption}</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))
@@ -753,6 +834,34 @@ export default function LobbyChatWidget() {
 
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setSelectedImage(file);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (!isLoggedIn) {
+                setFilterWarning('🔒 이미지는 로그인한 사용자만 첨부할 수 있어요. 로그인 후 이용해주세요!');
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
+            className={`rounded-xl px-3 py-2.5 border transition-colors ${
+              isLoggedIn
+                ? 'border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10'
+                : 'border-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
+            title={isLoggedIn ? '이미지 첨부' : '로그인 후 이미지 첨부 가능'}
+          >
+            <RiImageAddLine className="w-5 h-5" />
+          </button>
           <textarea
             ref={textareaRef}
             value={newMessage}
@@ -767,18 +876,39 @@ export default function LobbyChatWidget() {
             placeholder={
               gameActive
                 ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요`
+                : selectedImage
+                ? '이미지와 함께 보낼 메시지를 입력하세요 (선택)'
                 : "익명으로 메시지 보내기..."
             }
             className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
           />
           <button
             type="submit"
-            disabled={!newMessage.trim()}
+            disabled={(!newMessage.trim() && !selectedImage) || isUploadingImage}
             className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
           >
-            <RiSendPlaneLine className="text-white w-5 h-5" />
+            {isUploadingImage ? (
+              <span className="text-xs text-white font-semibold">업로드중</span>
+            ) : (
+              <RiSendPlaneLine className="text-white w-5 h-5" />
+            )}
           </button>
         </div>
+        {selectedImage && (
+          <div className="mt-2 text-xs text-cyan-300 flex items-center justify-between bg-cyan-900/20 border border-cyan-800/30 rounded-lg px-3 py-1.5">
+            <span>📎 {selectedImage.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedImage(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+              className="text-gray-400 hover:text-red-300 transition-colors"
+            >
+              첨부 해제
+            </button>
+          </div>
+        )}
         {filterWarning && (
           <div className="mt-2 flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-800/30 rounded-lg px-3 py-1.5">
             <RiAlertLine className="w-3.5 h-3.5" />
