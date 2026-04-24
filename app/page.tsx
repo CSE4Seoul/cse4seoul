@@ -238,6 +238,43 @@ export default function Home() {
               Clash Royale - CSE4seoul(Royaleapi) ↗
             </a>
           </p>
+
+            {/* 추가 1: 스탯티즈 */}
+  <p className="mt-2">
+    <a
+      href="https://www.statiz.co.kr/"
+      target="_blank"
+      rel="noreferrer"
+      className="inline-block text-cyan-400 underline decoration-cyan-400/70 underline-offset-4 hover:text-cyan-300 transition-colors"
+    >
+      KBO 기록 - 스탯티즈 ↗
+    </a>
+  </p>
+
+  {/* 추가 2: 카톡 분석 서비스 (위젯 느낌) */}
+<div className="mt-6 flex justify-center">
+  <a
+    href="https://chatanalyze.vercel.app/"
+    target="_blank"
+    rel="noreferrer"
+    className="group w-full max-w-md rounded-2xl border border-cyan-400/30 bg-gray-900/60 p-5 backdrop-blur-md transition-all hover:scale-[1.02] hover:border-cyan-400/60 hover:shadow-lg hover:shadow-cyan-400/20"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-base font-semibold text-white">
+          카카오톡 채팅 분석 서비스
+        </p>
+        <p className="text-sm text-gray-400 mt-1">
+          대화 데이터를 업로드하고 통계·패턴을 분석해보세요
+        </p>
+      </div>
+
+      <span className="text-cyan-400 group-hover:translate-x-1 transition-transform">
+        ↗
+      </span>
+    </div>
+  </a>
+</div>
         </motion.div>
       </motion.div>
 
