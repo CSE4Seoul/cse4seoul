@@ -204,6 +204,9 @@ export default function ChatPage() {
   useEffect(() => {
     if (!isJoined || !activeKey) return;
     let isUnmounted = false;
+    let retryCount = 0;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 
     setUserAgentName(generateAgentName());
 
@@ -259,48 +262,102 @@ export default function ChatPage() {
 
     loadMessages();
 
-    const channel = supabase
-      .channel('realtime:messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
-        async (payload) => {
-          const newRow = payload.new as ChatMessage;
-          const isExpired = newRow.expires_at && new Date(newRow.expires_at).getTime() < Date.now();
-          if (!isExpired && !newRow.is_deleted) {
-            const decrypted = await decryptMessage(newRow.content, activeKey);
-            setMessages((prev) => {
-              if (prev.some((message) => message.id === newRow.id)) return prev;
-              return [...prev, { ...newRow, decryptedContent: decrypted }];
-            });
+    const clearReconnectTimer = () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
+
+    const scheduleReconnect = () => {
+      clearReconnectTimer();
+      retryCount += 1;
+      const retryDelay = Math.min(30000, Math.pow(2, retryCount) * 1000);
+      reconnectTimer = setTimeout(() => {
+        subscribeRealtime(true);
+      }, retryDelay);
+    };
+
+    const subscribeRealtime = (force = false) => {
+      if (!force && currentChannel) return;
+      if (force && currentChannel) {
+        supabase.removeChannel(currentChannel);
+        currentChannel = null;
+      }
+
+      const channel = supabase
+        .channel(`realtime:messages:${Date.now()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
+          async (payload) => {
+            const newRow = payload.new as ChatMessage;
+            const isExpired = newRow.expires_at && new Date(newRow.expires_at).getTime() < Date.now();
+            if (!isExpired && !newRow.is_deleted) {
+              const decrypted = await decryptMessage(newRow.content, activeKey);
+              setMessages((prev) => {
+                if (prev.some((message) => message.id === newRow.id)) return prev;
+                return [...prev, { ...newRow, decryptedContent: decrypted }];
+              });
+            }
+            updateActiveUsers();
           }
-          updateActiveUsers();
-        }
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
-        const updated = payload.new as ChatMessage;
-        const isExpired = updated.expires_at && new Date(updated.expires_at).getTime() < Date.now();
+        )
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
+          const updated = payload.new as ChatMessage;
+          const isExpired = updated.expires_at && new Date(updated.expires_at).getTime() < Date.now();
 
-        if (updated.is_deleted || isExpired) {
-          setMessages((prev) => prev.filter((message) => message.id !== updated.id));
-          return;
-        }
+          if (updated.is_deleted || isExpired) {
+            setMessages((prev) => prev.filter((message) => message.id !== updated.id));
+            return;
+          }
 
-        const decrypted = await decryptMessage(updated.content, activeKey);
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === updated.id ? { ...updated, decryptedContent: decrypted } : message
-          )
-        );
-      })
-      .subscribe((status) => {
-        setIsRealtimeConnected(status === 'SUBSCRIBED');
-      });
+          const decrypted = await decryptMessage(updated.content, activeKey);
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === updated.id ? { ...updated, decryptedContent: decrypted } : message
+            )
+          );
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setIsRealtimeConnected(true);
+            retryCount = 0;
+            clearReconnectTimer();
+            loadMessages();
+            return;
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+            setIsRealtimeConnected(false);
+            scheduleReconnect();
+          }
+        });
+
+      currentChannel = channel;
+    };
+
+    subscribeRealtime();
 
     updateActiveUsers();
     const interval = setInterval(updateActiveUsers, 30000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') subscribeRealtime(true);
+    };
+    const handleOnline = () => subscribeRealtime(true);
+    const handleOffline = () => setIsRealtimeConnected(false);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     return () => {
       isUnmounted = true;
-      supabase.removeChannel(channel);
+      clearReconnectTimer();
+      if (currentChannel) {
+        supabase.removeChannel(currentChannel);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
   }, [isJoined, activeKey, supabase]);

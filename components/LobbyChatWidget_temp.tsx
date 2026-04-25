@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, FormEvent, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { 
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
-  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiRefreshLine
+  RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine
 } from 'react-icons/ri';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface LobbyMessage {
   id: string;
@@ -16,6 +15,7 @@ interface LobbyMessage {
   expires_at: string;
 }
 
+// 게임 브로드캐스트 페이로드 타입
 type GameStartPayload = { starter: string; startWord: string };
 type GameJoinPayload = { player: string };
 type GameLeavePayload = { player: string };
@@ -27,6 +27,7 @@ const BANNED_WORDS = [
   'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'nigger',
 ];
 
+// 간단한 단어 사전 (Set을 사용하여 O(1) 검색)
 const COMMON_WORDS = new Set<string>([
   '가나다', '가방', '가을', '나무', '나비', '다리', '다음', '라디오', '마음', '모자',
   '바다', '바람', '사과', '사랑', '아이', '아침', '자동차', '자전거', '차량', '차례',
@@ -47,33 +48,36 @@ const isValidWordChain = (word: string, previousWord: string): boolean => {
   return lastChar === firstChar;
 };
 
+// 단어 유효성 검증 (로컬 Set + 필요시 DB 연동)
 const isValidWord = async (word: string): Promise<boolean> => {
+  // 로컬 사전에 있으면 true
   if (COMMON_WORDS.has(word)) return true;
   // TODO: Supabase words 테이블에서 검색 (선택)
-  return false;
+  // const supabase = createClient();
+  // const { data } = await supabase.from('words').select('word').eq('word', word).single();
+  // return !!data;
+  return false; // 현재는 로컬 사전에 없는 단어는 유효하지 않음
 };
 
 export default function LobbyChatWidget() {
-  const [supabase] = useState(() => createClient());
+  const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<LobbyMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const isSendingRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const chatChannel = useRef<RealtimeChannel | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const chatEffectEpochRef = useRef(0);
-  const visibilityHandlerRef = useRef<(() => void) | null>(null);
-
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const chatChannel = useRef<any>(null);
+// ... 기존 state 들
+const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  // 로그인 상태
   const [userId, setUserId] = useState<string | null>(null);
   const [realName, setRealName] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [reconnectTrigger, setReconnectTrigger] = useState(0);
+const [reconnectTrigger, setReconnectTrigger] = useState(0);
+  // 닉네임 관련
   const [nickname, setNickname] = useState<string | null>(null);
   const [isAnonymousMode, setIsAnonymousMode] = useState(false);
   const [randomAgentName, setRandomAgentName] = useState('');
@@ -86,11 +90,8 @@ export default function LobbyChatWidget() {
   const [gameMessage, setGameMessage] = useState<string>('');
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
 
-  const gameChannel = useRef<RealtimeChannel | null>(null);
+  const gameChannel = useRef<any>(null);
   const gameChannelReady = useRef(false);
-  const afkTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
-  const MAX_MESSAGES = 100;
 
   const generateRandomName = () => {
     const prefixes = ['어둠의', '빛의', '전략의', '신속한', '정밀한', '신비로운', '침묵의', '폭풍의'];
@@ -101,21 +102,48 @@ export default function LobbyChatWidget() {
     return `${prefix} ${suffix} #${numbers.toString().padStart(3, '0')}`;
   };
 
-  // 유저/닉네임 초기화
+  // 컴포넌트 최상단 (useEffect 밖)에 수동 재연결 함수 추가
+const forceReconnect = async () => {
+  if (connectionStatus === 'connecting') return;
+  
+  setConnectionStatus('connecting');
+  
+  // 기존 채널이 있다면 폭파
+  if (chatChannel.current) {
+    await supabase.removeChannel(chatChannel.current);
+    chatChannel.current = null;
+  }
+
+  // 데이터 한 번 새로고침
+  setIsLoading(true);
+  const { data, error } = await supabase
+    .from('lobby_messages')
+    .select('*')
+    .gte('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(MAX_MESSAGES);
+    
+  if (!error) {
+    setMessages((data || []).reverse());
+  }
+  setIsLoading(false);
+
+  // 이 작업 직후 useEffect의 의존성이 변하거나 
+  // 내부 로직에 의해 subscribeToChat이 다시 실행되도록 유도
+  // (가장 간단한 건 chatChannel.current가 없을 때 
+  // 새 채널을 파주는 로직을 별도 함수로 빼서 여기서 호출하는 것입니다.)
+};
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-
       if (user) {
         setIsLoggedIn(true);
         setUserId(user.id);
-
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', user.id)
           .single();
-
         if (profile?.full_name) {
           setRealName(profile.full_name);
         }
@@ -125,7 +153,6 @@ export default function LobbyChatWidget() {
         setRealName(null);
       }
     };
-
     fetchUser();
   }, [supabase]);
 
@@ -135,14 +162,21 @@ export default function LobbyChatWidget() {
       setIsAnonymousMode(false);
     } else if (isLoggedIn && !realName) {
       const saved = localStorage.getItem('lobby_nickname');
-      setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
+      if (saved && saved.trim()) {
+        setNickname(saved.trim());
+      } else {
+        setNickname('익명의 요원');
+      }
       setIsAnonymousMode(false);
     } else {
       const saved = localStorage.getItem('lobby_nickname');
-      setNickname(saved && saved.trim() ? saved.trim() : '익명의 요원');
+      if (saved && saved.trim()) {
+        setNickname(saved.trim());
+      } else {
+        setNickname('익명의 요원');
+      }
       setIsAnonymousMode(true);
     }
-
     setRandomAgentName(generateRandomName());
   }, [isLoggedIn, realName]);
 
@@ -151,9 +185,7 @@ export default function LobbyChatWidget() {
       alert('익명 모드에서는 닉네임을 변경할 수 없습니다.');
       return;
     }
-
     const newName = prompt('새 닉네임을 입력하세요 (최대 20자)', nickname || '익명의 요원');
-
     if (newName && newName.trim()) {
       const trimmed = newName.trim().slice(0, 20);
       setNickname(trimmed);
@@ -172,191 +204,97 @@ export default function LobbyChatWidget() {
     setIsAnonymousMode(prev => !prev);
   };
 
-  // AFK 타이머 관리 (개선: 네트워크 지연 고려, 중복 방지)
-  const resetAfkTimer = useCallback(() => {
-    if (afkTimerRef.current) {
-      clearTimeout(afkTimerRef.current);
-      afkTimerRef.current = null;
+  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
+
+
+  const MAX_MESSAGES = 100;
+
+// 메시지 로드 및 구독
+useEffect(() => {
+  let isMounted = true;
+  let retryCount = 0;
+  const MAX_RETRIES = 5;
+  let subscription: any = null;
+
+  const loadMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lobby_messages')
+        .select('*')
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(MAX_MESSAGES);
+
+      if (error) throw error;
+      if (isMounted) setMessages((data || []).reverse());
+    } catch (err) {
+      console.error('로비 채팅 로드 실패:', err);
+    } finally {
+      if (isMounted) setIsLoading(false);
     }
+  };
 
-    if (gameActive && currentPlayer === displayName && players.length > 0) {
-      // 네트워크 지연을 고려하여 35초로 증가 (기존 30초)
-      afkTimerRef.current = setTimeout(() => {
-        if (gameActive && currentPlayer === displayName && gameChannel.current && gameChannelReady.current) {
-          // AFK 타임아웃 발생 시 game_word 이벤트 전송 (턴 넘기기)
-          gameChannel.current.send({
-            type: 'broadcast',
-            event: 'game_word',
-            payload: { player: displayName, word: '', success: false, reason: '시간 초과로 턴이 넘어갑니다.' }
-          });
-        }
-        afkTimerRef.current = null;
-      }, 35000);
-    }
-  }, [gameActive, currentPlayer, displayName, players.length]);
-
-  // currentPlayer나 gameActive 변경 시 AFK 타이머 재설정
-  useEffect(() => {
-    resetAfkTimer();
-    return () => {
-      if (afkTimerRef.current) {
-        clearTimeout(afkTimerRef.current);
-        afkTimerRef.current = null;
+  // 실시간 구독 함수 정의 (재사용 가능하게 분리)
+  const subscribeToChat = () => {
+      // 이미 구독 중인 튼튼한 채널이 있다면 굳이 새로 만들지 않음! (권한 뺏김 방지)
+      if (chatChannel.current) {
+        return; 
       }
-    };
-  }, [resetAfkTimer]);
-
-  // 실시간 채팅 구독 (강화된 재연결 및 메시지 동기화)
-  useEffect(() => {
-    const epoch = ++chatEffectEpochRef.current;
-    let disposed = false;
-    let retryCount = 0;
-    const MAX_RETRIES = 8;
-    let isSubscribing = false;
-
-    const isStale = () => disposed || chatEffectEpochRef.current !== epoch;
-
-    const clearReconnectTimer = () => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-    };
-
-    const teardownChatChannel = async () => {
-      clearReconnectTimer();
-      const channel = chatChannel.current;
-      if (!channel) return;
-      chatChannel.current = null;
-      await supabase.removeChannel(channel);
-    };
-
-    const loadMessages = async () => {
-      if (isStale()) return;
-      try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .select('*')
-          .gte('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(MAX_MESSAGES);
-
-        if (error) throw error;
-        if (!isStale()) setMessages((data || []).reverse());
-      } catch (err) {
-        console.error('로비 채팅 로드 실패:', err);
-      } finally {
-        if (!isStale()) setIsLoading(false);
-      }
-    };
-
-    const scheduleReconnect = () => {
-      if (isStale()) return;
-      if (retryCount >= MAX_RETRIES) {
-        console.error('최대 재연결 시도 실패, 수동 재연결 필요');
-        setConnectionStatus('error');
-        return;
-      }
-
-      retryCount += 1;
-      // 지수 백오프 최대 10초로 제한 (간헐적 지연 개선)
-      const backoffMs = Math.min(10000, Math.pow(2, retryCount) * 1000);
-      clearReconnectTimer();
-      reconnectTimerRef.current = setTimeout(() => {
-        if (!isStale()) void subscribeToChat();
-      }, backoffMs);
-    };
-
-    const subscribeToChat = async () => {
-      if (isStale() || isSubscribing) return;
-      isSubscribing = true;
-
-      // 기존 채널 제거
-      await teardownChatChannel();
-      if (isStale()) {
-        isSubscribing = false;
-        return;
-      }
-
-      setConnectionStatus('connecting');
 
       const newChannel = supabase
-        .channel('lobby:messages:realtime')
+        .channel('lobby-db-changes')
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'lobby_messages' },
           (payload) => {
-            if (isStale()) return;
             const newMsg = payload.new as LobbyMessage;
             setMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              if (prev.some(m => m.id === newMsg.id)) return prev;
               return [...prev, newMsg].slice(-MAX_MESSAGES);
             });
           }
         )
         .subscribe((status) => {
-          if (isStale()) {
-            isSubscribing = false;
-            return;
-          }
-          if (chatChannel.current !== newChannel) {
-            isSubscribing = false;
-            return;
-          }
-
           if (status === 'SUBSCRIBED') {
-            console.log('✅ 실시간 채팅 연결 성공');
+            console.log('✅ 실시간 채팅 연결 성공 (권한 확보!)');
             setConnectionStatus('connected');
             retryCount = 0;
-            isSubscribing = false;
-            return;
           }
-
-          if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+          if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             console.warn(`⚠️ 연결 끊김 (${status}). 재시도...`);
             setConnectionStatus('error');
-            void teardownChatChannel().then(() => {
-              isSubscribing = false;
-              scheduleReconnect();
-            });
-          } else {
-            isSubscribing = false;
+            chatChannel.current = null; // 끊기면 채널 비우고 재연결 유도
+            if (retryCount < MAX_RETRIES) {
+              retryCount++;
+              setTimeout(subscribeToChat, Math.pow(2, retryCount) * 1000);
+            }
           }
         });
 
+      // 생성된 채널을 안전한 금고(useRef)에 보관
       chatChannel.current = newChannel;
     };
 
-    // 초기 메시지 로드 및 구독
-    void loadMessages();
-    void subscribeToChat();
+    loadMessages();
+    subscribeToChat();
 
-    // visibilitychange 핸들러 (탭이 다시 활성화되면 재연결 시도)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if ((!chatChannel.current || connectionStatus !== 'connected') && !isStale()) {
-          retryCount = 0; // 재시도 카운터 리셋
-          void subscribeToChat();
-        }
+  // 브라우저 탭이 다시 활성화될 때 연결 상태 체크 (유용한 팁)
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      console.log('📱 앱이 포그라운드로 돌아옴. 연결 확인...');
+      subscribeToChat(); 
+    }
+  };
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  return () => {
+      isMounted = false;
+      if (chatChannel.current) {
+        supabase.removeChannel(chatChannel.current);
+        chatChannel.current = null;
       }
     };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    visibilityHandlerRef.current = handleVisibilityChange;
-
-    return () => {
-      disposed = true;
-      clearReconnectTimer();
-      if (visibilityHandlerRef.current) {
-        window.removeEventListener('visibilitychange', visibilityHandlerRef.current);
-        visibilityHandlerRef.current = null;
-      }
-      void teardownChatChannel();
-    };
-  }, [supabase, reconnectTrigger, connectionStatus]);
-
-  // Fallback 폴링 제거 (Realtime에 의존, 연결 끊김 시 자동 재연결로 대체)
-  // 필요시 수동 새로고침 버튼 제공
+  }, [supabase, reconnectTrigger]);
 
   // 게임 브로드캐스트 채널 구독
   useEffect(() => {
@@ -401,16 +339,6 @@ export default function LobbyChatWidget() {
           });
         } else {
           setGameMessage(`❌ ${payload.player}님의 단어 "${payload.word}" (은)는 잘못되었습니다. (${payload.reason})`);
-          // 실패 시에도 턴 넘기기
-          setPlayers(prevPlayers => {
-            const currentIdx = prevPlayers.findIndex(p => p === payload.player);
-            if (currentIdx === -1) return prevPlayers;
-            const nextIdx = (currentIdx + 1) % prevPlayers.length;
-            const nextPlayer = prevPlayers[nextIdx];
-            setCurrentPlayer(nextPlayer);
-            setGameMessage(`⏩ 다음 차례는 ${nextPlayer}님입니다.`);
-            return prevPlayers;
-          });
         }
       })
       .on('broadcast', { event: 'game_end' }, ({ payload }: { payload: GameEndPayload }) => {
@@ -425,21 +353,19 @@ export default function LobbyChatWidget() {
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         gameChannelReady.current = true;
-      } else {
-        gameChannelReady.current = false;
       }
     });
 
     gameChannel.current = channel;
 
     return () => {
-      gameChannelReady.current = false;
       channel.unsubscribe();
       gameChannel.current = null;
+      gameChannelReady.current = false;
     };
   }, [supabase]);
 
-  // 게임 상태 일관성 유지
+  // players 변경 시 currentPlayer 유효성 검사
   useEffect(() => {
     if (!gameActive) return;
     if (players.length === 0) {
@@ -489,10 +415,7 @@ export default function LobbyChatWidget() {
       setGameMessage('이미 참가 중입니다.');
       return;
     }
-    if (!gameChannel.current || !gameChannelReady.current) {
-      setGameMessage('게임 채널이 준비되지 않았습니다.');
-      return;
-    }
+    if (!gameChannel.current || !gameChannelReady.current) return;
     gameChannel.current.send({
       type: 'broadcast',
       event: 'game_join',
@@ -547,6 +470,7 @@ export default function LobbyChatWidget() {
       });
       return false;
     }
+    // 사전 검증
     const isValid = await isValidWord(word);
     if (!isValid) {
       if (!gameChannel.current) return false;
@@ -557,6 +481,7 @@ export default function LobbyChatWidget() {
       });
       return false;
     }
+    // 성공
     if (!gameChannel.current) return false;
     gameChannel.current.send({
       type: 'broadcast',
@@ -566,18 +491,23 @@ export default function LobbyChatWidget() {
     return true;
   };
 
-  // 메시지 전송 (재시도 로직 추가)
-  const sendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = newMessage.trim();
-    if (!trimmed || isSendingRef.current) return;
+ const sendMessage = async (e: FormEvent) => {
+  e.preventDefault();
+  const trimmed = newMessage.trim();
+  
+  if (!trimmed || isSending) {
+    chatInputRef.current?.focus();
+    return;
+  }
 
-    // 명령어 처리
+  try {
+    // 1. 명령어 처리 (게임 모드와 무관하게 우선 처리)
     if (trimmed === '/끝말잇기 시작') {
       await startGame();
       setNewMessage('');
       return;
     }
+
     if (gameActive) {
       if (trimmed === '/끝말잇기 참여') {
         joinGame();
@@ -598,16 +528,22 @@ export default function LobbyChatWidget() {
       }
     }
 
+    // 2. 일반 채팅 (게임 미활성 시) 비속어 필터링
     if (containsBadWord(trimmed)) {
       setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
       return;
     }
 
-    isSendingRef.current = true;
     setIsSending(true);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 1);
-    const tempId = crypto.randomUUID();
+
+    // --- 🌟 낙관적 업데이트 로직 시작 🌟 ---
+    
+    // (1) 임시 고유 ID 생성
+    const tempId = crypto.randomUUID(); 
+    
+    // (2) 서버 응답을 기다리지 않고 화면에 먼저 그릴 메시지 객체 생성
     const optimisticMsg: LobbyMessage = {
       id: tempId,
       content: trimmed,
@@ -615,47 +551,52 @@ export default function LobbyChatWidget() {
       created_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString(),
     };
-    setMessages(prev => [...prev, optimisticMsg].slice(-MAX_MESSAGES));
+
+    // (3) 내 화면(UI)에 즉시 렌더링
+    setMessages(prev => {
+      const newList = [...prev, optimisticMsg];
+      return newList.slice(-MAX_MESSAGES);
+    });
+    
+    // (4) 입력창 즉시 비우고 포커스 유지
     setNewMessage('');
+    requestAnimationFrame(() => chatInputRef.current?.focus());
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
 
-    // 전송 재시도 로직 (최대 2회)
-    let attempt = 0;
-    const maxAttempts = 2;
-    let success = false;
+    // --- 🌟 낙관적 업데이트 UI 처리 끝 🌟 ---
 
-    while (attempt < maxAttempts && !success) {
-      try {
-        const { data: realData, error } = await supabase
-          .from('lobby_messages')
-          .insert({
-            content: trimmed,
-            author_name: displayName,
-            expires_at: expiresAt.toISOString(),
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        setMessages(prev => prev.map(m => m.id === tempId ? (realData as LobbyMessage) : m));
-        success = true;
-      } catch (err) {
-        console.error(`메시지 전송 실패 (시도 ${attempt + 1}):`, err);
-        attempt++;
-        if (attempt === maxAttempts) {
-          setMessages(prev => prev.filter(m => m.id !== tempId));
-          setFilterWarning('⚠️ 메시지 전송에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요.');
-        } else {
-          // 재시도 전 지연 (0.5초)
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
+    // (5) 백그라운드에서 실제 DB 서버로 전송
+    const { data: realData, error } = await supabase
+      .from('lobby_messages')
+      .insert({
+        content: trimmed,
+        author_name: displayName,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select() // 중요: insert 후 DB에서 자동 생성된 진짜 ID를 받아옴
+      .single();
+
+    if (error) {
+      // 전송 실패 시 UI에 그렸던 임시 메시지 삭제 (롤백)
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      throw error;
     }
 
-    isSendingRef.current = false;
+    // (6) 성공 시, 화면의 임시 메시지를 DB에서 받아온 진짜 메시지로 조용히 교체
+    // (이렇게 해야 실시간 채널에서 같은 메시지가 날아왔을 때 중복 방지 로직이 정상 작동함)
+    setMessages(prev => 
+      prev.map(m => m.id === tempId ? (realData as LobbyMessage) : m)
+    );
+
+  } catch (err) {
+    console.error('로비 메시지 전송 실패:', err);
+    alert('메시지 전송에 실패했습니다.');
+  } finally {
     setIsSending(false);
-  };
+  }
+};
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -667,20 +608,6 @@ export default function LobbyChatWidget() {
       return () => clearTimeout(timer);
     }
   }, [filterWarning]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (e.nativeEvent.isComposing) return;
-      const form = e.currentTarget.form;
-      if (form) form.requestSubmit();
-    }
-  };
-
-  const manualReconnect = () => {
-    setConnectionStatus('connecting');
-    setReconnectTrigger(prev => prev + 1);
-  };
 
   return (
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
@@ -760,28 +687,33 @@ export default function LobbyChatWidget() {
               </button>
             )}
           </div>
-          <button
-            onClick={manualReconnect}
-            disabled={connectionStatus === 'connecting'}
-            className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 border ${
-              connectionStatus === 'connected' 
-                ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20' 
-                : connectionStatus === 'error'
-                ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 cursor-pointer'
-                : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 cursor-wait'
-            }`}
-            title="클릭하여 서버 수동 재연결"
-          >
-            <RiRefreshLine className="w-3 h-3 mr-0.5" />
-            <span className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' :
-              connectionStatus === 'error' ? 'bg-red-500' :
-              'bg-yellow-500 animate-bounce'
-            }`}></span>
-            {connectionStatus === 'connected' ? 'LIVE' : 
-             connectionStatus === 'error' ? '연결 끊김' : 
-             '연결 중...'}
-          </button>
+          
+            <button
+  onClick={() => {
+    // 수동 재연결 트리거 로직
+    setConnectionStatus('connecting');
+    setReconnectTrigger(prev => prev + 1);
+  }}
+  disabled={connectionStatus === 'connecting'}
+  className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 border ${
+    connectionStatus === 'connected' 
+      ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20' 
+      : connectionStatus === 'error'
+      ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 cursor-pointer'
+      : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 cursor-wait'
+  }`}
+  title="클릭하여 서버 수동 재연결"
+>
+  <span className={`w-2 h-2 rounded-full ${
+    connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' :
+    connectionStatus === 'error' ? 'bg-red-500' :
+    'bg-yellow-500 animate-bounce'
+  }`}></span>
+  {connectionStatus === 'connected' ? 'LIVE' : 
+   connectionStatus === 'error' ? '연결 끊김 (클릭시 재연결)' : 
+   '연결 중...'}
+</button>
+        
         </div>
       </div>
 
@@ -835,26 +767,36 @@ export default function LobbyChatWidget() {
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2">
           <textarea
-            ref={textareaRef}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onInput={(e) => {
-              const el = e.currentTarget;
-              el.style.height = 'auto';
-              el.style.height = el.scrollHeight + 'px';
-            }}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder={
-              gameActive
-                ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요`
-                : "익명으로 메시지 보내기..."
-            }
-            className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
-          />
+  ref={(el) => {
+    textareaRef.current = el;
+    (chatInputRef as any).current = el;
+  }}
+  value={newMessage}
+  onChange={(e) => setNewMessage(e.target.value)}
+  onInput={(e) => {
+    const el = e.currentTarget;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      if (form) form.requestSubmit();
+    }
+  }}
+  rows={1}
+  placeholder={
+    gameActive
+      ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어를 입력하세요`
+      : "익명으로 메시지 보내기..."
+  }
+  className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
+ // disabled={isSending}
+/>
           <button
             type="submit"
-            disabled={!newMessage.trim() || isSending}
+            disabled={isSending || !newMessage.trim()}
             className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
           >
             <RiSendPlaneLine className="text-white w-5 h-5" />
