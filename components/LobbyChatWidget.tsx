@@ -274,6 +274,7 @@ export default function LobbyChatWidget() {
   const [isLoading, setIsLoading]     = useState(true);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
   const messagesEndRef                = useRef<HTMLDivElement>(null);
+  const scrollContainerRef            = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
 
   const chatChannel         = useRef<RealtimeChannel | null>(null);
@@ -704,7 +705,17 @@ export default function LobbyChatWidget() {
     setIsSending(false);
   };
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // 사용자가 현재 채팅창 하단에 있을 때만 자동 스크롤
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
+
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
   useEffect(() => {
     if (filterWarning) {
       const t = setTimeout(() => setFilterWarning(null), 3000);
@@ -815,7 +826,10 @@ export default function LobbyChatWidget() {
       )}
 
       {/* ── 메시지 목록 ── */}
-      <div className="h-80 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+      <div 
+        ref={scrollContainerRef}
+        className="h-[550px] overflow-y-auto p-4 space-y-3 custom-scrollbar"
+      >
         {isLoading ? (
           <div className="flex justify-center items-center h-full text-gray-400">
             <div className="animate-pulse">메시지 로딩 중...</div>
