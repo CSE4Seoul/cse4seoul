@@ -706,19 +706,7 @@ export default function LobbyChatWidget() {
   };
 
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // 사용자가 현재 채팅창 하단에 있을 때만 자동 스크롤
-
-    /*
-    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
-
-    자동스크롤 기능 일시 비활성화 - UX 개선을 위해 새 메시지가 도착해도 사용자가 스크롤 위치를 유지하도록 변경
-   */
-    if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    // 자동 스크롤을 완전히 비활성화합니다.
   }, [messages]);
   useEffect(() => {
     if (filterWarning) {
