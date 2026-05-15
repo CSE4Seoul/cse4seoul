@@ -50,15 +50,21 @@ type GameEndPayload   = { reason: string };
  *   - 사용자 정의 이모티콘 업로드 (부적절 콘텐츠 필터 준비 후)
  */
 export const EMOTICONS: { keyword: string; label: string; ext?: string }[] = [
-  { keyword: '안녕',   label: '안녕',   ext: 'jpg' },
-  { keyword: '감사',   label: '감사',   ext: 'jpg' },
-  { keyword: 'ㅋㅋ',   label: 'ㅋㅋ',   ext: 'jpg' },
-  { keyword: '화남',   label: '화남',   ext: 'jpg' },
+  { keyword: '멍',     label: '멍',     ext: 'jpg' },
+  { keyword: '신나',   label: '신나',   ext: 'png' },
+  { keyword: '음',     label: '음',     ext: 'png' },
+  { keyword: '헐',     label: '헐',     ext: 'jpg' },
+  { keyword: '부끄러워', label: '부끄러워', ext: 'png' },
   { keyword: '화났어', label: '화났어', ext: 'png' },
-  { keyword: '슬픔',   label: '슬픔',   ext: 'jpg' },
-  { keyword: '사랑',   label: '사랑',   ext: 'jpg' },
-  { keyword: '파이팅', label: '파이팅', ext: 'jpg' },
-  { keyword: '졸림',   label: '졸림',   ext: 'jpg' },
+  { keyword: '졸려',   label: '졸려',   ext: 'jpg' },
+  { keyword: '찡긋',   label: '찡긋',   ext: 'png' },
+  { keyword: '배고파', label: '배고파', ext: 'png' },
+  { keyword: '냠냠',   label: '냠냠',   ext: 'jpg' },
+  { keyword: '사랑해', label: '사랑해', ext: 'png' },
+  { keyword: '응',     label: '응',     ext: 'png' },
+  { keyword: '화이팅', label: '화이팅', ext: 'png' },
+  { keyword: '장난',   label: '장난',   ext: 'jpg' },
+  { keyword: '힝',     label: '힝',     ext: 'png' },
 ];
 
 /** keyword → 이미지 경로 변환 */
