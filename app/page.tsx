@@ -13,7 +13,7 @@ import {
   RiInformationLine,
   RiCloseLine
 } from 'react-icons/ri';
-import LobbyChatWidget from '@/components/LobbyChatWidget'; // 🔥 컴포넌트 임포트
+import LobbyChatWidget from '@/components/LobbyChatWidget';
 
 // DB에서 가져올 게시글 타입 정의
 interface Post {
