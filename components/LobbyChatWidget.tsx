@@ -884,7 +884,13 @@ export default function LobbyChatWidget() {
           {/* AI 모드 토글 */}
           <button
             type="button"
-            onClick={() => setIsAiMode(prev => !prev)}
+            onClick={() => {
+              if (!isLoggedIn) {
+                alert('AI 기능은 로그인한 회원만 이용할 수 있습니다.');
+                return;
+              }
+              setIsAiMode(prev => !prev);
+            }}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
               isAiMode ? 'bg-pink-600/20 text-pink-300 border border-pink-500/30 hover:bg-pink-600/30'
                        : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'

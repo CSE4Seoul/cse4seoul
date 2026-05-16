@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 
 export async function POST(req: Request) {
   try {
+    // 0. 로그인 여부 확인
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'AI 기능은 로그인한 회원만 이용할 수 있습니다. 로그인을 먼저 해주세요.' }, 
+        { status: 401 }
+      );
+    }
+
     const { model, prompt } = await req.json();
     
     // 환경변수가 제대로 들어오는지 확인용 로그
@@ -19,7 +31,7 @@ export async function POST(req: Request) {
       process.env.NODE_ENV === 'production';
 
     const remoteUrlRaw =
-      process.env.OLLAMA_URL?.replace(/\/$/, "");;
+      process.env.OLLAMA_URL?.replace(/\/$/, "");
     let remoteUrl: string | null = null;
     const urlsToTry: Array<{ name: string; url: string; fallbackModel: string; isLocal?: boolean }> = [];
 
