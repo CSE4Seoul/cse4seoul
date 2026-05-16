@@ -309,12 +309,10 @@ export default function LobbyChatWidget() {
 
   // ── AI 통신 (Next.js API Route Proxy) ───────────────────────
   const askOllama = async (prompt: string) => {
-    // 무한 루프 방지: AI가 보낸 메시지는 무시
     if (prompt.startsWith('🤖')) return null;
 
     setIsAiProcessing(true);
     try {
-      // 프론트엔드는 이제 OLLAMA_URL(ngrok)을 모르고, 우리 서버의 API만 호출합니다.
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -324,16 +322,18 @@ export default function LobbyChatWidget() {
         }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'API route proxy failed');
+        // 서버에서 전달한 에러 메시지가 있으면 그것을 사용, 없으면 기본 메시지
+        throw new Error(data.error || data.content || `Server Error (${response.status})`);
       }
       
-      const data = await response.json();
-      return data.content; // API Route가 응답 텍스트만 추출해서 전달한다고 가정
-    } catch (err) {
+      return data.content;
+    } catch (err: any) {
       console.error('AI 프록시 통신 에러:', err);
-      return '⚠️ 서버와의 AI 통신에 실패했습니다.';
+      // 단순 에러 메시지 대신 실제 원인을 살짝 보여줍니다.
+      return `⚠️ AI 연결 실패: ${err.message}`;
     } finally {
       setIsAiProcessing(false);
     }
