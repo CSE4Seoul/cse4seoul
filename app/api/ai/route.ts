@@ -5,11 +5,24 @@ export async function POST(req: Request) {
     const { model, prompt } = await req.json();
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const remoteUrl = process.env.OLLAMA_URL?.replace(/\/$/, "");
+    const remoteUrlRaw = process.env.OLLAMA_URL?.replace(/\/$/, "");
+    let remoteUrl: string | null = null;
     const urlsToTry: Array<{ name: string; url: string; fallbackModel: string; isLocal?: boolean }> = [];
 
-    // 1. 외부 서버 (ngrok 주소가 설정되어 있을 때만)
-    if (remoteUrl && remoteUrl.startsWith('http')) {
+    if (remoteUrlRaw && remoteUrlRaw.startsWith('http')) {
+      // ngrok 등의 외부 주소가 유효한지 확인
+      try {
+        const parsed = new URL(remoteUrlRaw);
+        if (parsed.host.includes('*')) {
+          throw new Error('환경변수에 와일드카드(*)가 포함되어 있습니다. 실제 ngrok URL을 입력하세요.');
+        }
+        remoteUrl = parsed.toString();
+      } catch (err: any) {
+        console.error('[AI Proxy] 잘못된 OLLAMA_URL:', remoteUrlRaw, err.message);
+      }
+    }
+
+    if (remoteUrl) {
       urlsToTry.push({ 
         name: "🚀 외부 AI 서버 (로컬 PC)", 
         url: remoteUrl, 
@@ -83,8 +96,9 @@ export async function POST(req: Request) {
             source: item.name 
           });
         } else {
+          const text = await response.text().catch(() => '응답 본문을 읽을 수 없습니다.');
           console.warn(
-            `[AI Proxy] ❌ ${item.name} 응답 에러 (${response.status})`
+            `[AI Proxy] ❌ ${item.name} 응답 에러 (${response.status}) - ${text}`
           );
         }
 
