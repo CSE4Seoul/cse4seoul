@@ -60,7 +60,10 @@ export async function POST(req: Request) {
           item.isLocal ? 25000 : 12000
         );
 
-        const response = await fetch(`${item.url}/api/chat`, {
+        const targetUrl = new URL('/api/chat', item.url).toString();
+        console.log(`[AI Proxy] 실제 호출 URL: ${targetUrl}`);
+
+        const response = await fetch(targetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -98,7 +101,7 @@ export async function POST(req: Request) {
         } else {
           const text = await response.text().catch(() => '응답 본문을 읽을 수 없습니다.');
           console.warn(
-            `[AI Proxy] ❌ ${item.name} 응답 에러 (${response.status}) - ${text}`
+            `[AI Proxy] ❌ ${item.name} 응답 에러 (${response.status}) ${response.url} - ${text}`
           );
         }
 
