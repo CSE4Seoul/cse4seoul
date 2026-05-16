@@ -3,9 +3,23 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { model, prompt } = await req.json();
+    
+    // 환경변수가 제대로 들어오는지 확인용 로그
+    console.log(
+      '[AI Proxy] OLLAMA_URL 존재 여부:',
+      !!process.env.OLLAMA_URL
+    );
 
-    const isProduction = process.env.NODE_ENV === 'production';
-    const remoteUrlRaw = process.env.OLLAMA_URL?.replace(/\/$/, "");
+    console.log(
+      '[AI Proxy] NODE_ENV:',
+      process.env.NODE_ENV
+    );
+
+    const isProduction =
+      process.env.NODE_ENV === 'production';
+
+    const remoteUrlRaw =
+      process.env.OLLAMA_URL?.replace(/\/$/, "");;
     let remoteUrl: string | null = null;
     const urlsToTry: Array<{ name: string; url: string; fallbackModel: string; isLocal?: boolean }> = [];
 
