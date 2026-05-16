@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import {
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
   RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiRefreshLine,
-  RiEmotionLine, RiImageLine,
+  RiEmotionLine, RiImageLine, RiArrowDownSLine, RiArrowUpSLine,
 } from 'react-icons/ri';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -293,8 +293,73 @@ export default function LobbyChatWidget() {
 
   // 이모티콘 피커 상태
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('lobby_auto_scroll') !== 'false';
+  });
 
-  // 끝말잇기 상태
+  // AI 상태
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiModel, setAiModel] = useState('gemma:2b'); // 로컬 PC용 메인 모델
+  const [isAiMode, setIsAiMode] = useState(false); 
+
+  useEffect(() => {
+    localStorage.setItem('lobby_auto_scroll', autoScrollEnabled ? 'true' : 'false');
+  }, [autoScrollEnabled]);
+
+  // ── AI 통신 (Next.js API Route Proxy) ───────────────────────
+  const askOllama = async (prompt: string) => {
+    // 무한 루프 방지: AI가 보낸 메시지는 무시
+    if (prompt.startsWith('🤖')) return null;
+
+    setIsAiProcessing(true);
+    try {
+      // 프론트엔드는 이제 OLLAMA_URL(ngrok)을 모르고, 우리 서버의 API만 호출합니다.
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: aiModel,
+          prompt: prompt
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'API route proxy failed');
+      }
+      
+      const data = await response.json();
+      return data.content; // API Route가 응답 텍스트만 추출해서 전달한다고 가정
+    } catch (err) {
+      console.error('AI 프록시 통신 에러:', err);
+      return '⚠️ 서버와의 AI 통신에 실패했습니다.';
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const sendAiMessage = async (content: string) => {
+    if (!content) return; // 무시된 메시지(무한루프 방지 등)는 전송하지 않음
+    
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1);
+    
+    try {
+      await supabase
+        .from('lobby_messages')
+        .insert({ 
+          content, 
+          author_name: `🤖 AI Assistant (${aiModel})`, 
+          message_type: 'text', 
+          expires_at: expiresAt.toISOString() 
+        });
+    } catch (err) {
+      console.error('AI 메시지 전송 실패:', err);
+    }
+  };
+
+  // ── 끝말잇기 상태 ──
   const [gameActive,     setGameActive]     = useState(false);
   const [currentWord,    setCurrentWord]    = useState('');
   const [currentPlayer,  setCurrentPlayer]  = useState('');
@@ -682,6 +747,8 @@ export default function LobbyChatWidget() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     let attempt = 0, success = false;
+    let finalData: LobbyMessage | null = null;
+
     while (attempt < 2 && !success) {
       try {
         const { data, error } = await supabase
@@ -689,7 +756,8 @@ export default function LobbyChatWidget() {
           .insert({ content: trimmed, author_name: displayName, message_type: 'text', expires_at: expiresAt.toISOString() })
           .select().single();
         if (error) throw error;
-        setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
+        finalData = data as LobbyMessage;
+        setMessages(prev => prev.map(m => m.id === tempId ? finalData! : m));
         success = true;
       } catch {
         attempt++;
@@ -703,11 +771,28 @@ export default function LobbyChatWidget() {
     }
     isSendingRef.current = false;
     setIsSending(false);
+
+    // AI 응답 로직
+    if (success && !isAiProcessing) {
+      if (trimmed.startsWith('/ai ')) {
+        const aiPrompt = trimmed.replace('/ai ', '');
+        const aiResponse = await askOllama(aiPrompt);
+        await sendAiMessage(aiResponse);
+      } else if (isAiMode) {
+        // AI 모드일 경우 모든 일반 메시지에 대해 응답 시도 (선택 사항)
+        const aiResponse = await askOllama(trimmed);
+        await sendAiMessage(aiResponse);
+      }
+    }
   };
 
   useEffect(() => {
-    // 자동 스크롤을 완전히 비활성화합니다.
-  }, [messages]);
+    if (!autoScrollEnabled) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, autoScrollEnabled]);
+
   useEffect(() => {
     if (filterWarning) {
       const t = setTimeout(() => setFilterWarning(null), 3000);
@@ -776,6 +861,33 @@ export default function LobbyChatWidget() {
               {isAnonymousMode ? '익명' : '실명'}
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setAutoScrollEnabled(prev => !prev)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              autoScrollEnabled ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
+                                : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
+            }`}
+            title={autoScrollEnabled ? '자동 스크롤 끄기' : '자동 스크롤 켜기'}
+          >
+            {autoScrollEnabled ? <RiArrowDownSLine className="w-3 h-3" /> : <RiArrowUpSLine className="w-3 h-3" />}
+            {autoScrollEnabled ? '스크롤 ON' : '스크롤 OFF'}
+          </button>
+
+          {/* AI 모드 토글 */}
+          <button
+            type="button"
+            onClick={() => setIsAiMode(prev => !prev)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              isAiMode ? 'bg-pink-600/20 text-pink-300 border border-pink-500/30 hover:bg-pink-600/30'
+                       : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
+            }`}
+            title={isAiMode ? 'AI 자동 응답 끄기' : 'AI 자동 응답 켜기'}
+          >
+            <span className={isAiMode ? 'animate-bounce' : ''}>🤖</span>
+            {isAiMode ? 'AI ON' : 'AI OFF'}
+          </button>
 
           <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
             <span className="text-gray-400">👤</span>
@@ -877,10 +989,20 @@ export default function LobbyChatWidget() {
             placeholder={
               gameActive
                 ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어 입력`
-                : '메시지 입력... (이모티콘: /안녕, /감사 …)'
+                : isAiMode 
+                  ? 'AI와 대화 중... 메시지를 입력하세요.'
+                  : '메시지 입력... (/ai [질문] 으로 AI에게 묻기)'
             }
             className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
           />
+
+          {/* AI 처리 중 표시 */}
+          {isAiProcessing && (
+            <div className="absolute -top-8 left-0 flex items-center gap-2 text-pink-400 text-xs animate-pulse">
+              <span className="flex h-2 w-2 rounded-full bg-pink-500"></span>
+              AI가 생각 중입니다 ({aiModel})...
+            </div>
+          )}
 
           {/* 전송 버튼 */}
           <button
