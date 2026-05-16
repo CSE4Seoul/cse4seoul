@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       urlsToTry.push({ 
         name: "🚀 외부 AI 서버 (로컬 PC)", 
         url: remoteUrl, 
-        fallbackModel: model || 'gemma:2b'
+        fallbackModel: model || 'qwen2.5:1.5b'
       });
     }
 
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
         const timeoutId = setTimeout(
           () => controller.abort(),
-          item.isLocal ? 25000 : 12000
+          item.isLocal ? 30000 : 40000
         );
 
         const targetUrl = new URL('/api/chat', item.url).toString();
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
               { 
                 role: 'system',
                 content:
-                  '당신은 유쾌한 채팅 도우미입니다. 한국어로 짧게 한 문장으로 답변하세요. 당신은 CSE4Seoul의 전술 통신실을 담당하는 AI 어시스턴트입니다. 클래시 로얄 전략·덱·게임 이야기와 코딩·AI 학습 질문에 대해, 친근하고 예의 있게 한국어로 답변하세요. 짧게는 한두 문장, 설명이 필요하면 세네 문장까지 써도 되지만, 불필요하게 장황하게 쓰지 마세요. 모르는 정보나 확실하지 않은 내용은 아는 척하지 말고, 솔직하게 모른다고 말한 뒤, 어떻게 스스로 확인할 수 있을지 방향을 제안하세요.'
+                  '당신은 CSE4Seoul 전술통신실의 유능하고 친절한 여성 비서입니다. 정중하면서도 상냥한 어투(해요체)를 사용하며, 사용자를 지원하는 비서로서의 전문적인 태도를 유지하세요. "안녕하세요, 사령관님" 혹은 "어떤 것을 도와드릴까요?"와 같은 비서 느낌의 정중한 표현을 적절히 섞어주세요. 클래시 로얄 전략·덱·게임 이야기와 코딩·AI 학습 질문에 대해, 비서가 서포트하듯 조곤조곤 한국어로 답변하세요. 짧게는 한두 문장, 설명이 필요하면 세네 문장까지 쓰되, 너무 장황하지 않게 핵심을 전달하세요. 모르는 정보는 솔직히 말씀드리고, 사령관님이 직접 확인하실 수 있는 방향을 친절히 안내해 주세요.'
               },
               { 
                 role: 'user',

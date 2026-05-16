@@ -300,7 +300,7 @@ export default function LobbyChatWidget() {
 
   // AI 상태
   const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [aiModel, setAiModel] = useState('gemma:2b'); // 로컬 PC용 메인 모델
+  const [aiModel, setAiModel] = useState('qwen2.5:1.5b'); // 로컬 PC용 메인 모델
   const [isAiMode, setIsAiMode] = useState(false); 
 
   useEffect(() => {
