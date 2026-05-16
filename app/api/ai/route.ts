@@ -6,9 +6,7 @@ export async function POST(req: Request) {
 
     const isProduction = process.env.NODE_ENV === 'production';
     const remoteUrl = process.env.OLLAMA_URL?.replace(/\/$/, "");
-    const localUrl = "http://localhost:11434";
-
-    const urlsToTry = [];
+    const urlsToTry: Array<{ name: string; url: string; fallbackModel: string; isLocal?: boolean }> = [];
 
     // 1. 외부 서버 (ngrok 주소가 설정되어 있을 때만)
     if (remoteUrl && remoteUrl.startsWith('http')) {
@@ -21,10 +19,12 @@ export async function POST(req: Request) {
 
     // 2. 개발 환경용 Codespace 로컬 백업
     if (!isProduction) {
+      const localUrl = "http://localhost:11434";
       urlsToTry.push({ 
         name: "🐢 Codespace 로컬 백업", 
         url: localUrl, 
-        fallbackModel: "qwen2.5:0.5b" 
+        fallbackModel: "qwen2.5:0.5b",
+        isLocal: true,
       });
     }
 
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
         const timeoutId = setTimeout(
           () => controller.abort(),
-          item.url === localUrl ? 25000 : 12000
+          item.isLocal ? 25000 : 12000
         );
 
         const response = await fetch(`${item.url}/api/chat`, {
