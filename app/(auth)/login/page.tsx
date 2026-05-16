@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [isAgreed, setIsAgreed] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -41,13 +42,40 @@ export default function LoginPage() {
   const handleSignUp = async () => {
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signUp({
+    if (!isAgreed) {
+      setError('개인정보 수집 및 이용에 동의해 주세요.');
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+      options: {
+        emailRedirectTo: `${location.origin}/auth/callback`,
+        data: {
+          is_consented: true,
+          consented_at: new Date().toISOString(),
+        },
+      },
     });
-    if (error) setError(error.message);
-    else setError('이메일을 확인해서 인증해주세요! (또는 Supabase에서 Confirm Email 끄면 바로 됨)');
+    if (error) {
+      setError(error.message);
+    } else {
+      // persist consent server-side
+      try {
+        const userId = data?.user?.id;
+        if (userId) {
+          await fetch('/api/profiles/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: userId, is_consented: true, consented_at: new Date().toISOString() }),
+          });
+        }
+      } catch (e) {
+        console.error('Failed to persist consent:', e);
+      }
+      setError('이메일을 확인해서 인증해주세요! (또는 Supabase에서 Confirm Email 끄면 바로 됨)');
+    }
     setLoading(false);
   };
 
@@ -128,6 +156,22 @@ export default function LoginPage() {
             >
               {t('createNewIdentity')}
             </button>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                id="consent-login"
+                type="checkbox"
+                checked={isAgreed}
+                onChange={(e) => setIsAgreed(e.target.checked)}
+                className="mt-1"
+              />
+              <label htmlFor="consent-login" className="text-sm text-gray-300">
+                개인정보 수집 · 이용에 동의합니다. (
+                <a href="/privacy" className="underline">
+                  개인정보 처리방침
+                </a>
+                )
+              </label>
+            </div>
             <div className="text-center mt-4">
               <button
                 type="button"

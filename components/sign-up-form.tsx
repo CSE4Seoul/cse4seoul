@@ -23,6 +23,7 @@ export function SignUpForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
+  const [isAgreed, setIsAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -40,14 +41,39 @@ export function SignUpForm({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      if (!isAgreed) {
+        setError("개인정보 수집 및 이용에 동의해 주세요.");
+        setIsLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
+          data: {
+            is_consented: true,
+            consented_at: new Date().toISOString(),
+          },
         },
       });
       if (error) throw error;
+
+      // Persist consent server-side
+      try {
+        const userId = data?.user?.id;
+        if (userId) {
+          await fetch('/api/profiles/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: userId, is_consented: true, consented_at: new Date().toISOString() }),
+          });
+        }
+      } catch (e) {
+        // non-fatal: log client-side
+        console.error('Failed to persist consent:', e);
+      }
+
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -100,6 +126,22 @@ export function SignUpForm({
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}
                 />
+              </div>
+              <div className="flex items-start gap-2">
+                <input
+                  id="consent"
+                  type="checkbox"
+                  checked={isAgreed}
+                  onChange={(e) => setIsAgreed(e.target.checked)}
+                  className="mt-1"
+                />
+                <label htmlFor="consent" className="text-sm">
+                  개인정보 수집 및 이용에 동의합니다. (
+                  <Link href="/privacy" className="underline">
+                    개인정보 처리방침
+                  </Link>
+                  )
+                </label>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>
