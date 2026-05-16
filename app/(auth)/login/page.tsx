@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Link from 'next/link';
 
 export default function LoginPage() {
-  const { t, toggleLanguage } = useLanguage();
+  const { t, toggleLanguage, lang } = useLanguage();
   const router = useRouter();
   const supabase = createClient();
   
@@ -43,7 +44,7 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     if (!isAgreed) {
-      setError('개인정보 수집 및 이용에 동의해 주세요.');
+      setError(lang === 'ko' ? '개인정보 수집 및 이용에 동의해 주세요.' : 'Please agree to the collection and use of personal information.');
       setLoading(false);
       return;
     }
@@ -74,7 +75,7 @@ export default function LoginPage() {
       } catch (e) {
         console.error('Failed to persist consent:', e);
       }
-      setError('이메일을 확인해서 인증해주세요! (또는 Supabase에서 Confirm Email 끄면 바로 됨)');
+      setError(lang === 'ko' ? '이메일을 확인해서 인증해주세요!' : 'Please check your email for verification!');
     }
     setLoading(false);
   };
@@ -165,10 +166,10 @@ export default function LoginPage() {
                 className="mt-1"
               />
               <label htmlFor="consent-login" className="text-sm text-gray-300">
-                개인정보 수집 · 이용에 동의합니다. (
-                <a href="/privacy" className="underline">
-                  개인정보 처리방침
-                </a>
+                {t('privacyAgree')} (
+                <Link href="/privacy" className="underline">
+                  {t('privacyPolicy')}
+                </Link>
                 )
               </label>
             </div>

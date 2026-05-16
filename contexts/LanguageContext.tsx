@@ -17,6 +17,8 @@ const dictionaries = {
     sendResetLink: 'Send Reset Link',
     sending: 'Sending...',
     backToLogin: 'Back to Login',
+    privacyAgree: 'I agree to the collection and use of personal information.',
+    privacyPolicy: 'Privacy Policy',
   },
   ko: {
     systemAccess: '시스템 접근',
@@ -32,6 +34,8 @@ const dictionaries = {
     sendResetLink: '재설정 링크 보내기',
     sending: '보내는 중...',
     backToLogin: '로그인으로 돌아가기',
+    privacyAgree: '개인정보 수집 · 이용에 동의합니다.',
+    privacyPolicy: '개인정보 처리방침',
   },
 };
 

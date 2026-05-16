@@ -46,7 +46,8 @@ export async function updateSession(request: NextRequest) {
     pathname !== "/" &&
     !user &&
     !isAuthPage &&
-    !isApiPage
+    !isApiPage &&
+    !isPrivacyPage
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -63,7 +64,7 @@ export async function updateSession(request: NextRequest) {
 
     // If no profile found OR is_consented is falsy (false or null)
     if (!profile || !profile.is_consented) {
-      if (!pathname.startsWith("/privacy/consent") && !isAuthPage) {
+      if (!pathname.startsWith("/privacy/consent") && !isAuthPage && !isPrivacyPage) {
         const url = request.nextUrl.clone();
         url.pathname = "/privacy/consent";
         return NextResponse.redirect(url);

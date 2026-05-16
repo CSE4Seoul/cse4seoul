@@ -15,11 +15,13 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export function SignUpForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const { t, lang } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
@@ -42,7 +44,7 @@ export function SignUpForm({
 
     try {
       if (!isAgreed) {
-        setError("개인정보 수집 및 이용에 동의해 주세요.");
+        setError(lang === 'ko' ? '개인정보 수집 및 이용에 동의해 주세요.' : 'Please agree to the collection and use of personal information.');
         setIsLoading(false);
         return;
       }
@@ -136,9 +138,9 @@ export function SignUpForm({
                   className="mt-1"
                 />
                 <label htmlFor="consent" className="text-sm">
-                  개인정보 수집 및 이용에 동의합니다. (
+                  {t('privacyAgree')} (
                   <Link href="/privacy" className="underline">
-                    개인정보 처리방침
+                    {t('privacyPolicy')}
                   </Link>
                   )
                 </label>

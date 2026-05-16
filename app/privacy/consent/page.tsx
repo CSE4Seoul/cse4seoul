@@ -83,9 +83,17 @@ export default function PrivacyConsentPage() {
         </p>
 
         <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 mb-8 space-y-4 max-h-60 overflow-y-auto text-sm text-gray-300">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <ChevronRight className="w-4 h-4 text-blue-500" /> 수집하는 개인정보 항목
-          </h3>
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-bold text-white flex items-center gap-2">
+              <ChevronRight className="w-4 h-4 text-blue-500" /> 개인정보 처리방침 요약
+            </h3>
+            <a 
+              href="/privacy" 
+              className="text-xs text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
+            >
+              전체 보기
+            </a>
+          </div>
           <p>
             - 이메일, 코드네임, 소속 대학, Clash Royale 태그
             <br />
