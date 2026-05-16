@@ -322,17 +322,23 @@ export default function LobbyChatWidget() {
         }),
       });
 
+      // 응답이 JSON인지 먼저 확인
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error('서버 응답이 JSON이 아닙니다:', text);
+        throw new Error(`서버가 올바르지 않은 응답을 보냈습니다. (Status: ${response.status})`);
+      }
+
       const data = await response.json();
       
       if (!response.ok) {
-        // 서버에서 전달한 에러 메시지가 있으면 그것을 사용, 없으면 기본 메시지
-        throw new Error(data.error || data.content || `Server Error (${response.status})`);
+        throw new Error(data.error || data.content || `서버 에러 (${response.status})`);
       }
       
       return data.content;
     } catch (err: any) {
-      console.error('AI 프록시 통신 에러:', err);
-      // 단순 에러 메시지 대신 실제 원인을 살짝 보여줍니다.
+      console.error('AI 프록시 상세 에러:', err);
       return `⚠️ AI 연결 실패: ${err.message}`;
     } finally {
       setIsAiProcessing(false);
