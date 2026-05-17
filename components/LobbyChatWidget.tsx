@@ -19,13 +19,7 @@ interface LobbyMessage {
   author_name: string;
   created_at: string;
   expires_at: string;
-  /**
-   * 'text'     → 일반 텍스트 메시지
-   * 'emoticon' → 이모티콘 메시지  (content = "[emoticon:키워드]")
-   * 'image'    → 향후 사진 업로드 확장용 (현재 미사용)
-   */
   message_type?: 'text' | 'emoticon' | 'image';
-  /** 향후 사진 업로드 시 사용할 미디어 URL (현재 미사용) */
   media_url?: string;
 }
 
@@ -39,16 +33,6 @@ type GameEndPayload   = { reason: string };
 // Emoticon registry
 // ─────────────────────────────────────────────
 
-/**
- * 사용 가능한 이모티콘 목록.
- * 파일 경로: /emotions/e_{keyword}.{ext}
- * 새 이모티콘 추가 시 이 배열에만 등록하면 됩니다.
- *
- * 향후 확장:
- *   - 이모티콘 디렉토리를 API로 스캔해 동적으로 목록 구성
- *   - 카테고리(인사, 감정, 게임…)별 그루핑
- *   - 사용자 정의 이모티콘 업로드 (부적절 콘텐츠 필터 준비 후)
- */
 export const EMOTICONS: { keyword: string; label: string; ext?: string }[] = [
   { keyword: '멍',     label: '멍',     ext: 'jpg' },
   { keyword: '신나',   label: '신나',   ext: 'png' },
@@ -67,14 +51,8 @@ export const EMOTICONS: { keyword: string; label: string; ext?: string }[] = [
   { keyword: '힝',     label: '힝',     ext: 'png' },
 ];
 
-/** keyword → 이미지 경로 변환 */
-const emoticonSrc = (keyword: string, ext = 'jpg') =>
-  `/emotions/e_${keyword}.${ext}`;
+const emoticonSrc = (keyword: string, ext = 'jpg') => `/emotions/e_${keyword}.${ext}`;
 
-/**
- * 텍스트에서 [emoticon:키워드] 토큰을 찾아 이미지 src로 변환합니다.
- * 없으면 null을 반환합니다.
- */
 const parseEmoticonToken = (content: string): string | null => {
   const m = content.match(/^\[emoticon:(.+?)\]$/);
   if (!m) return null;
@@ -83,10 +61,6 @@ const parseEmoticonToken = (content: string): string | null => {
   return meta ? emoticonSrc(meta.keyword, meta.ext) : null;
 };
 
-/**
- * 사용자가 /키워드 형식으로 입력했는지 확인하고
- * 매칭되는 이모티콘 keyword를 반환합니다. 없으면 null.
- */
 const matchEmoticonCommand = (text: string): string | null => {
   if (!text.startsWith('/')) return null;
   const keyword = text.slice(1).trim();
@@ -95,7 +69,7 @@ const matchEmoticonCommand = (text: string): string | null => {
 };
 
 // ─────────────────────────────────────────────
-// Profanity / game utils (unchanged)
+// Profanity / game utils
 // ─────────────────────────────────────────────
 
 const BANNED_WORDS = [
@@ -152,7 +126,6 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
                  bg-gray-900 border border-gray-700 rounded-2xl p-3 shadow-2xl
                  w-64 animate-in fade-in slide-in-from-bottom-2 duration-150"
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-gray-400 font-semibold tracking-wider uppercase">이모티콘</span>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
@@ -160,7 +133,6 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
         </button>
       </div>
 
-      {/* Emoticon grid */}
       <div className="grid grid-cols-4 gap-2">
         {EMOTICONS.map(({ keyword, label, ext }) => (
           <button
@@ -172,13 +144,11 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
             title={`/${keyword}`}
           >
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-800 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={emoticonSrc(keyword, ext)}
                 alt={label}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-150"
                 onError={(e) => {
-                  // 이미지 없을 때 placeholder 텍스트
                   const el = e.currentTarget;
                   el.style.display = 'none';
                   el.parentElement!.innerHTML = `<span class="text-xs text-gray-500">${label}</span>`;
@@ -192,18 +162,10 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
         ))}
       </div>
 
-      {/* Hint */}
       <p className="text-[9px] text-gray-600 mt-2 text-center">
         채팅창에 <span className="text-cyan-600">/키워드</span> 입력으로도 사용 가능
       </p>
 
-      {/*
-        ── 향후 확장 포인트 ──────────────────────────────────────────
-        이 영역에 "사진 업로드" 버튼을 추가할 예정입니다.
-        부적절 이미지 필터(서버사이드 Vision API 또는 클라이언트 NSFWJS)
-        준비 완료 후 구현합니다.
-        ────────────────────────────────────────────────────────────
-      */}
       <div className="mt-2 pt-2 border-t border-gray-800 flex items-center gap-2 opacity-40 cursor-not-allowed select-none">
         <RiImageLine className="w-3.5 h-3.5 text-gray-500" />
         <span className="text-[9px] text-gray-500">사진 업로드 (준비 중)</span>
@@ -221,14 +183,12 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
 
   return (
     <div className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
-      {/* Avatar */}
       <div className="flex-shrink-0 mt-1">
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/50 flex items-center justify-center">
           <span className="text-xs font-bold text-cyan-300">?</span>
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-sm font-semibold text-cyan-300">{msg.author_name}</span>
@@ -238,9 +198,7 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
         </div>
 
         {emoticonSrcVal ? (
-          /* ── 이모티콘 메시지 ── */
           <div className="mt-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={emoticonSrcVal}
               alt={msg.content}
@@ -251,7 +209,6 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
             />
           </div>
         ) : (
-          /* ── 일반 텍스트 메시지 ── */
           <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">
             {msg.content}
           </p>
@@ -327,29 +284,27 @@ export default function LobbyChatWidget() {
   const [isAnonymousMode,  setIsAnonymousMode]  = useState(false);
   const [randomAgentName,  setRandomAgentName]  = useState('');
 
-  // 이모티콘 피커 상태
   const [showEmoticonPicker, setShowEmoticonPicker] = useState(false);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
     return localStorage.getItem('lobby_auto_scroll') !== 'false';
   });
 
-  // AI 상태
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiModel, setAiModel] = useState('qwen2.5:1.5b');
   const [isAiMode, setIsAiMode] = useState(false); 
 
-  // ── 끝말잇기 상태 ──
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
   const [showRecruitmentPopup, setShowRecruitmentPopup] = useState(false);
 
+  // 로컬 환경 탭 다중 테스트 대응: localStorage 대신 sessionStorage 사용
   const [guestId] = useState(() => {
     if (typeof window === 'undefined') return '';
-    let id = localStorage.getItem('guest_id');
+    let id = sessionStorage.getItem('guest_id');
     if (!id) {
       id = crypto.randomUUID();
-      localStorage.setItem('guest_id', id);
+      sessionStorage.setItem('guest_id', id);
     }
     return id;
   });
@@ -359,7 +314,7 @@ export default function LobbyChatWidget() {
   const gameTimerRef     = useRef<NodeJS.Timeout | null>(null);
 
   const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
-  const currentUserId = userId || guestId; // Stable identification for anonymous users
+  const currentUserId = userId || guestId; 
   const currentUserIdRef = useRef(currentUserId);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
 
@@ -375,7 +330,6 @@ export default function LobbyChatWidget() {
     localStorage.setItem('lobby_auto_scroll', autoScrollEnabled ? 'true' : 'false');
   }, [autoScrollEnabled]);
 
-  // ── AI 통신 ... (생략 가능하지만 유지) ───────────────────────
   const askOllama = async (prompt: string) => {
     if (prompt.startsWith('🤖')) return null;
     setIsAiProcessing(true);
@@ -411,7 +365,6 @@ export default function LobbyChatWidget() {
     } catch (err) { console.error(err); }
   };
 
-  // ── 유저 초기화 ──────────────────────────────
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -458,17 +411,20 @@ export default function LobbyChatWidget() {
     setIsAnonymousMode(prev => !prev);
   };
 
-  // ── 끝말잇기 게임 로직 ───────────────────────
-
-  const broadcastGameSync = useCallback(async (state: GameState) => {
+  // 통신 안정화를 위한 try-catch 로직 추가
+  const broadcastGameSync = useCallback((state: GameState) => {
     if (gameChannel.current) {
       const send = async (retries = 3) => {
         if (gameChannelReady.current) {
-          await gameChannel.current!.send({
-            type: 'broadcast',
-            event: 'game_sync',
-            payload: state,
-          });
+          try {
+            await gameChannel.current!.send({
+              type: 'broadcast',
+              event: 'game_sync',
+              payload: state,
+            });
+          } catch (error) {
+            console.error('Game sync broadcast failed:', error);
+          }
         } else if (retries > 0) {
           setTimeout(() => send(retries - 1), 500);
         }
@@ -611,7 +567,6 @@ export default function LobbyChatWidget() {
     };
   }, [gameState.status, currentUserId]);
 
-  // Host-only effect to handle transitions
   useEffect(() => {
     if (gameState.hostId === currentUserId && gameState.remainingTime <= 0) {
       if (gameState.status === 'WAITING' || gameState.status === 'PLAYING') {
@@ -658,7 +613,6 @@ export default function LobbyChatWidget() {
     broadcastGameSync(newState);
   };
 
-  // ── 실시간 채팅 & 게임 채널 구독 ─────────────────────────
   useEffect(() => {
     const epoch = ++chatEffectEpochRef.current;
     let disposed = false;
@@ -674,14 +628,12 @@ export default function LobbyChatWidget() {
       finally { if (!isStale()) setIsLoading(false); }
     };
 
-    // 1. 채팅 구독
     const chatCh = supabase.channel('lobby:messages:realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
         if (isStale()) return;
         setMessages(prev => [...prev, payload.new as LobbyMessage].slice(-MAX_MESSAGES));
       }).subscribe();
 
-    // 2. 게임 동기화 구독 (안정성 강화)
     const gameCh = supabase.channel('game:lobby', {
       config: {
         broadcast: { ack: true, self: true },
@@ -693,7 +645,6 @@ export default function LobbyChatWidget() {
       setGameState(payload);
 
       if (payload.status === 'WAITING') {
-        // ref를 사용해 항상 최신 currentUserId로 비교
         const isMeInGame = payload.players.some(p => p.id === currentUserIdRef.current);
         if (!isMeInGame) {
           setShowRecruitmentPopup(true);
@@ -705,7 +656,10 @@ export default function LobbyChatWidget() {
       }
     }).subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        setConnectionStatus('connected');
         gameChannelReady.current = true;
+      } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+        setConnectionStatus('error');
       }
     });
 
@@ -720,9 +674,8 @@ export default function LobbyChatWidget() {
       supabase.removeChannel(chatCh);
       supabase.removeChannel(gameCh);
     };
-  }, [supabase, currentUserId, reconnectTrigger]); // reconnectTrigger 추가로 재연결 버튼이 게임 채널도 재구독
+  }, [supabase, currentUserId, reconnectTrigger]); 
 
-  // ── 이모티콘 선택 핸들러 ─────────────────────
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
     isSendingRef.current = true;
@@ -748,7 +701,6 @@ export default function LobbyChatWidget() {
     }
   };
 
-  // ── 메시지 전송 ──────────────────────────────
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const trimmed = newMessage.trim();
@@ -789,7 +741,6 @@ export default function LobbyChatWidget() {
       }).select().single();
       
       if (!error && data) {
-        // AI Response Logic
         if (gameState.status !== 'PLAYING') {
           if (trimmed.startsWith('/ai ')) {
             const aiResponse = await askOllama(trimmed.replace('/ai ', ''));
@@ -828,8 +779,6 @@ export default function LobbyChatWidget() {
       if (!e.nativeEvent.isComposing) e.currentTarget.form?.requestSubmit();
     }
   };
-
-  // ── Render Helpers ───────────────────────────
 
   const RecruitmentPopup = () => (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -924,7 +873,6 @@ export default function LobbyChatWidget() {
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
       {showRecruitmentPopup && gameState.status === 'WAITING' && <RecruitmentPopup />}
       
-      {/* ── Header ── */}
       <div className="p-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <RiChat3Line className="text-cyan-400 text-xl" />
@@ -958,7 +906,6 @@ export default function LobbyChatWidget() {
             {autoScrollEnabled ? '스크롤 ON' : '스크롤 OFF'}
           </button>
 
-          {/* AI 모드 토글 */}
           <button
             type="button"
             onClick={() => {
@@ -996,7 +943,6 @@ export default function LobbyChatWidget() {
 
       {gameState.status !== 'IDLE' && <GameHUD />}
 
-      {/* ── 메시지 목록 ── */}
       <div 
         ref={scrollContainerRef}
         className="h-[550px] overflow-y-auto p-4 space-y-3 custom-scrollbar"
@@ -1015,7 +961,6 @@ export default function LobbyChatWidget() {
         )}
       </div>
 
-      {/* ── 입력창 ── */}
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2 items-end relative">
           {showEmoticonPicker && (
@@ -1052,7 +997,6 @@ export default function LobbyChatWidget() {
             className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
           />
 
-          {/* AI 처리 중 표시 */}
           {isAiProcessing && (
             <div className="absolute -top-8 left-0 flex items-center gap-2 text-pink-400 text-xs animate-pulse">
               <span className="flex h-2 w-2 rounded-full bg-pink-500"></span>
