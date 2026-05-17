@@ -693,6 +693,32 @@ export default function LobbyChatWidget() {
     };
   }, [supabase, currentUserId]); // Removed gameState dependency to avoid loops
 
+  // ── 이모티콘 선택 핸들러 ─────────────────────
+  const handleEmoticonSend = async (keyword: string) => {
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
+    setIsSending(true);
+
+    const content = `[emoticon:${keyword}]`;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1);
+
+    try {
+      await supabase.from('lobby_messages').insert({
+        content,
+        author_name: displayName,
+        message_type: 'emoticon',
+        expires_at: expiresAt.toISOString(),
+      });
+      setNewMessage('');
+    } catch {
+      setFilterWarning('⚠️ 이모티콘 전송에 실패했습니다.');
+    } finally {
+      isSendingRef.current = false;
+      setIsSending(false);
+    }
+  };
+
   // ── 메시지 전송 ──────────────────────────────
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
