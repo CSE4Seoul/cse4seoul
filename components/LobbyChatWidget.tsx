@@ -411,26 +411,25 @@ export default function LobbyChatWidget() {
     setIsAnonymousMode(prev => !prev);
   };
 
-  // 통신 안정화를 위한 try-catch 로직 추가
   const broadcastGameSync = useCallback((state: GameState) => {
-    if (gameChannel.current) {
-      const send = async (retries = 3) => {
-        if (gameChannelReady.current) {
-          try {
-            await gameChannel.current!.send({
-              type: 'broadcast',
-              event: 'game_sync',
-              payload: state,
-            });
-          } catch (error) {
-            console.error('Game sync broadcast failed:', error);
-          }
-        } else if (retries > 0) {
-          setTimeout(() => send(retries - 1), 500);
+    if (!gameChannel.current || !gameChannelReady.current) return;
+
+    const send = async (retries = 3) => {
+      try {
+        await gameChannel.current!.send({
+          type: 'broadcast',
+          event: 'game_sync',
+          payload: { ...state }, // Deep copy
+        });
+        console.log('[GameSync] Broadcasted state:', state.status);
+      } catch (error) {
+        console.error('[GameSync] Broadcast failed:', error);
+        if (retries > 0) {
+          setTimeout(() => send(retries - 1), 400);
         }
-      };
-      send();
-    }
+      }
+    };
+    send();
   }, []);
 
   const handleGameInit = () => {
@@ -447,7 +446,9 @@ export default function LobbyChatWidget() {
       turnTimeLimit: 10,
     };
     setGameState(newState);
-    broadcastGameSync(newState);
+    // Slight delay to ensure state update is reflected in any closures if necessary, 
+    // and to give the broadcast system a breathing room
+    setTimeout(() => broadcastGameSync(newState), 50);
   };
 
   const handleGameJoin = () => {
@@ -641,8 +642,8 @@ export default function LobbyChatWidget() {
     });
 
     gameCh.on('broadcast', { event: 'game_sync' }, ({ payload }: { payload: GameState }) => {
-      if (disposed) return;
-      console.log('[GameSync] Received payload status:', payload.status);
+      if (disposed || isStale()) return;
+      console.log('[GameSync] Received game_sync:', payload.status, payload.players.length);
       setGameState(payload);
 
       if (payload.status === 'WAITING') {
@@ -658,9 +659,23 @@ export default function LobbyChatWidget() {
       }
     })
     .on('broadcast', { event: 'request_sync' }, () => {
-      if (!disposed && gameStateRef.current.status !== 'IDLE' && gameStateRef.current.hostId === currentUserIdRef.current) {
-        console.log('[GameSync] Host responding to sync request');
-        broadcastGameSync(gameStateRef.current);
+      if (disposed || isStale()) return;
+
+      const currentHostId = gameStateRef.current.hostId;
+      const myId = currentUserIdRef.current;
+
+      console.log('[GameSync] request_sync received. Am I host?', currentHostId === myId);
+
+      if (currentHostId === myId && gameStateRef.current.status !== 'IDLE') {
+        setTimeout(() => {
+          if (!disposed) broadcastGameSync(gameStateRef.current);
+        }, 100);
+      } else if (currentHostId && currentHostId !== myId) {
+        setTimeout(() => {
+          if (!disposed && gameStateRef.current.status !== 'IDLE') {
+            broadcastGameSync(gameStateRef.current);
+          }
+        }, 150);
       }
     })
     .subscribe((status) => {
@@ -668,7 +683,12 @@ export default function LobbyChatWidget() {
       if (status === 'SUBSCRIBED') {
         setConnectionStatus('connected');
         gameChannelReady.current = true;
-        gameCh.send({ type: 'broadcast', event: 'request_sync', payload: {} });
+        
+        setTimeout(() => {
+          if (!disposed) {
+            gameCh.send({ type: 'broadcast', event: 'request_sync', payload: {} });
+          }
+        }, 300);
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
         setConnectionStatus('error');
       }
@@ -685,7 +705,7 @@ export default function LobbyChatWidget() {
       supabase.removeChannel(chatCh);
       supabase.removeChannel(gameCh);
     };
-  }, [supabase, reconnectTrigger]); 
+  }, [supabase, reconnectTrigger, broadcastGameSync]); 
 
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
