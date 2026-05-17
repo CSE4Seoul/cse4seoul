@@ -273,7 +273,6 @@ export default function LobbyChatWidget() {
   const isSendingRef                  = useRef(false);
   const [isLoading, setIsLoading]     = useState(true);
   const [filterWarning, setFilterWarning] = useState<string | null>(null);
-  const messagesEndRef                = useRef<HTMLDivElement>(null);
   const scrollContainerRef            = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
 
@@ -795,8 +794,12 @@ export default function LobbyChatWidget() {
   useEffect(() => {
     if (!autoScrollEnabled) return;
     const container = scrollContainerRef.current;
-    if (!container) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   }, [messages, autoScrollEnabled]);
 
   useEffect(() => {
@@ -958,7 +961,6 @@ export default function LobbyChatWidget() {
         ) : (
           messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* ── 입력창 ── */}
