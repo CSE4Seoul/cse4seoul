@@ -222,8 +222,12 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
 // Game Types & Constants
 // ─────────────────────────────────────────────
 
-import wordData from './word_map.json';
-const WORD_MAP: Record<string, string[]> = wordData;
+import normalWordData from './normal_word_map.json';
+const WORD_MAP: Record<string, string[]> = normalWordData;
+
+const TIME_REDUCTION_RATIO = 0.05; // Each turn reduces time by 5%
+const MIN_TURN_TIME = 3; // Minimum time limit per turn
+const MAX_SETTABLE_TIME = 60; // Max time limit host can set
 
 interface GamePlayer {
   id: string;
@@ -603,12 +607,17 @@ export default function LobbyChatWidget() {
     }
 
     const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    
+    // Calculate reduced time for next turn
+    const nextTimeLimit = Math.max(MIN_TURN_TIME, Math.ceil(gameState.turnTimeLimit * (1 - TIME_REDUCTION_RATIO)));
+
     const newState: GameState = {
       ...gameState,
       currentWord: word,
       usedWords: [...gameState.usedWords, word],
       currentTurnIndex: nextIndex,
-      remainingTime: gameState.turnTimeLimit,
+      turnTimeLimit: nextTimeLimit,
+      remainingTime: nextTimeLimit,
     };
     setGameState(newState);
     broadcastGameSync(newState);
@@ -862,10 +871,10 @@ const sendMessage = async (e: FormEvent) => {
                 <div className="flex items-center gap-2 bg-gray-800 px-2 py-1 rounded-lg border border-gray-700">
                   <span className="text-[10px] text-gray-400">제한시간:</span>
                   <input
-                    type="range" min="5" max="30" step="5"
+                    type="range" min={MIN_TURN_TIME} max={MAX_SETTABLE_TIME} step="1"
                     value={gameState.turnTimeLimit}
                     onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
-                    className="w-20 h-1 accent-purple-500"
+                    className="w-20 h-1 accent-purple-500 cursor-pointer"
                   />
                   <span className="text-[10px] text-purple-300 w-6">{gameState.turnTimeLimit}s</span>
                 </div>
