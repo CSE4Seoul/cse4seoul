@@ -734,25 +734,32 @@ export default function LobbyChatWidget() {
       setIsSending(false);
     }
   };
+// ── 메시지 전송 ──────────────────────────────
+const sendMessage = async (e: FormEvent) => {
+  e.preventDefault();
+  const trimmed = newMessage.trim();
+  if (!trimmed || isSendingRef.current) return;
 
-  const sendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = newMessage.trim();
-    if (!trimmed || isSendingRef.current) return;
+  if (trimmed === '/끝말잇기') {
+    handleGameInit();
+    setNewMessage('');
+    return;
+  }
 
-    if (trimmed === '/끝말잇기') {
-      handleGameInit();
-      setNewMessage('');
-      return;
-    }
-
-    if (gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex].id === currentUserId) {
+  // 게임 중 본인 턴일 때의 처리
+  if (gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId) {
+    const error = validateWord(trimmed);
+    if (!error) {
+      // 유효한 단어인 경우 게임 진행
       submitWord(trimmed);
       setNewMessage('');
       return;
     }
+    // 유효하지 않은 단어(시작 글자 불일치 등)인 경우 아래의 일반 채팅 로직으로 흐름이 넘어감
+  }
 
-    const emoticonKeyword = matchEmoticonCommand(trimmed);
+  const emoticonKeyword = matchEmoticonCommand(trimmed);
+
     if (emoticonKeyword) {
       await handleEmoticonSend(emoticonKeyword);
       return;
@@ -975,8 +982,7 @@ export default function LobbyChatWidget() {
         </div>
       </div>
 
-      {gameState.status !== 'IDLE' && <GameHUD />}
-
+      {/* ── 메시지 목록 ── */}
       <div 
         ref={scrollContainerRef}
         className="h-[550px] overflow-y-auto p-4 space-y-3 custom-scrollbar"
@@ -994,6 +1000,9 @@ export default function LobbyChatWidget() {
           messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)
         )}
       </div>
+
+      {/* ── 게임 HUD (채팅창과 입력창 사이) ── */}
+      {gameState.status !== 'IDLE' && <GameHUD />}
 
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2 items-end relative">
