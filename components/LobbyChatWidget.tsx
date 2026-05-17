@@ -360,6 +360,8 @@ export default function LobbyChatWidget() {
 
   const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
   const currentUserId = userId || guestId; // Stable identification for anonymous users
+  const currentUserIdRef = useRef(currentUserId);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
 
   useEffect(() => {
     const sets: Record<string, Set<string>> = {};
@@ -682,7 +684,7 @@ export default function LobbyChatWidget() {
     // 2. 게임 동기화 구독 (안정성 강화)
     const gameCh = supabase.channel('game:lobby', {
       config: {
-        broadcast: { ack: true },
+        broadcast: { ack: true, self: true },
       }
     });
 
@@ -691,9 +693,12 @@ export default function LobbyChatWidget() {
       setGameState(payload);
 
       if (payload.status === 'WAITING') {
-        const isMeInGame = payload.players.some(p => p.id === currentUserId);
+        // ref를 사용해 항상 최신 currentUserId로 비교
+        const isMeInGame = payload.players.some(p => p.id === currentUserIdRef.current);
         if (!isMeInGame) {
           setShowRecruitmentPopup(true);
+        } else {
+          setShowRecruitmentPopup(false);
         }
       } else {
         setShowRecruitmentPopup(false);
@@ -715,7 +720,7 @@ export default function LobbyChatWidget() {
       supabase.removeChannel(chatCh);
       supabase.removeChannel(gameCh);
     };
-  }, [supabase, currentUserId]); // Removed gameState dependency to avoid loops
+  }, [supabase, currentUserId, reconnectTrigger]); // reconnectTrigger 추가로 재연결 버튼이 게임 채널도 재구독
 
   // ── 이모티콘 선택 핸들러 ─────────────────────
   const handleEmoticonSend = async (keyword: string) => {
