@@ -262,6 +262,43 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
 }
 
 // ─────────────────────────────────────────────
+// Game Types & Constants
+// ─────────────────────────────────────────────
+
+import wordData from './word_map.json';
+const WORD_MAP: Record<string, string[]> = wordData;
+
+interface GamePlayer {
+  id: string;
+  name: string;
+}
+
+type GameStatus = 'IDLE' | 'WAITING' | 'PLAYING' | 'ENDED';
+
+interface GameState {
+  status: GameStatus;
+  hostId: string;
+  players: GamePlayer[];
+  currentTurnIndex: number;
+  currentWord: string;
+  usedWords: string[];
+  turnTimeLimit: number;
+  remainingTime: number;
+  winner?: string;
+}
+
+const INITIAL_GAME_STATE: GameState = {
+  status: 'IDLE',
+  hostId: '',
+  players: [],
+  currentTurnIndex: 0,
+  currentWord: '',
+  usedWords: [],
+  turnTimeLimit: 10,
+  remainingTime: 0,
+};
+
+// ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
 
@@ -299,45 +336,51 @@ export default function LobbyChatWidget() {
 
   // AI 상태
   const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [aiModel, setAiModel] = useState('qwen2.5:1.5b'); // 로컬 PC용 메인 모델
+  const [aiModel, setAiModel] = useState('qwen2.5:1.5b');
   const [isAiMode, setIsAiMode] = useState(false); 
+
+  // ── 끝말잇기 상태 ──
+  const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
+  const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
+  const [showRecruitmentPopup, setShowRecruitmentPopup] = useState(false);
+
+  const gameChannel      = useRef<RealtimeChannel | null>(null);
+  const gameChannelReady = useRef(false);
+  const gameTimerRef     = useRef<NodeJS.Timeout | null>(null);
+
+  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
+  const currentUserId = userId || randomAgentName; // Fallback to name for anon
+
+  useEffect(() => {
+    const sets: Record<string, Set<string>> = {};
+    for (const char in WORD_MAP) {
+      sets[char] = new Set(WORD_MAP[char]);
+    }
+    setWordSets(sets);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('lobby_auto_scroll', autoScrollEnabled ? 'true' : 'false');
   }, [autoScrollEnabled]);
 
-  // ── AI 통신 (Next.js API Route Proxy) ───────────────────────
+  // ── AI 통신 ... (생략 가능하지만 유지) ───────────────────────
   const askOllama = async (prompt: string) => {
     if (prompt.startsWith('🤖')) return null;
-
     setIsAiProcessing(true);
     try {
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: aiModel,
-          prompt: prompt
-        }),
+        body: JSON.stringify({ model: aiModel, prompt: prompt }),
       });
-
-      // 응답이 JSON인지 먼저 확인
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error('서버 응답이 JSON이 아닙니다:', text);
-        throw new Error(`서버가 올바르지 않은 응답을 보냈습니다. (Status: ${response.status})`);
+        throw new Error(`서버가 올바르지 않은 응답을 보냈습니다.`);
       }
-
       const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || data.content || `서버 에러 (${response.status})`);
-      }
-      
+      if (!response.ok) throw new Error(data.error || data.content);
       return data.content;
     } catch (err: any) {
-      console.error('AI 프록시 상세 에러:', err);
       return `⚠️ AI 연결 실패: ${err.message}`;
     } finally {
       setIsAiProcessing(false);
@@ -345,38 +388,16 @@ export default function LobbyChatWidget() {
   };
 
   const sendAiMessage = async (content: string) => {
-    if (!content) return; // 무시된 메시지(무한루프 방지 등)는 전송하지 않음
-    
+    if (!content) return;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 1);
-    
     try {
-      await supabase
-        .from('lobby_messages')
-        .insert({ 
-          content, 
-          author_name: `🤖 AI Assistant (${aiModel})`, 
-          message_type: 'text', 
-          expires_at: expiresAt.toISOString() 
-        });
-    } catch (err) {
-      console.error('AI 메시지 전송 실패:', err);
-    }
+      await supabase.from('lobby_messages').insert({ 
+        content, author_name: `🤖 AI Assistant (${aiModel})`, 
+        message_type: 'text', expires_at: expiresAt.toISOString() 
+      });
+    } catch (err) { console.error(err); }
   };
-
-  // ── 끝말잇기 상태 ──
-  const [gameActive,     setGameActive]     = useState(false);
-  const [currentWord,    setCurrentWord]    = useState('');
-  const [currentPlayer,  setCurrentPlayer]  = useState('');
-  const [players,        setPlayers]        = useState<string[]>([]);
-  const [gameMessage,    setGameMessage]    = useState('');
-  const [usedWords,      setUsedWords]      = useState<Set<string>>(new Set());
-
-  const gameChannel      = useRef<RealtimeChannel | null>(null);
-  const gameChannelReady = useRef(false);
-  const afkTimerRef      = useRef<NodeJS.Timeout | null>(null);
-
-  const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
 
   // ── 유저 초기화 ──────────────────────────────
   useEffect(() => {
@@ -385,13 +406,10 @@ export default function LobbyChatWidget() {
       if (user) {
         setIsLoggedIn(true);
         setUserId(user.id);
-        const { data: profile } = await supabase
-          .from('profiles').select('full_name').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile?.full_name) setRealName(profile.full_name);
       } else {
-        setIsLoggedIn(false);
-        setUserId(null);
-        setRealName(null);
+        setIsLoggedIn(false); setUserId(null); setRealName(null);
       }
     };
     fetchUser();
@@ -420,9 +438,6 @@ export default function LobbyChatWidget() {
       const t = newName.trim().slice(0, 20);
       setNickname(t);
       localStorage.setItem('lobby_nickname', t);
-    } else if (newName === '') {
-      setNickname('익명의 요원');
-      localStorage.setItem('lobby_nickname', '익명의 요원');
     }
   };
 
@@ -431,281 +446,252 @@ export default function LobbyChatWidget() {
     setIsAnonymousMode(prev => !prev);
   };
 
-  // ── AFK 타이머 ───────────────────────────────
-  const resetAfkTimer = useCallback(() => {
-    if (afkTimerRef.current) { clearTimeout(afkTimerRef.current); afkTimerRef.current = null; }
-    if (gameActive && currentPlayer === displayName && players.length > 0) {
-      afkTimerRef.current = setTimeout(() => {
-        if (gameActive && currentPlayer === displayName && gameChannel.current && gameChannelReady.current) {
-          gameChannel.current.send({
-            type: 'broadcast', event: 'game_word',
-            payload: { player: displayName, word: '', success: false, reason: '시간 초과로 턴이 넘어갑니다.' }
-          });
-        }
-        afkTimerRef.current = null;
-      }, 35000);
+  // ── 끝말잇기 게임 로직 ───────────────────────
+
+  const broadcastGameSync = useCallback((state: GameState) => {
+    if (gameChannel.current && gameChannelReady.current) {
+      gameChannel.current.send({
+        type: 'broadcast',
+        event: 'game_sync',
+        payload: state,
+      });
     }
-  }, [gameActive, currentPlayer, displayName, players.length]);
+  }, []);
+
+  const handleGameInit = () => {
+    if (gameState.status !== 'IDLE' && gameState.status !== 'ENDED') {
+      setFilterWarning('이미 끝말잇기 게임이 진행 중입니다.');
+      return;
+    }
+    const newState: GameState = {
+      ...INITIAL_GAME_STATE,
+      status: 'WAITING',
+      hostId: currentUserId,
+      players: [{ id: currentUserId, name: displayName }],
+      remainingTime: 15,
+      turnTimeLimit: 10,
+    };
+    setGameState(newState);
+    broadcastGameSync(newState);
+    setShowRecruitmentPopup(true);
+  };
+
+  const handleGameJoin = () => {
+    if (gameState.status !== 'WAITING') return;
+    if (gameState.players.some(p => p.id === currentUserId)) return;
+
+    const newState = {
+      ...gameState,
+      players: [...gameState.players, { id: currentUserId, name: displayName }],
+    };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleUpdateTimeLimit = (limit: number) => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState = { ...gameState, turnTimeLimit: limit };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const sendSystemMessage = useCallback(async (content: string) => {
+    if (gameState.hostId !== currentUserId) return;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 1);
+    try {
+      await supabase.from('lobby_messages').insert({ 
+        content: `📢 ${content}`, author_name: '시스템', 
+        message_type: 'text', expires_at: expiresAt.toISOString() 
+      });
+    } catch (err) { console.error(err); }
+  }, [supabase, gameState.hostId, currentUserId]);
+
+  const startPlaying = useCallback(async () => {
+    if (gameState.hostId !== currentUserId) return;
+    
+    if (gameState.players.length < 2) {
+      const endState: GameState = { ...gameState, status: 'ENDED', winner: '인원 부족으로 취소' };
+      setGameState(endState);
+      broadcastGameSync(endState);
+      return;
+    }
+
+    const allChars = Object.keys(WORD_MAP);
+    const randomChar = allChars[Math.floor(Math.random() * allChars.length)];
+    const words = WORD_MAP[randomChar];
+    const startWord = words[Math.floor(Math.random() * words.length)];
+
+    const newState: GameState = {
+      ...gameState,
+      status: 'PLAYING',
+      currentTurnIndex: 0,
+      currentWord: startWord,
+      usedWords: [startWord],
+      remainingTime: gameState.turnTimeLimit,
+    };
+    setGameState(newState);
+    broadcastGameSync(newState);
+    await sendSystemMessage(`게임 시작! 시작 단어: [${startWord}]`);
+  }, [gameState, currentUserId, broadcastGameSync, sendSystemMessage]);
+
+  const handleTimeout = useCallback(async () => {
+    if (gameState.hostId !== currentUserId) return;
+
+    if (gameState.status === 'WAITING') {
+      await startPlaying();
+    } else if (gameState.status === 'PLAYING') {
+      const currentPlayer = gameState.players[gameState.currentTurnIndex];
+      const remainingPlayers = gameState.players.filter(p => p.id !== currentPlayer.id);
+
+      await sendSystemMessage(`${currentPlayer.name}님 시간 초과로 탈락!`);
+
+      if (remainingPlayers.length === 1) {
+        const endState: GameState = {
+          ...gameState,
+          status: 'ENDED',
+          players: remainingPlayers,
+          winner: remainingPlayers[0].name,
+        };
+        setGameState(endState);
+        broadcastGameSync(endState);
+        await sendSystemMessage(`게임 종료! 우승자: ${remainingPlayers[0].name}`);
+      } else {
+        const nextIndex = gameState.currentTurnIndex % remainingPlayers.length;
+        const newState: GameState = {
+          ...gameState,
+          players: remainingPlayers,
+          currentTurnIndex: nextIndex,
+          remainingTime: gameState.turnTimeLimit,
+        };
+        setGameState(newState);
+        broadcastGameSync(newState);
+      }
+    }
+  }, [gameState, currentUserId, startPlaying, broadcastGameSync, sendSystemMessage]);
 
   useEffect(() => {
-    resetAfkTimer();
-    return () => { if (afkTimerRef.current) { clearTimeout(afkTimerRef.current); afkTimerRef.current = null; } };
-  }, [resetAfkTimer]);
+    if (gameState.status === 'IDLE' || gameState.status === 'ENDED') {
+      if (gameTimerRef.current) clearInterval(gameTimerRef.current);
+      return;
+    }
 
-  // ── 실시간 채팅 구독 ─────────────────────────
+    gameTimerRef.current = setInterval(() => {
+      setGameState(prev => {
+        if (prev.remainingTime <= 0) {
+          if (prev.hostId === currentUserId) {
+            // Host handles the actual logic in handleTimeout which is called by another effect
+          }
+          return prev;
+        }
+        return { ...prev, remainingTime: prev.remainingTime - 1 };
+      });
+    }, 1000);
+
+    return () => {
+      if (gameTimerRef.current) clearInterval(gameTimerRef.current);
+    };
+  }, [gameState.status, currentUserId]);
+
+  // Host-only effect to handle transitions
+  useEffect(() => {
+    if (gameState.hostId === currentUserId && gameState.remainingTime <= 0) {
+      if (gameState.status === 'WAITING' || gameState.status === 'PLAYING') {
+        handleTimeout();
+      }
+    }
+  }, [gameState.remainingTime, gameState.status, gameState.hostId, currentUserId, handleTimeout]);
+
+  const validateWord = (word: string): string | null => {
+    if (word.length < 2) return '2글자 이상 입력해주세요.';
+    if (!/^[가-힣]+$/.test(word)) return '한글만 입력 가능합니다.';
+    
+    const lastChar = gameState.currentWord[gameState.currentWord.length - 1];
+    if (word[0] !== lastChar) return `'${lastChar}'로 시작해야 합니다.`;
+    
+    if (gameState.usedWords.includes(word)) return '이미 사용된 단어입니다.';
+    
+    const firstChar = word[0];
+    if (!wordSets[firstChar]?.has(word)) return '사전에 없는 단어입니다.';
+    
+    return null;
+  };
+
+  const submitWord = (word: string) => {
+    if (gameState.status !== 'PLAYING') return;
+    const currentPlayer = gameState.players[gameState.currentTurnIndex];
+    if (currentPlayer.id !== currentUserId) return;
+
+    const error = validateWord(word);
+    if (error) {
+      setFilterWarning(error);
+      return;
+    }
+
+    const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    const newState: GameState = {
+      ...gameState,
+      currentWord: word,
+      usedWords: [...gameState.usedWords, word],
+      currentTurnIndex: nextIndex,
+      remainingTime: gameState.turnTimeLimit,
+    };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  // ── 실시간 채팅 & 게임 채널 구독 ─────────────────────────
   useEffect(() => {
     const epoch = ++chatEffectEpochRef.current;
-    let disposed   = false;
-    let retryCount = 0;
-    const MAX_RETRIES = 8;
-    let isSubscribing = false;
-
+    let disposed = false;
     const isStale = () => disposed || chatEffectEpochRef.current !== epoch;
-    const clearTimer = () => { if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; } };
-
-    const teardown = async () => {
-      clearTimer();
-      const ch = chatChannel.current;
-      if (!ch) return;
-      chatChannel.current = null;
-      await supabase.removeChannel(ch);
-    };
 
     const loadMessages = async () => {
-      if (isStale()) return;
       try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .select('*')
+        const { data } = await supabase.from('lobby_messages').select('*')
           .gte('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .limit(MAX_MESSAGES);
-        if (error) throw error;
+          .order('created_at', { ascending: false }).limit(MAX_MESSAGES);
         if (!isStale()) setMessages((data || []).reverse());
-      } catch (err) {
-        console.error('로비 채팅 로드 실패:', err);
-      } finally {
-        if (!isStale()) setIsLoading(false);
-      }
+      } catch (err) { console.error(err); }
+      finally { if (!isStale()) setIsLoading(false); }
     };
 
-    const scheduleReconnect = () => {
-      if (isStale()) return;
-      if (retryCount >= MAX_RETRIES) { setConnectionStatus('error'); return; }
-      retryCount++;
-      const ms = Math.min(10000, Math.pow(2, retryCount) * 1000);
-      clearTimer();
-      reconnectTimerRef.current = setTimeout(() => { if (!isStale()) void subscribe(); }, ms);
-    };
-
-    const subscribe = async () => {
-      if (isStale() || isSubscribing) return;
-      isSubscribing = true;
-      await teardown();
-      if (isStale()) { isSubscribing = false; return; }
-      setConnectionStatus('connecting');
-
-      const ch = supabase
-        .channel('lobby:messages:realtime')
+    const subscribeChat = async () => {
+      const ch = supabase.channel('lobby:messages:realtime')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
           if (isStale()) return;
-          const newMsg = payload.new as LobbyMessage;
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg].slice(-MAX_MESSAGES);
-          });
-        })
-        .subscribe((status) => {
-          if (isStale()) { isSubscribing = false; return; }
-          if (chatChannel.current !== ch) { isSubscribing = false; return; }
-          if (status === 'SUBSCRIBED') {
-            setConnectionStatus('connected');
-            retryCount = 0;
-            isSubscribing = false;
-          } else if (['CHANNEL_ERROR','CLOSED','TIMED_OUT'].includes(status)) {
-            setConnectionStatus('error');
-            void teardown().then(() => { isSubscribing = false; scheduleReconnect(); });
-          } else {
-            isSubscribing = false;
-          }
-        });
-
+          setMessages(prev => [...prev, payload.new as LobbyMessage].slice(-MAX_MESSAGES));
+        }).subscribe();
       chatChannel.current = ch;
     };
 
-    void loadMessages();
-    void subscribe();
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && !isStale() && connectionStatus !== 'connected') {
-        retryCount = 0;
-        void subscribe();
-      }
+    const subscribeGame = () => {
+      const ch = supabase.channel('game:lobby');
+      ch.on('broadcast', { event: 'game_sync' }, ({ payload }: { payload: GameState }) => {
+        if (isStale()) return;
+        setGameState(payload);
+        // Only show popup if status is WAITING and I'm not in the player list yet
+        if (payload.status === 'WAITING' && !payload.players.some(p => p.id === currentUserId)) {
+          setShowRecruitmentPopup(true);
+        }
+        // If game ended or started, hide recruitment popup
+        if (payload.status !== 'WAITING') {
+          setShowRecruitmentPopup(false);
+        }
+      }).subscribe(status => { gameChannelReady.current = status === 'SUBSCRIBED'; });
+      gameChannel.current = ch;
     };
-    window.addEventListener('visibilitychange', handleVisibility);
-    visibilityHandlerRef.current = handleVisibility;
+
+    loadMessages();
+    subscribeChat();
+    subscribeGame();
 
     return () => {
       disposed = true;
-      clearTimer();
-      if (visibilityHandlerRef.current) {
-        window.removeEventListener('visibilitychange', visibilityHandlerRef.current);
-        visibilityHandlerRef.current = null;
-      }
-      void teardown();
+      if (chatChannel.current) supabase.removeChannel(chatChannel.current);
+      if (gameChannel.current) supabase.removeChannel(gameChannel.current);
     };
-  }, [supabase, reconnectTrigger, connectionStatus]);
-
-  // ── 게임 채널 구독 ───────────────────────────
-  useEffect(() => {
-    if (!supabase) return;
-    const ch = supabase.channel('game:lobby', { config: { broadcast: { ack: false } } });
-
-    ch
-      .on('broadcast', { event: 'game_start' }, ({ payload }: { payload: GameStartPayload }) => {
-        setGameActive(true); setCurrentWord(payload.startWord);
-        setPlayers([payload.starter]); setCurrentPlayer(payload.starter);
-        setUsedWords(new Set());
-        setGameMessage(`🎮 게임이 시작되었습니다! 시작 단어: "${payload.startWord}"`);
-      })
-      .on('broadcast', { event: 'game_join' }, ({ payload }: { payload: GameJoinPayload }) => {
-        setPlayers(prev => prev.includes(payload.player) ? prev : [...prev, payload.player]);
-        setGameMessage(`✨ ${payload.player}님이 게임에 참가했습니다!`);
-      })
-      .on('broadcast', { event: 'game_leave' }, ({ payload }: { payload: GameLeavePayload }) => {
-        setPlayers(prev => prev.filter(p => p !== payload.player));
-        setGameMessage(`👋 ${payload.player}님이 게임을 떠났습니다.`);
-      })
-      .on('broadcast', { event: 'game_word' }, ({ payload }: { payload: GameWordPayload }) => {
-        if (payload.success) {
-          setCurrentWord(payload.word);
-          setUsedWords(prev => new Set(prev).add(payload.word));
-          setPlayers(prevPlayers => {
-            const idx = prevPlayers.findIndex(p => p === payload.player);
-            if (idx === -1) return prevPlayers;
-            const next = prevPlayers[(idx + 1) % prevPlayers.length];
-            setCurrentPlayer(next);
-            setGameMessage(`✅ ${payload.player}님이 "${payload.word}" (으)로 이어갑니다! 다음은 ${next}님 차례입니다.`);
-            return prevPlayers;
-          });
-        } else {
-          setPlayers(prevPlayers => {
-            const idx = prevPlayers.findIndex(p => p === payload.player);
-            if (idx === -1) return prevPlayers;
-            const next = prevPlayers[(idx + 1) % prevPlayers.length];
-            setCurrentPlayer(next);
-            setGameMessage(`❌ ${payload.player}님의 "${payload.word}" 실패 (${payload.reason}) → 다음은 ${next}님 차례입니다.`);
-            return prevPlayers;
-          });
-        }
-      })
-      .on('broadcast', { event: 'game_end' }, ({ payload }: { payload: GameEndPayload }) => {
-        setGameActive(false); setCurrentWord(''); setCurrentPlayer('');
-        setPlayers([]); setUsedWords(new Set());
-        setGameMessage(`🏁 게임 종료. ${payload.reason || ''}`);
-      });
-
-    ch.subscribe(status => { gameChannelReady.current = status === 'SUBSCRIBED'; });
-    gameChannel.current = ch;
-    return () => { gameChannelReady.current = false; ch.unsubscribe(); gameChannel.current = null; };
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!gameActive) return;
-    if (players.length === 0) { setGameActive(false); setGameMessage('게임에 참여한 사람이 없어 종료됩니다.'); return; }
-    if (!players.includes(currentPlayer)) {
-      setCurrentPlayer(players[0]);
-      setGameMessage(`🔄 턴이 ${players[0]}님으로 자동 조정되었습니다.`);
-    }
-  }, [players, currentPlayer, gameActive]);
-
-  // ── 게임 액션 ────────────────────────────────
-  const startGame = async () => {
-    if (gameActive) { setGameMessage('이미 진행 중인 게임이 있습니다.'); return; }
-    const raw = prompt('시작 단어를 입력하세요 (2글자 이상)', '가나다');
-    if (!raw || raw.trim().length < 2) { setGameMessage('시작 단어는 2글자 이상이어야 합니다.'); return; }
-    const startWord = raw.trim();
-    if (!await isValidWord(startWord)) { setGameMessage(`"${startWord}"은(는) 사전에 없는 단어입니다.`); return; }
-    if (!gameChannel.current || !gameChannelReady.current) { setGameMessage('게임 채널이 준비되지 않았습니다.'); return; }
-    gameChannel.current.send({ type: 'broadcast', event: 'game_start', payload: { starter: displayName, startWord } });
-  };
-
-  const joinGame = () => {
-    if (!gameActive) { setGameMessage('먼저 게임을 시작해주세요.'); return; }
-    if (players.includes(displayName)) { setGameMessage('이미 참가 중입니다.'); return; }
-    if (!gameChannel.current || !gameChannelReady.current) { setGameMessage('게임 채널이 준비되지 않았습니다.'); return; }
-    gameChannel.current.send({ type: 'broadcast', event: 'game_join', payload: { player: displayName } });
-  };
-  const leaveGame = () => {
-    if (!gameActive || !gameChannel.current || !gameChannelReady.current) return;
-    gameChannel.current.send({ type: 'broadcast', event: 'game_leave', payload: { player: displayName } });
-  };
-  const endGame = () => {
-    if (!gameActive || !gameChannel.current || !gameChannelReady.current) return;
-    gameChannel.current.send({ type: 'broadcast', event: 'game_end', payload: { reason: `${displayName}님이 게임을 종료했습니다.` } });
-  };
-
-  const submitWord = async (word: string) => {
-    if (!gameActive) { setGameMessage('현재 활성화된 게임이 없습니다.'); return false; }
-    if (currentPlayer !== displayName) { setGameMessage(`지금은 ${currentPlayer}님의 차례입니다.`); return false; }
-    const fail = (reason: string) => {
-      gameChannel.current?.send({ type: 'broadcast', event: 'game_word', payload: { player: displayName, word, success: false, reason } });
-      return false;
-    };
-    if (usedWords.has(word))           return fail('이미 사용된 단어입니다.');
-    if (!isValidWordChain(word, currentWord)) return fail(`'${currentWord}'의 끝 글자와 맞지 않습니다.`);
-    if (!await isValidWord(word))      return fail('사전에 없는 단어입니다.');
-    gameChannel.current?.send({ type: 'broadcast', event: 'game_word', payload: { player: displayName, word, success: true } });
-    return true;
-  };
-
-  // ── 이모티콘 선택 핸들러 ─────────────────────
-  /**
-   * 이모티콘 피커에서 keyword가 선택되거나 /keyword 타이핑 시 호출됩니다.
-   * DB content: "[emoticon:키워드]"  message_type: 'emoticon'
-   */
-  const handleEmoticonSend = async (keyword: string) => {
-    if (isSendingRef.current) return;
-    isSendingRef.current = true;
-    setIsSending(true);
-
-    const content   = `[emoticon:${keyword}]`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
-    const tempId    = crypto.randomUUID();
-
-    const optimistic: LobbyMessage = {
-      id: tempId, content, author_name: displayName, message_type: 'emoticon',
-      created_at: new Date().toISOString(), expires_at: expiresAt.toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic].slice(-MAX_MESSAGES));
-    setNewMessage('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
-    let attempt = 0;
-    let success = false;
-    while (attempt < 2 && !success) {
-      try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .insert({ content, author_name: displayName, message_type: 'emoticon', expires_at: expiresAt.toISOString() })
-          .select().single();
-        if (error) throw error;
-        setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
-        success = true;
-      } catch {
-        attempt++;
-        if (attempt === 2) {
-          setMessages(prev => prev.filter(m => m.id !== tempId));
-          setFilterWarning('⚠️ 이모티콘 전송에 실패했습니다.');
-        } else {
-          await new Promise(r => setTimeout(r, 500));
-        }
-      }
-    }
-    isSendingRef.current = false;
-    setIsSending(false);
-  };
+  }, [supabase, currentUserId]); // Removed gameState dependency to avoid loops
 
   // ── 메시지 전송 ──────────────────────────────
   const sendMessage = async (e: FormEvent) => {
@@ -713,92 +699,64 @@ export default function LobbyChatWidget() {
     const trimmed = newMessage.trim();
     if (!trimmed || isSendingRef.current) return;
 
-    // 이모티콘 커맨드 감지 (/키워드)
+    if (trimmed === '/끝말잇기') {
+      handleGameInit();
+      setNewMessage('');
+      return;
+    }
+
+    if (gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex].id === currentUserId) {
+      submitWord(trimmed);
+      setNewMessage('');
+      return;
+    }
+
     const emoticonKeyword = matchEmoticonCommand(trimmed);
     if (emoticonKeyword) {
       await handleEmoticonSend(emoticonKeyword);
       return;
     }
 
-    // 게임 커맨드
-    if (trimmed === '/끝말잇기 시작') { await startGame(); setNewMessage(''); return; }
-    if (gameActive) {
-      if (trimmed === '/끝말잇기 참여')  { joinGame();  setNewMessage(''); return; }
-      if (trimmed === '/끝말잇기 나가기') { leaveGame(); setNewMessage(''); return; }
-      if (trimmed === '/끝말잇기 종료')  { endGame();   setNewMessage(''); return; }
-      await submitWord(trimmed);
-      setNewMessage('');
-      return;
-    }
-
-    // 욕설 필터
     if (containsBadWord(trimmed)) {
       setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
       return;
     }
 
-    // 일반 텍스트 전송
     isSendingRef.current = true;
     setIsSending(true);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 1);
-    const tempId = crypto.randomUUID();
-    const optimistic: LobbyMessage = {
-      id: tempId, content: trimmed, author_name: displayName, message_type: 'text',
-      created_at: new Date().toISOString(), expires_at: expiresAt.toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic].slice(-MAX_MESSAGES));
-    setNewMessage('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
-    let attempt = 0, success = false;
-    let finalData: LobbyMessage | null = null;
-
-    while (attempt < 2 && !success) {
-      try {
-        const { data, error } = await supabase
-          .from('lobby_messages')
-          .insert({ content: trimmed, author_name: displayName, message_type: 'text', expires_at: expiresAt.toISOString() })
-          .select().single();
-        if (error) throw error;
-        finalData = data as LobbyMessage;
-        setMessages(prev => prev.map(m => m.id === tempId ? finalData! : m));
-        success = true;
-      } catch {
-        attempt++;
-        if (attempt === 2) {
-          setMessages(prev => prev.filter(m => m.id !== tempId));
-          setFilterWarning('⚠️ 메시지 전송에 실패했습니다. 네트워크를 확인해 주세요.');
-        } else {
-          await new Promise(r => setTimeout(r, 500));
+    
+    try {
+      const { data, error } = await supabase.from('lobby_messages').insert({ 
+        content: trimmed, author_name: displayName, message_type: 'text', 
+        expires_at: expiresAt.toISOString() 
+      }).select().single();
+      
+      if (!error && data) {
+        // AI Response Logic
+        if (gameState.status !== 'PLAYING') {
+          if (trimmed.startsWith('/ai ')) {
+            const aiResponse = await askOllama(trimmed.replace('/ai ', ''));
+            await sendAiMessage(aiResponse);
+          } else if (isAiMode && !isAiProcessing) {
+            const aiResponse = await askOllama(trimmed);
+            await sendAiMessage(aiResponse);
+          }
         }
       }
-    }
-    isSendingRef.current = false;
-    setIsSending(false);
-
-    // AI 응답 로직
-    if (success && !isAiProcessing) {
-      if (trimmed.startsWith('/ai ')) {
-        const aiPrompt = trimmed.replace('/ai ', '');
-        const aiResponse = await askOllama(aiPrompt);
-        await sendAiMessage(aiResponse);
-      } else if (isAiMode) {
-        // AI 모드일 경우 모든 일반 메시지에 대해 응답 시도 (선택 사항)
-        const aiResponse = await askOllama(trimmed);
-        await sendAiMessage(aiResponse);
-      }
+    } catch {
+      setFilterWarning('⚠️ 메시지 전송에 실패했습니다.');
+    } finally {
+      setNewMessage('');
+      isSendingRef.current = false;
+      setIsSending(false);
     }
   };
 
   useEffect(() => {
-    if (!autoScrollEnabled) return;
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth',
-      });
+    if (autoScrollEnabled && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
     }
   }, [messages, autoScrollEnabled]);
 
@@ -812,19 +770,105 @@ export default function LobbyChatWidget() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (e.nativeEvent.isComposing) return;
-      e.currentTarget.form?.requestSubmit();
+      if (!e.nativeEvent.isComposing) e.currentTarget.form?.requestSubmit();
     }
   };
 
-  const manualReconnect = () => {
-    setConnectionStatus('connecting');
-    setReconnectTrigger(prev => prev + 1);
+  // ── Render Helpers ───────────────────────────
+
+  const RecruitmentPopup = () => (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-gray-900 border border-purple-500/50 rounded-2xl p-6 shadow-2xl w-80 text-center">
+        <RiGamepadLine className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-bounce" />
+        <h4 className="text-xl font-bold text-white mb-2">끝말잇기 모집 중!</h4>
+        <p className="text-gray-400 text-sm mb-6">함께 게임을 즐기시겠습니까?</p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { handleGameJoin(); setShowRecruitmentPopup(false); }}
+            className="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-xl font-bold transition-colors"
+          >
+            참여하기
+          </button>
+          <button
+            onClick={() => setShowRecruitmentPopup(false)}
+            className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-xl transition-colors"
+          >
+            <RiCloseLine className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const GameHUD = () => {
+    const isMyTurn = gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
+    
+    return (
+      <div className="bg-purple-900/40 border-b border-purple-500/30 p-3">
+        {gameState.status === 'WAITING' ? (
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 text-purple-200 font-bold">
+              <span className="animate-pulse">모집 중...</span>
+              <span className="bg-purple-600/50 px-2 py-0.5 rounded text-xs">{gameState.remainingTime}초 남음</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">참가자: {gameState.players.length}명</span>
+              {gameState.hostId === currentUserId && (
+                <div className="flex items-center gap-2 bg-gray-800 px-2 py-1 rounded-lg border border-gray-700">
+                  <span className="text-[10px] text-gray-400">제한시간:</span>
+                  <input
+                    type="range" min="5" max="30" step="5"
+                    value={gameState.turnTimeLimit}
+                    onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
+                    className="w-20 h-1 accent-purple-500"
+                  />
+                  <span className="text-[10px] text-purple-300 w-6">{gameState.turnTimeLimit}s</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : gameState.status === 'PLAYING' ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-purple-300 font-bold">현재 단어:</span>
+                <span className="text-lg text-white font-black tracking-widest">{gameState.currentWord}</span>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-gray-800 text-gray-400'}`}>
+                {isMyTurn ? '내 차례!' : `${gameState.players[gameState.currentTurnIndex]?.name}님 차례`}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-1000 ${gameState.remainingTime < 4 ? 'bg-red-500' : 'bg-purple-500'}`}
+                  style={{ width: `${(gameState.remainingTime / gameState.turnTimeLimit) * 100}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-purple-300 w-4">{gameState.remainingTime}s</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <span className="text-sm font-bold text-yellow-400">
+              {gameState.winner === '인원 부족으로 취소' ? '참가 인원이 부족하여 게임이 취소되었습니다.' : `🎉 ${gameState.winner}님 우승!`}
+            </span>
+            <button 
+              onClick={() => setGameState(INITIAL_GAME_STATE)}
+              className="ml-3 text-[10px] bg-gray-800 px-2 py-1 rounded hover:bg-gray-700 text-gray-400 transition-colors"
+            >
+              닫기
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
-  // ── Render ────────────────────────────────────
   return (
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+      {showRecruitmentPopup && gameState.status === 'WAITING' && <RecruitmentPopup />}
+      
       {/* ── Header ── */}
       <div className="p-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
@@ -833,43 +877,20 @@ export default function LobbyChatWidget() {
           <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">
             {isAnonymousMode ? '익명 모드' : (isLoggedIn ? '실명 모드' : '게스트')}
           </span>
-          {gameActive && (
-            <span className="text-xs bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <RiGamepadLine className="w-3 h-3" /> 끝말잇기 진행중
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 게임 버튼 */}
           <button
-            onClick={startGame} disabled={gameActive}
+            onClick={handleGameInit}
+            disabled={gameState.status !== 'IDLE' && gameState.status !== 'ENDED'}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-              gameActive ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
-                        : 'bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30'
+              (gameState.status !== 'IDLE' && gameState.status !== 'ENDED')
+                ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
+                : 'bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30'
             }`}
-            title="끝말잇기 게임 시작"
           >
-            <RiGamepadLine className="w-3 h-3" /> 게임시작
+            <RiGamepadLine className="w-3 h-3" /> 끝말잇기
           </button>
-          {gameActive && (<>
-            <button onClick={joinGame}  className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-green-600/20 text-green-300 border border-green-500/30 hover:bg-green-600/30 transition-colors"><RiUserAddLine className="w-3 h-3" /> 참가</button>
-            <button onClick={leaveGame} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600/30 transition-colors"><RiLogoutCircleLine className="w-3 h-3" /> 나가기</button>
-            <button onClick={endGame}   className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-orange-600/20 text-orange-300 border border-orange-500/30 hover:bg-orange-600/30 transition-colors"><RiCloseLine className="w-3 h-3" /> 종료</button>
-          </>)}
-
-          {isLoggedIn && (
-            <button onClick={toggleAnonymousMode}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
-                isAnonymousMode ? 'bg-gray-800/80 text-gray-400 hover:text-cyan-300'
-                                : 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30'
-              }`}
-              title={isAnonymousMode ? '실명 모드로 전환' : '익명 모드로 전환'}
-            >
-              {isAnonymousMode ? <RiEyeOffLine className="w-3 h-3" /> : <RiUserLine className="w-3 h-3" />}
-              {isAnonymousMode ? '익명' : '실명'}
-            </button>
-          )}
 
           <button
             type="button"
@@ -878,9 +899,7 @@ export default function LobbyChatWidget() {
               autoScrollEnabled ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
                                 : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
             }`}
-            title={autoScrollEnabled ? '자동 스크롤 끄기' : '자동 스크롤 켜기'}
           >
-            {autoScrollEnabled ? <RiArrowDownSLine className="w-3 h-3" /> : <RiArrowUpSLine className="w-3 h-3" />}
             {autoScrollEnabled ? '스크롤 ON' : '스크롤 OFF'}
           </button>
 
@@ -907,42 +926,20 @@ export default function LobbyChatWidget() {
           <div className="flex items-center gap-1 px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm">
             <span className="text-gray-400">👤</span>
             <span className="text-cyan-300 font-mono">{displayName}</span>
-            {!isAnonymousMode && (
-              <button onClick={changeNickname} className="ml-1 text-gray-500 hover:text-cyan-400 transition-colors" title="닉네임 변경">✏️</button>
-            )}
           </div>
 
-          <button onClick={manualReconnect} disabled={connectionStatus === 'connecting'}
+          <button onClick={() => setReconnectTrigger(t => t+1)}
             className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-200 border ${
-              connectionStatus === 'connected' ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20'
-              : connectionStatus === 'error'   ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
-                                               : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20 cursor-wait'
+              connectionStatus === 'connected' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
             }`}
-            title="클릭하여 서버 수동 재연결"
           >
-            <RiRefreshLine className="w-3 h-3 mr-0.5" />
-            <span className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-500 animate-pulse'
-              : connectionStatus === 'error'   ? 'bg-red-500'
-                                               : 'bg-yellow-500 animate-bounce'
-            }`} />
-            {connectionStatus === 'connected' ? 'LIVE' : connectionStatus === 'error' ? '연결 끊김' : '연결 중...'}
+            <RiRefreshLine className="w-3 h-3" />
+            {connectionStatus === 'connected' ? 'LIVE' : 'CONNECTING...'}
           </button>
         </div>
       </div>
 
-      {/* ── 게임 HUD ── */}
-      {gameActive && (
-        <div className="bg-purple-900/30 border-b border-purple-800/50 p-2 text-center text-sm">
-          <div className="flex justify-between items-center flex-wrap gap-2">
-            <span className="text-purple-200">🎮 끝말잇기 중</span>
-            <span className="text-cyan-300 font-mono">현재 단어: <strong>{currentWord || '?'}</strong></span>
-            <span className="text-yellow-200">🎤 차례: {currentPlayer}</span>
-            <span className="text-gray-400">👥 {players.length}명 참여</span>
-          </div>
-          {gameMessage && <div className="text-xs text-gray-300 mt-1 animate-pulse">{gameMessage}</div>}
-        </div>
-      )}
+      {gameState.status !== 'IDLE' && <GameHUD />}
 
       {/* ── 메시지 목록 ── */}
       <div 
@@ -966,7 +963,6 @@ export default function LobbyChatWidget() {
       {/* ── 입력창 ── */}
       <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
         <div className="flex gap-2 items-end relative">
-          {/* 이모티콘 피커 */}
           {showEmoticonPicker && (
             <EmoticonPicker
               onSelect={handleEmoticonSend}
@@ -974,21 +970,14 @@ export default function LobbyChatWidget() {
             />
           )}
 
-          {/* 이모티콘 버튼 */}
           <button
             type="button"
             onClick={() => setShowEmoticonPicker(prev => !prev)}
-            className={`flex-shrink-0 p-2.5 rounded-xl border transition-all duration-200 ${
-              showEmoticonPicker
-                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:text-cyan-300 hover:border-cyan-500/30'
-            }`}
-            title="이모티콘 선택"
+            className="flex-shrink-0 p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-cyan-300 hover:border-cyan-500/30 bg-gray-800/50"
           >
             <RiEmotionLine className="w-5 h-5" />
           </button>
 
-          {/* 텍스트 입력 */}
           <textarea
             ref={textareaRef}
             value={newMessage}
@@ -1001,11 +990,9 @@ export default function LobbyChatWidget() {
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder={
-              gameActive
-                ? `끝말잇기: '${currentWord}'의 끝 글자로 시작하는 단어 입력`
-                : isAiMode 
-                  ? 'AI와 대화 중... 메시지를 입력하세요.'
-                  : '메시지 입력... (/ai [질문] 으로 AI에게 묻기)'
+              gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId
+                ? `'${gameState.currentWord[gameState.currentWord.length - 1]}'로 시작하는 단어 입력!`
+                : '메시지 입력... (/끝말잇기 로 시작)'
             }
             className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
           />
@@ -1018,11 +1005,10 @@ export default function LobbyChatWidget() {
             </div>
           )}
 
-          {/* 전송 버튼 */}
           <button
             type="submit"
             disabled={!newMessage.trim() || isSending}
-            className="flex-shrink-0 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200 shadow-lg shadow-cyan-900/20"
+            className="flex-shrink-0 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl px-5 py-2.5 transition-all duration-200"
           >
             <RiSendPlaneLine className="text-white w-5 h-5" />
           </button>
@@ -1034,11 +1020,6 @@ export default function LobbyChatWidget() {
             {filterWarning}
           </div>
         )}
-
-        <div className="flex justify-between items-center mt-2 px-1">
-          <p className="text-[10px] text-gray-500">⚡ 모든 메시지는 24시간 후 자동 삭제됩니다.</p>
-          <p className="text-[10px] text-gray-600">#{messages.length} messages</p>
-        </div>
       </form>
     </div>
   );
