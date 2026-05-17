@@ -448,13 +448,20 @@ export default function LobbyChatWidget() {
 
   // ── 끝말잇기 게임 로직 ───────────────────────
 
-  const broadcastGameSync = useCallback((state: GameState) => {
-    if (gameChannel.current && gameChannelReady.current) {
-      gameChannel.current.send({
-        type: 'broadcast',
-        event: 'game_sync',
-        payload: state,
-      });
+  const broadcastGameSync = useCallback(async (state: GameState) => {
+    if (gameChannel.current) {
+      const send = async (retries = 3) => {
+        if (gameChannelReady.current) {
+          await gameChannel.current!.send({
+            type: 'broadcast',
+            event: 'game_sync',
+            payload: state,
+          });
+        } else if (retries > 0) {
+          setTimeout(() => send(retries - 1), 500);
+        }
+      };
+      send();
     }
   }, []);
 
@@ -656,40 +663,48 @@ export default function LobbyChatWidget() {
       finally { if (!isStale()) setIsLoading(false); }
     };
 
-    const subscribeChat = async () => {
-      const ch = supabase.channel('lobby:messages:realtime')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
-          if (isStale()) return;
-          setMessages(prev => [...prev, payload.new as LobbyMessage].slice(-MAX_MESSAGES));
-        }).subscribe();
-      chatChannel.current = ch;
-    };
-
-    const subscribeGame = () => {
-      const ch = supabase.channel('game:lobby');
-      ch.on('broadcast', { event: 'game_sync' }, ({ payload }: { payload: GameState }) => {
+    // 1. 채팅 구독
+    const chatCh = supabase.channel('lobby:messages:realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
         if (isStale()) return;
-        setGameState(payload);
-        // Only show popup if status is WAITING and I'm not in the player list yet
-        if (payload.status === 'WAITING' && !payload.players.some(p => p.id === currentUserId)) {
+        setMessages(prev => [...prev, payload.new as LobbyMessage].slice(-MAX_MESSAGES));
+      }).subscribe();
+
+    // 2. 게임 동기화 구독 (안정성 강화)
+    const gameCh = supabase.channel('game:lobby', {
+      config: {
+        broadcast: { ack: true },
+      }
+    });
+
+    gameCh.on('broadcast', { event: 'game_sync' }, ({ payload }: { payload: GameState }) => {
+      if (disposed) return;
+      setGameState(payload);
+
+      if (payload.status === 'WAITING') {
+        const isMeInGame = payload.players.some(p => p.id === currentUserId);
+        if (!isMeInGame) {
           setShowRecruitmentPopup(true);
         }
-        // If game ended or started, hide recruitment popup
-        if (payload.status !== 'WAITING') {
-          setShowRecruitmentPopup(false);
-        }
-      }).subscribe(status => { gameChannelReady.current = status === 'SUBSCRIBED'; });
-      gameChannel.current = ch;
-    };
+      } else {
+        setShowRecruitmentPopup(false);
+      }
+    }).subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        gameChannelReady.current = true;
+      }
+    });
+
+    chatChannel.current = chatCh;
+    gameChannel.current = gameCh;
 
     loadMessages();
-    subscribeChat();
-    subscribeGame();
 
     return () => {
       disposed = true;
-      if (chatChannel.current) supabase.removeChannel(chatChannel.current);
-      if (gameChannel.current) supabase.removeChannel(gameChannel.current);
+      gameChannelReady.current = false;
+      supabase.removeChannel(chatCh);
+      supabase.removeChannel(gameCh);
     };
   }, [supabase, currentUserId]); // Removed gameState dependency to avoid loops
 
