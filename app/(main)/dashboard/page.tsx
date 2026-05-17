@@ -4,7 +4,7 @@ import { getClanInfo } from '@/utils/clash';
 import Link from 'next/link';
 import { Zap, ChevronLeft, UserCircle } from 'lucide-react';
 import { Settings } from 'lucide-react';
-import LobbyChatWidget from '@/components/LobbyChatWidget_temp3';
+import LobbyChatWidget from '@/components/LobbyChatWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
