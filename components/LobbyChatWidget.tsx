@@ -344,12 +344,22 @@ export default function LobbyChatWidget() {
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
   const [showRecruitmentPopup, setShowRecruitmentPopup] = useState(false);
 
+  const [guestId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    let id = localStorage.getItem('guest_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('guest_id', id);
+    }
+    return id;
+  });
+
   const gameChannel      = useRef<RealtimeChannel | null>(null);
   const gameChannelReady = useRef(false);
   const gameTimerRef     = useRef<NodeJS.Timeout | null>(null);
 
   const displayName = isAnonymousMode ? randomAgentName : (nickname || '익명의 요원');
-  const currentUserId = userId || randomAgentName; // Fallback to name for anon
+  const currentUserId = userId || guestId; // Stable identification for anonymous users
 
   useEffect(() => {
     const sets: Record<string, Set<string>> = {};
@@ -480,7 +490,6 @@ export default function LobbyChatWidget() {
     };
     setGameState(newState);
     broadcastGameSync(newState);
-    setShowRecruitmentPopup(true);
   };
 
   const handleGameJoin = () => {
