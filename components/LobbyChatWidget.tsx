@@ -642,10 +642,12 @@ export default function LobbyChatWidget() {
 
     gameCh.on('broadcast', { event: 'game_sync' }, ({ payload }: { payload: GameState }) => {
       if (disposed) return;
+      console.log('[GameSync] Received payload status:', payload.status);
       setGameState(payload);
 
       if (payload.status === 'WAITING') {
-        const isMeInGame = payload.players.some(p => p.id === currentUserIdRef.current);
+        const myId = currentUserIdRef.current;
+        const isMeInGame = payload.players.some(p => p.id === myId);
         if (!isMeInGame) {
           setShowRecruitmentPopup(true);
         } else {
@@ -654,10 +656,19 @@ export default function LobbyChatWidget() {
       } else {
         setShowRecruitmentPopup(false);
       }
-    }).subscribe((status) => {
+    })
+    .on('broadcast', { event: 'request_sync' }, () => {
+      if (!disposed && gameStateRef.current.status !== 'IDLE' && gameStateRef.current.hostId === currentUserIdRef.current) {
+        console.log('[GameSync] Host responding to sync request');
+        broadcastGameSync(gameStateRef.current);
+      }
+    })
+    .subscribe((status) => {
+      console.log('[GameSync] Channel status:', status);
       if (status === 'SUBSCRIBED') {
         setConnectionStatus('connected');
         gameChannelReady.current = true;
+        gameCh.send({ type: 'broadcast', event: 'request_sync', payload: {} });
       } else if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
         setConnectionStatus('error');
       }
@@ -674,7 +685,10 @@ export default function LobbyChatWidget() {
       supabase.removeChannel(chatCh);
       supabase.removeChannel(gameCh);
     };
-  }, [supabase, currentUserId, reconnectTrigger]); 
+  }, [supabase, reconnectTrigger]); 
+
+  const gameStateRef = useRef(gameState);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
