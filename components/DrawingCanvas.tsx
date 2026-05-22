@@ -12,6 +12,12 @@ export default function DrawingCanvas({ isPainter, onDraw, initialData }: Drawin
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPos = useRef({ x: 0, y: 0 });
+  const initialDataRef = useRef(initialData);
+  const lineCountRef = useRef(0);
+
+  useEffect(() => {
+    initialDataRef.current = initialData;
+  }, [initialData]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -23,26 +29,50 @@ export default function DrawingCanvas({ isPainter, onDraw, initialData }: Drawin
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
       if (parent) {
-        canvas.width = parent.clientWidth;
-        canvas.height = 300; // Fixed height for now
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fff';
+        // Only resize if dimensions actually changed to avoid unnecessary clearing
+        if (canvas.width !== parent.clientWidth) {
+          canvas.width = parent.clientWidth;
+          canvas.height = 300;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#fff';
+          
+          // Re-draw if we have data after resize
+          if (initialDataRef.current) {
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0);
+            img.src = initialDataRef.current;
+          }
+        }
       }
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-
-    if (initialData) {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0);
-      img.src = initialData;
-    }
-
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, [initialData]);
+  }, []);
+
+  useEffect(() => {
+    if (!isPainter && initialData) {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx && canvas) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = initialData;
+      }
+    } else if (!isPainter && !initialData) {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }, [initialData, isPainter]);
 
   const getMousePos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -80,13 +110,19 @@ export default function DrawingCanvas({ isPainter, onDraw, initialData }: Drawin
     ctx.stroke();
 
     lastPos.current = pos;
+
+    lineCountRef.current += 1;
+    if (lineCountRef.current % 10 === 0 && onDraw) {
+      onDraw(canvas.toDataURL('image/webp', 0.5));
+    }
   };
 
   const stopDrawing = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
+    lineCountRef.current = 0;
     if (onDraw && canvasRef.current) {
-      onDraw(canvasRef.current.toDataURL());
+      onDraw(canvasRef.current.toDataURL('image/webp', 0.5));
     }
   };
 

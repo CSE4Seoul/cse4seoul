@@ -89,6 +89,14 @@ const isValidWordChain = (word: string, prev: string) => {
   if (word.length < 2) return false;
   return prev[prev.length - 1] === word[0];
 };
+
+const DUUM_MAP: Record<string, string> = {
+  '녀': '여', '뇨': '요', '뉴': '유', '니': '이',
+  '랴': '야', '려': '여', '례': '예', '료': '요', '류': '유', '리': '이',
+  '라': '나', '래': '내', '로': '노', '뢰': '뇌', '루': '누', '르': '느',
+};
+const applyDuum = (char: string) => DUUM_MAP[char] || char;
+
 const isValidWord = async (word: string): Promise<boolean> => COMMON_WORDS.has(word);
 
 const generateRandomName = () => {
@@ -243,6 +251,7 @@ const MAX_SETTABLE_TIME = 60; // Max time limit host can set
 interface GamePlayer {
   id: string;
   name: string;
+  score: number;
 }
 
 type GameStatus = 'IDLE' | 'WAITING' | 'PLAYING' | 'ENDED';
@@ -268,6 +277,7 @@ interface GameState {
   quizWord: string;
   currentDrawing: string;
   language: 'KO' | 'EN';
+  currentStack: number;
 }
 
 const INITIAL_GAME_STATE: GameState = {
@@ -286,6 +296,7 @@ const INITIAL_GAME_STATE: GameState = {
   quizWord: '',
   currentDrawing: '',
   language: 'KO',
+  currentStack: 0,
 };
 
 // ─────────────────────────────────────────────
@@ -525,8 +536,8 @@ export default function LobbyChatWidget() {
       ...INITIAL_GAME_STATE,
       status: 'WAITING',
       hostId: currentUserId,
-      players: [{ id: currentUserId, name: displayName }],
-      remainingTime: 15,
+      players: [{ id: currentUserId, name: displayName, score: 0 }],
+      remainingTime: 30,
       turnTimeLimit: 10,
     };
     setGameState(newState);
@@ -535,14 +546,26 @@ export default function LobbyChatWidget() {
     setTimeout(() => broadcastGameSync(newState), 50);
   };
 
+  const onStartNow = () => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    startPlaying();
+  };
+
   const handleGameJoin = () => {
     if (gameState.status !== 'WAITING') return;
     if (gameState.players.some(p => p.id === currentUserId)) return;
 
     const newState = {
       ...gameState,
-      players: [...gameState.players, { id: currentUserId, name: displayName }],
+      players: [...gameState.players, { id: currentUserId, name: displayName, score: 0 }],
     };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleGameCancel = () => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState: GameState = { ...INITIAL_GAME_STATE, status: 'IDLE' };
     setGameState(newState);
     broadcastGameSync(newState);
   };
@@ -571,15 +594,35 @@ export default function LobbyChatWidget() {
 
     await sendSystemMessage(`🎉 ${winnerName}님이 정답 [${gameState.quizWord}]을(를) 맞혔습니다!`);
 
-    const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    const painter = gameState.players[gameState.currentTurnIndex];
+    const timeBonus = gameState.remainingTime * 2;
+    const stackPoints = gameState.currentStack * 10;
+    
+    const updatedPlayers = gameState.players.map(p => {
+      let newScore = p.score || 0;
+      if (p.name === winnerName) newScore += (50 + timeBonus + stackPoints);
+      if (p.id === painter.id) newScore += 30;
+      return { ...p, score: newScore };
+    });
+
+    const nextIndex = (gameState.currentTurnIndex + 1) % updatedPlayers.length;
     let nextRound = gameState.round;
-    if (nextIndex === 0) nextRound += 1;
+    let newStack = gameState.currentStack + 1;
+
+    if (nextIndex === 0) {
+      nextRound += 1;
+      newStack = 0; // 라운드마다 스택 초기화
+    }
 
     if (nextRound > gameState.maxRounds) {
+      const sorted = [...updatedPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const finalWinner = sorted[0];
       const endState: GameState = {
         ...gameState,
+        players: updatedPlayers,
         status: 'ENDED',
-        winner: winnerName,
+        winner: `${finalWinner.name} (${finalWinner.score}점)`,
+        currentStack: 0,
       };
       setGameState(endState);
       broadcastGameSync(endState);
@@ -599,15 +642,17 @@ export default function LobbyChatWidget() {
 
     const newState: GameState = {
       ...gameState,
+      players: updatedPlayers,
       currentTurnIndex: nextIndex,
       quizWord: newQuizWord,
       remainingTime: gameState.turnTimeLimit,
       round: nextRound,
       currentDrawing: '',
+      currentStack: newStack,
     };
     setGameState(newState);
     broadcastGameSync(newState);
-  }, [gameState, currentUserId, broadcastGameSync, sendSystemMessage]);
+  }, [gameState, currentUserId, broadcastGameSync, sendSystemMessage, cseKeywords, englishWordSets, wordSets]);
 
   const startPlaying = useCallback(async () => {
     if (gameState.hostId !== currentUserId) return;
@@ -657,6 +702,7 @@ export default function LobbyChatWidget() {
       usedWords: startWord ? [startWord] : [],
       remainingTime: gameState.turnTimeLimit,
       currentDrawing: '',
+      round: 1, // Explicitly reset round
     };
     setGameState(newState);
     broadcastGameSync(newState);
@@ -677,25 +723,38 @@ export default function LobbyChatWidget() {
       const currentPlayer = gameState.players[gameState.currentTurnIndex];
       const remainingPlayers = gameState.players.filter(p => p.id !== currentPlayer.id);
 
-      await sendSystemMessage(`${currentPlayer.name}님 시간 초과로 탈락!`);
+      // 감점 로직: 스택이 높을수록 큰 감점
+      const penalty = 20 + (gameState.currentStack * 15);
+      const updatedPlayersWithPenalty = gameState.players.map(p => {
+        if (p.id === currentPlayer.id) {
+          const newScore = Math.max(0, (p.score || 0) - penalty);
+          return { ...p, score: newScore };
+        }
+        return p;
+      });
+
+      await sendSystemMessage(`${currentPlayer.name}님 시간 초과! (${penalty}점 감점)`);
 
       if (remainingPlayers.length === 1) {
+        const sorted = [...updatedPlayersWithPenalty].sort((a, b) => (b.score || 0) - (a.score || 0));
+        const finalWinner = sorted[0];
         const endState: GameState = {
           ...gameState,
           status: 'ENDED',
-          players: remainingPlayers,
-          winner: remainingPlayers[0].name,
+          players: updatedPlayersWithPenalty,
+          winner: `${finalWinner.name} (${finalWinner.score}점)`,
         };
         setGameState(endState);
         broadcastGameSync(endState);
-        await sendSystemMessage(`게임 종료! 우승자: ${remainingPlayers[0].name}`);
+        await sendSystemMessage(`게임 종료! 최종 우승자: ${finalWinner.name}`);
       } else {
         const nextIndex = gameState.currentTurnIndex % remainingPlayers.length;
         const newState: GameState = {
           ...gameState,
-          players: remainingPlayers,
+          players: updatedPlayersWithPenalty.filter(p => p.id !== currentPlayer.id),
           currentTurnIndex: nextIndex,
           remainingTime: gameState.turnTimeLimit,
+          currentStack: 0, // 타임아웃 시 스택 초기화
         };
         setGameState(newState);
         broadcastGameSync(newState);
@@ -747,9 +806,17 @@ export default function LobbyChatWidget() {
     }
     
     const lastWord = gameState.currentWord;
-    const lastChar = lastWord[lastWord.length - 1].toLowerCase();
-    if (normalizedWord[0].toLowerCase() !== lastChar) {
-      return `'${lastChar}'(으)로 시작해야 합니다.`;
+    const lastChar = lastWord[lastWord.length - 1];
+    
+    if (isEnglish) {
+      if (normalizedWord[0].toLowerCase() !== lastChar.toLowerCase()) {
+        return `'${lastChar.toLowerCase()}'(으)로 시작해야 합니다.`;
+      }
+    } else {
+      const duumChar = applyDuum(lastChar);
+      if (normalizedWord[0] !== lastChar && normalizedWord[0] !== duumChar) {
+        return `'${lastChar}'${lastChar !== duumChar ? ` 또는 '${duumChar}'` : ''}(으)로 시작해야 합니다.`;
+      }
     }
     
     if (gameState.usedWords.includes(normalizedWord)) return '이미 사용된 단어입니다.';
@@ -789,24 +856,40 @@ export default function LobbyChatWidget() {
       return;
     }
 
-    const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    // Award points: 남은 시간 보너스 + 스택 보너스
+    const timeBonus = Math.floor(gameState.remainingTime * 1.5);
+    const stackBonus = gameState.currentStack * 10;
+    const pointsEarned = 20 + timeBonus + stackBonus;
+
+    const updatedPlayers = gameState.players.map(p => {
+      if (p.id === currentUserId) return { ...p, score: (p.score || 0) + pointsEarned };
+      return p;
+    });
+
+    const nextIndex = (gameState.currentTurnIndex + 1) % updatedPlayers.length;
     let nextRound = gameState.round;
+    let newStack = gameState.currentStack + 1;
     
     // 한 바퀴 돌면 라운드 증가
     if (nextIndex === 0) {
       nextRound += 1;
+      newStack = 0; // 라운드마다 스택 초기화
     }
 
     // 최대 라운드 도달 시 종료 체크 (옵션)
     if (nextRound > gameState.maxRounds) {
+      const sorted = [...updatedPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const finalWinner = sorted[0];
       const endState: GameState = {
         ...gameState,
+        players: updatedPlayers,
         status: 'ENDED',
-        winner: '모든 라운드 종료 (무승부 또는 포인트제 필요)', // 현재 포인트제가 없으므로 일단 무승부 처리
+        winner: `${finalWinner.name} (${finalWinner.score}점)`,
+        currentStack: 0,
       };
       setGameState(endState);
       broadcastGameSync(endState);
-      sendSystemMessage(`모든 라운드(${gameState.maxRounds})가 종료되었습니다!`);
+      sendSystemMessage(`모든 라운드(${gameState.maxRounds})가 종료되었습니다! 우승자: ${finalWinner.name}`);
       return;
     }
     
@@ -815,12 +898,14 @@ export default function LobbyChatWidget() {
 
     const newState: GameState = {
       ...gameState,
+      players: updatedPlayers,
       currentWord: word,
       usedWords: [...gameState.usedWords, word],
       currentTurnIndex: nextIndex,
       turnTimeLimit: nextTimeLimit,
       remainingTime: nextTimeLimit,
       round: nextRound,
+      currentStack: newStack,
     };
     setGameState(newState);
     broadcastGameSync(newState);
@@ -1143,77 +1228,154 @@ const sendMessage = async (e: FormEvent) => {
               <span className="bg-purple-600/50 px-2 py-0.5 rounded text-xs">{gameState.remainingTime}초 남음</span>
             </div>
             
-            <div className="flex flex-wrap justify-center items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-400">참가자:</span>
-                <span className="text-xs font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
-                  {gameState.players.length}명
-                </span>
+            <div className="flex flex-col gap-4 w-full">
+              {/* 참가자 명단 */}
+              <div className="flex flex-wrap justify-center items-center gap-2">
+                {gameState.players.map(p => (
+                  <div key={p.id} className="flex items-center gap-1.5 bg-gray-800/80 px-3 py-1.5 rounded-full border border-gray-700 shadow-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                    <span className="text-[10px] text-gray-300 font-medium">{p.name}</span>
+                    <span className="text-[10px] font-bold text-yellow-400 ml-1">{p.score || 0}P</span>
+                  </div>
+                ))}
               </div>
 
+              {/* 설정 영역 (호스트 전용) */}
               {gameState.hostId === currentUserId && (
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 bg-gray-800/80 px-2 py-1.5 rounded-lg border border-gray-700">
-                    <span className="text-[10px] text-gray-400">제한시간:</span>
-                    <input
-                      type="range" min={MIN_TURN_TIME} max={MAX_SETTABLE_TIME} step="1"
-                      value={gameState.turnTimeLimit}
-                      onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
-                      className="w-16 h-1 accent-purple-500 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-purple-300 w-6">{gameState.turnTimeLimit}s</span>
+                <div className="flex flex-wrap items-center justify-center gap-3 bg-black/20 p-3 rounded-2xl border border-white/5">
+                  {/* 시간 & 라운드 조절 */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Turn Time</span>
+                        <span className="text-[10px] text-purple-300 font-mono">{gameState.turnTimeLimit}s</span>
+                      </div>
+                      <input
+                        type="range" min={MIN_TURN_TIME} max={MAX_SETTABLE_TIME} step="1"
+                        value={gameState.turnTimeLimit}
+                        onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
+                        className="w-24 h-1.5 accent-purple-500 cursor-pointer bg-gray-700 rounded-lg appearance-none"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Max Rounds</span>
+                        <span className="text-[10px] text-purple-300 font-mono">{gameState.maxRounds}</span>
+                      </div>
+                      <input
+                        type="range" min={1} max={20} step="1"
+                        value={gameState.maxRounds}
+                        onChange={(e) => handleUpdateMaxRounds(Number(e.target.value))}
+                        className="w-24 h-1.5 accent-purple-500 cursor-pointer bg-gray-700 rounded-lg appearance-none"
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-gray-800/80 px-2 py-1.5 rounded-lg border border-gray-700">
-                    <span className="text-[10px] text-gray-400">라운드:</span>
-                    <input
-                      type="range" min={1} max={20} step="1"
-                      value={gameState.maxRounds}
-                      onChange={(e) => handleUpdateMaxRounds(Number(e.target.value))}
-                      className="w-16 h-1 accent-purple-500 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-purple-300 w-6">{gameState.maxRounds}</span>
+                  {/* 모드 & 언어 토글 */}
+                  <div className="flex items-center gap-2 z-10">
+                    <button
+                      onClick={handleToggleStrictMode}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all duration-200 ${
+                        gameState.isStrictMode 
+                          ? 'bg-red-500/30 text-red-200 border-red-500/50 shadow-[inset_0_1px_4px_rgba(0,0,0,0.3)]' 
+                          : 'bg-gray-800/50 text-gray-500 border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      깐깐 모드 {gameState.isStrictMode ? 'ON' : 'OFF'}
+                    </button>
+
+                    <div className="flex bg-gray-900/60 rounded-xl p-1 border border-gray-700/50 shadow-inner">
+                      <button
+                        onClick={() => handleUpdateLanguage('KO')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-200 ${
+                          gameState.language === 'KO' 
+                            ? 'bg-cyan-600 text-white shadow-[0_2px_10px_rgba(8,145,178,0.4)] scale-105' 
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                        }`}
+                      >
+                        KO
+                      </button>
+                      <button
+                        onClick={() => handleUpdateLanguage('EN')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-200 ${
+                          gameState.language === 'EN' 
+                            ? 'bg-cyan-600 text-white shadow-[0_2px_10px_rgba(8,145,178,0.4)] scale-105' 
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                        }`}
+                      >
+                        EN
+                      </button>
+                    </div>
+
+                    <div className="flex bg-gray-900/60 rounded-xl p-1 border border-gray-700/50 shadow-inner">
+                      <button
+                        onClick={() => handleUpdateGameMode('WORD_CHAIN')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-200 ${
+                          gameState.gameMode === 'WORD_CHAIN' 
+                            ? 'bg-purple-600 text-white shadow-[0_2px_10px_rgba(147,51,234,0.4)] scale-105' 
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                        }`}
+                      >
+                        끝말잇기
+                      </button>
+                      <button
+                        onClick={() => handleUpdateGameMode('DRAWING_QUIZ')}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-200 ${
+                          gameState.gameMode === 'DRAWING_QUIZ' 
+                            ? 'bg-purple-600 text-white shadow-[0_2px_10px_rgba(147,51,234,0.4)] scale-105' 
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                        }`}
+                      >
+                        그림퀴즈
+                      </button>
+                    </div>
                   </div>
 
-                  <button
-                    onClick={handleToggleStrictMode}
-                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
-                      gameState.isStrictMode 
-                        ? 'bg-red-500/20 text-red-400 border-red-500/50' 
-                        : 'bg-gray-800 text-gray-400 border-gray-700'
-                    }`}
-                  >
-                    깐깐 모드 {gameState.isStrictMode ? 'ON' : 'OFF'}
-                  </button>
+                  {/* 액션 버튼 */}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      onClick={handleGameCancel}
+                      className="px-4 py-1.5 rounded-xl text-[10px] font-bold border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 transition-all duration-200"
+                    >
+                      모집 취소
+                    </button>
 
-                  <select
-                    value={gameState.language}
-                    onChange={(e) => handleUpdateLanguage(e.target.value as any)}
-                    className="bg-gray-800 text-cyan-300 text-[10px] font-bold border border-gray-700 rounded px-1.5 py-1 outline-none"
-                  >
-                    <option value="KO">KOREAN</option>
-                    <option value="EN">ENGLISH</option>
-                  </select>
-
-                  <select
-                    value={gameState.gameMode}
-                    onChange={(e) => handleUpdateGameMode(e.target.value as any)}
-                    className="bg-gray-800 text-purple-300 text-[10px] font-bold border border-gray-700 rounded px-1.5 py-1 outline-none"
-                  >
-                    <option value="WORD_CHAIN">끝말잇기</option>
-                    <option value="DRAWING_QUIZ">그림퀴즈</option>
-                  </select>
+                    <button
+                      onClick={onStartNow}
+                      className="px-4 py-1.5 rounded-xl text-[10px] font-bold border bg-green-500/20 text-green-400 border-green-500/50 hover:bg-green-500/30 transition-all duration-200 animate-pulse hover:animate-none"
+                    >
+                      지금 시작
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
+            </div>          </div>
         ) : gameState.status === 'PLAYING' ? (
           <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              {gameState.players.map(p => (
+                <div key={p.id} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] transition-all ${
+                  gameState.players[gameState.currentTurnIndex]?.id === p.id 
+                    ? 'bg-yellow-500 text-black border-yellow-400 font-bold scale-105 shadow-sm' 
+                    : 'bg-gray-800/80 border-gray-700 text-gray-400'
+                }`}>
+                  <span>{p.name}</span>
+                  <span className={`${gameState.players[gameState.currentTurnIndex]?.id === p.id ? 'text-black' : 'text-yellow-500'} font-black`}>{p.score || 0}</span>
+                </div>
+              ))}
+            </div>
+
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Round</span>
                   <span className="text-lg font-black text-white leading-none">{gameState.round}/{gameState.maxRounds}</span>
+                </div>
+                <div className="h-8 w-px bg-purple-500/30 mx-1" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider">Stack</span>
+                  <span className="text-lg font-black text-yellow-500 leading-none">x{gameState.currentStack}</span>
                 </div>
                 <div className="h-8 w-px bg-purple-500/30 mx-1" />
                 <div className="flex flex-col">
