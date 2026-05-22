@@ -21,6 +21,7 @@ interface LobbyMessage {
   expires_at: string;
   message_type?: 'text' | 'emoticon' | 'image';
   media_url?: string;
+  author_avatar_url?: string;
 }
 
 type GameStartPayload = { starter: string; startWord: string };
@@ -184,9 +185,19 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
   return (
     <div className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
       <div className="flex-shrink-0 mt-1">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/50 flex items-center justify-center">
-          <span className="text-xs font-bold text-cyan-300">?</span>
-        </div>
+        {msg.author_avatar_url ? (
+          <img 
+            src={msg.author_avatar_url} 
+            alt={msg.author_name} 
+            className="w-8 h-8 rounded-full border border-cyan-500/50 object-cover"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/50 flex items-center justify-center">
+            <span className="text-xs font-bold text-cyan-300">
+              {msg.author_name ? msg.author_name[0] : '?'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
@@ -236,6 +247,10 @@ interface GamePlayer {
 
 type GameStatus = 'IDLE' | 'WAITING' | 'PLAYING' | 'ENDED';
 
+import DrawingCanvas from './DrawingCanvas';
+
+// ... (skipping some code)
+
 interface GameState {
   status: GameStatus;
   hostId: string;
@@ -246,6 +261,13 @@ interface GameState {
   turnTimeLimit: number;
   remainingTime: number;
   winner?: string;
+  round: number;
+  maxRounds: number;
+  isStrictMode: boolean;
+  gameMode: 'WORD_CHAIN' | 'DRAWING_QUIZ';
+  quizWord: string;
+  currentDrawing: string;
+  language: 'KO' | 'EN';
 }
 
 const INITIAL_GAME_STATE: GameState = {
@@ -257,6 +279,13 @@ const INITIAL_GAME_STATE: GameState = {
   usedWords: [],
   turnTimeLimit: 10,
   remainingTime: 0,
+  round: 1,
+  maxRounds: 10,
+  isStrictMode: false,
+  gameMode: 'WORD_CHAIN',
+  quizWord: '',
+  currentDrawing: '',
+  language: 'KO',
 };
 
 // ─────────────────────────────────────────────
@@ -300,7 +329,27 @@ export default function LobbyChatWidget() {
 
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
+  const [englishWordSets, setEnglishWordSets] = useState<Record<string, Set<string>>>({});
+  const [cseKeywords, setCseKeywords] = useState<string[]>([]);
   const [showRecruitmentPopup, setShowRecruitmentPopup] = useState(false);
+
+  // Profile and Mouse tracking states
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [lastMessageForBubble, setLastMessageForBubble] = useState<{content: string, author: string} | null>(null);
+  const bubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // BGM
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const [isBgmReady, setIsBgmReady] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   // 로컬 환경 탭 다중 테스트 대응: localStorage 대신 sessionStorage 사용
   const [guestId] = useState(() => {
@@ -328,6 +377,36 @@ export default function LobbyChatWidget() {
       sets[char] = new Set(WORD_MAP[char]);
     }
     setWordSets(sets);
+
+    const fetchEnglishWords = async () => {
+      try {
+        const response = await fetch('/English_word_list.json');
+        if (response.ok) {
+          const data = await response.json();
+          const eSets: Record<string, Set<string>> = {};
+          for (const char in data) {
+            eSets[char.toLowerCase()] = new Set(data[char].map((w: string) => w.toLowerCase()));
+          }
+          setEnglishWordSets(eSets);
+        }
+      } catch (e) {
+        console.log('English word list not found');
+      }
+    };
+    const fetchCseKeywords = async () => {
+      try {
+        const response = await fetch('/drawing_keyword_set_cse.json');
+        if (response.ok) {
+          const data = await response.json();
+          setCseKeywords(data.cse_keywords || []);
+        }
+      } catch (e) {
+        console.log('CSE keywords not found');
+      }
+    };
+
+    fetchEnglishWords();
+    fetchCseKeywords();
   }, []);
 
   useEffect(() => {
@@ -375,10 +454,11 @@ export default function LobbyChatWidget() {
       if (user) {
         setIsLoggedIn(true);
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
         if (profile?.full_name) setRealName(profile.full_name);
+        if (profile?.avatar_url) setAvatarUrl(profile.avatar_url);
       } else {
-        setIsLoggedIn(false); setUserId(null); setRealName(null);
+        setIsLoggedIn(false); setUserId(null); setRealName(null); setAvatarUrl(null);
       }
     };
     fetchUser();
@@ -486,6 +566,49 @@ export default function LobbyChatWidget() {
     } catch (err) { console.error(err); }
   }, [supabase, gameState.hostId, currentUserId]);
 
+  const handleQuizSuccess = useCallback(async (winnerName: string) => {
+    if (gameState.hostId !== currentUserId) return;
+
+    await sendSystemMessage(`🎉 ${winnerName}님이 정답 [${gameState.quizWord}]을(를) 맞혔습니다!`);
+
+    const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    let nextRound = gameState.round;
+    if (nextIndex === 0) nextRound += 1;
+
+    if (nextRound > gameState.maxRounds) {
+      const endState: GameState = {
+        ...gameState,
+        status: 'ENDED',
+        winner: winnerName,
+      };
+      setGameState(endState);
+      broadcastGameSync(endState);
+      return;
+    }
+
+    const isEnglish = gameState.language === 'EN';
+    let allWords = [];
+    if (cseKeywords.length > 0) {
+      allWords = cseKeywords;
+    } else if (isEnglish) {
+      allWords = Object.keys(englishWordSets).length > 0 ? Object.values(englishWordSets).map(s => Array.from(s)).flat() : ['apple', 'banana', 'cat'];
+    } else {
+      allWords = Object.values(WORD_MAP).flat();
+    }
+    const newQuizWord = allWords[Math.floor(Math.random() * allWords.length)];
+
+    const newState: GameState = {
+      ...gameState,
+      currentTurnIndex: nextIndex,
+      quizWord: newQuizWord,
+      remainingTime: gameState.turnTimeLimit,
+      round: nextRound,
+      currentDrawing: '',
+    };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  }, [gameState, currentUserId, broadcastGameSync, sendSystemMessage]);
+
   const startPlaying = useCallback(async () => {
     if (gameState.hostId !== currentUserId) return;
     
@@ -496,22 +619,53 @@ export default function LobbyChatWidget() {
       return;
     }
 
-    const allChars = Object.keys(WORD_MAP);
-    const randomChar = allChars[Math.floor(Math.random() * allChars.length)];
-    const words = WORD_MAP[randomChar];
-    const startWord = words[Math.floor(Math.random() * words.length)];
+    let startWord = '';
+    let quizWord = '';
+
+    if (gameState.gameMode === 'WORD_CHAIN') {
+      const isEnglish = gameState.language === 'EN';
+      let allChars = isEnglish ? Object.keys(englishWordSets) : Object.keys(WORD_MAP);
+      
+      if (isEnglish && allChars.length === 0) {
+        // Fallback words if JSON not loaded yet
+        const fallbacks = ['apple', 'banana', 'cat', 'dog', 'egg', 'fish', 'goat', 'hat', 'ice', 'jam'];
+        startWord = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      } else {
+        const randomChar = allChars[Math.floor(Math.random() * allChars.length)];
+        const words = isEnglish ? Array.from(englishWordSets[randomChar]) : WORD_MAP[randomChar];
+        startWord = words[Math.floor(Math.random() * words.length)];
+      }
+    } else {
+      const isEnglish = gameState.language === 'EN';
+      let allWords = [];
+      if (cseKeywords.length > 0) {
+        allWords = cseKeywords;
+      } else if (isEnglish) {
+        allWords = Object.keys(englishWordSets).length > 0 ? Object.values(englishWordSets).map(s => Array.from(s)).flat() : ['apple', 'banana', 'cat'];
+      } else {
+        allWords = Object.values(WORD_MAP).flat();
+      }
+      quizWord = allWords[Math.floor(Math.random() * allWords.length)];
+    }
 
     const newState: GameState = {
       ...gameState,
       status: 'PLAYING',
       currentTurnIndex: 0,
       currentWord: startWord,
-      usedWords: [startWord],
+      quizWord: quizWord,
+      usedWords: startWord ? [startWord] : [],
       remainingTime: gameState.turnTimeLimit,
+      currentDrawing: '',
     };
     setGameState(newState);
     broadcastGameSync(newState);
-    await sendSystemMessage(`게임 시작! 시작 단어: [${startWord}]`);
+
+    if (gameState.gameMode === 'WORD_CHAIN') {
+      await sendSystemMessage(`게임 시작! 시작 단어: [${startWord}]`);
+    } else {
+      await sendSystemMessage(`그림 퀴즈 시작! ${gameState.players[0].name}님이 출제자입니다.`);
+    }
   }, [gameState, currentUserId, broadcastGameSync, sendSystemMessage]);
 
   const handleTimeout = useCallback(async () => {
@@ -581,16 +735,45 @@ export default function LobbyChatWidget() {
   }, [gameState.remainingTime, gameState.status, gameState.hostId, currentUserId, handleTimeout]);
 
   const validateWord = (word: string): string | null => {
-    if (word.length < 2) return '2글자 이상 입력해주세요.';
-    if (!/^[가-힣]+$/.test(word)) return '한글만 입력 가능합니다.';
+    const isEnglish = gameState.language === 'EN';
+    const normalizedWord = isEnglish ? word.toLowerCase().trim() : word.trim();
+
+    if (normalizedWord.length < 2) return '2글자 이상 입력해주세요.';
     
-    const lastChar = gameState.currentWord[gameState.currentWord.length - 1];
-    if (word[0] !== lastChar) return `'${lastChar}'로 시작해야 합니다.`;
+    if (isEnglish) {
+      if (!/^[a-z]+$/.test(normalizedWord)) return '영어만 입력 가능합니다.';
+    } else {
+      if (!/^[가-힣]+$/.test(normalizedWord)) return '한글만 입력 가능합니다.';
+    }
     
-    if (gameState.usedWords.includes(word)) return '이미 사용된 단어입니다.';
+    const lastWord = gameState.currentWord;
+    const lastChar = lastWord[lastWord.length - 1].toLowerCase();
+    if (normalizedWord[0].toLowerCase() !== lastChar) {
+      return `'${lastChar}'(으)로 시작해야 합니다.`;
+    }
     
-    const firstChar = word[0];
-    if (!wordSets[firstChar]?.has(word)) return '사전에 없는 단어입니다.';
+    if (gameState.usedWords.includes(normalizedWord)) return '이미 사용된 단어입니다.';
+    
+    const firstChar = normalizedWord[0].toLowerCase();
+    const currentWordSets = isEnglish ? englishWordSets : wordSets;
+    
+    if (!currentWordSets[firstChar]?.has(normalizedWord)) {
+      return '사전에 없는 단어입니다.';
+    }
+
+    // 한 방 단어 & 깐깐 모드 검사 (한국어만 또는 영어도 적용 가능)
+    const lastCharOfInput = normalizedWord[normalizedWord.length - 1].toLowerCase();
+    // For English, we need to check followUps in englishWordSets
+    const followUps = (isEnglish ? Object.values(englishWordSets).flat().filter(w => w.startsWith(lastCharOfInput)) 
+                                 : WORD_MAP[lastCharOfInput]) || [];
+
+    if (followUps.length === 0) {
+      return '⚠️ 한 방 단어는 금지되어 있습니다!';
+    }
+
+    if (gameState.isStrictMode && followUps.length <= 5) {
+      return `⚠️ 깐깐 모드: 뒤에 올 수 있는 단어가 ${followUps.length}개뿐이라 금지됩니다!`;
+    }
     
     return null;
   };
@@ -607,6 +790,25 @@ export default function LobbyChatWidget() {
     }
 
     const nextIndex = (gameState.currentTurnIndex + 1) % gameState.players.length;
+    let nextRound = gameState.round;
+    
+    // 한 바퀴 돌면 라운드 증가
+    if (nextIndex === 0) {
+      nextRound += 1;
+    }
+
+    // 최대 라운드 도달 시 종료 체크 (옵션)
+    if (nextRound > gameState.maxRounds) {
+      const endState: GameState = {
+        ...gameState,
+        status: 'ENDED',
+        winner: '모든 라운드 종료 (무승부 또는 포인트제 필요)', // 현재 포인트제가 없으므로 일단 무승부 처리
+      };
+      setGameState(endState);
+      broadcastGameSync(endState);
+      sendSystemMessage(`모든 라운드(${gameState.maxRounds})가 종료되었습니다!`);
+      return;
+    }
     
     // Calculate reduced time for next turn
     const nextTimeLimit = Math.max(MIN_TURN_TIME, Math.ceil(gameState.turnTimeLimit * (1 - TIME_REDUCTION_RATIO)));
@@ -618,6 +820,7 @@ export default function LobbyChatWidget() {
       currentTurnIndex: nextIndex,
       turnTimeLimit: nextTimeLimit,
       remainingTime: nextTimeLimit,
+      round: nextRound,
     };
     setGameState(newState);
     broadcastGameSync(newState);
@@ -641,7 +844,13 @@ export default function LobbyChatWidget() {
     const chatCh = supabase.channel('lobby:messages:realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
         if (isStale()) return;
-        setMessages(prev => [...prev, payload.new as LobbyMessage].slice(-MAX_MESSAGES));
+        const newMsg = payload.new as LobbyMessage;
+        setMessages(prev => [...prev, newMsg].slice(-MAX_MESSAGES));
+        
+        // Update bubble
+        setLastMessageForBubble({ content: newMsg.content, author: newMsg.author_name });
+        if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+        bubbleTimerRef.current = setTimeout(() => setLastMessageForBubble(null), 3000);
       }).subscribe();
 
     const gameCh = supabase.channel('game:lobby', {
@@ -665,6 +874,12 @@ export default function LobbyChatWidget() {
         }
       } else {
         setShowRecruitmentPopup(false);
+      }
+    })
+    .on('broadcast', { event: 'quiz_success' }, ({ payload }: { payload: { winner: string } }) => {
+      if (disposed || isStale()) return;
+      if (gameStateRef.current.hostId === currentUserIdRef.current) {
+        handleQuizSuccess(payload.winner);
       }
     })
     .on('broadcast', { event: 'request_sync' }, () => {
@@ -734,6 +949,7 @@ export default function LobbyChatWidget() {
         author_name: displayName,
         message_type: 'emoticon',
         expires_at: expiresAt.toISOString(),
+        author_avatar_url: isAnonymousMode ? null : avatarUrl,
       });
       setNewMessage('');
     } catch {
@@ -756,15 +972,35 @@ const sendMessage = async (e: FormEvent) => {
   }
 
   // 게임 중 본인 턴일 때의 처리
-  if (gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId) {
-    const error = validateWord(trimmed);
-    if (!error) {
-      // 유효한 단어인 경우 게임 진행
-      submitWord(trimmed);
-      setNewMessage('');
-      return;
+  if (gameState.status === 'PLAYING') {
+    if (gameState.gameMode === 'WORD_CHAIN') {
+      if (gameState.players[gameState.currentTurnIndex]?.id === currentUserId) {
+        const error = validateWord(trimmed);
+        if (!error) {
+          submitWord(trimmed);
+          setNewMessage('');
+          return;
+        }
+      }
+    } else {
+      // Drawing Quiz: any non-painter can guess
+      const isPainter = gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
+      if (!isPainter && (trimmed === gameState.quizWord || trimmed.replace(/\s/g, '') === gameState.quizWord.replace(/\s/g, ''))) {
+        // 정답을 맞힘!
+        if (gameState.hostId === currentUserId) {
+          handleQuizSuccess(displayName);
+        } else {
+          // 호스트가 아니면 호스트에게 알림 (또는 브로드캐스트)
+          gameChannel.current?.send({
+            type: 'broadcast',
+            event: 'quiz_success',
+            payload: { winner: displayName }
+          });
+        }
+        setNewMessage('');
+        return;
+      }
     }
-    // 유효하지 않은 단어(시작 글자 불일치 등)인 경우 아래의 일반 채팅 로직으로 흐름이 넘어감
   }
 
   const emoticonKeyword = matchEmoticonCommand(trimmed);
@@ -786,8 +1022,11 @@ const sendMessage = async (e: FormEvent) => {
     
     try {
       const { data, error } = await supabase.from('lobby_messages').insert({ 
-        content: trimmed, author_name: displayName, message_type: 'text', 
-        expires_at: expiresAt.toISOString() 
+        content: trimmed, 
+        author_name: displayName, 
+        message_type: 'text', 
+        expires_at: expiresAt.toISOString(),
+        author_avatar_url: isAnonymousMode ? null : avatarUrl,
       }).select().single();
       
       if (!error && data) {
@@ -854,52 +1093,169 @@ const sendMessage = async (e: FormEvent) => {
     </div>
   );
 
+  const handleUpdateMaxRounds = (max: number) => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState = { ...gameState, maxRounds: max };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleToggleStrictMode = () => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState = { ...gameState, isStrictMode: !gameState.isStrictMode };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleDraw = (data: string) => {
+    if (gameState.status !== 'PLAYING' || gameState.gameMode !== 'DRAWING_QUIZ') return;
+    const isPainter = gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
+    if (!isPainter) return;
+
+    const newState = { ...gameState, currentDrawing: data };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleUpdateGameMode = (mode: 'WORD_CHAIN' | 'DRAWING_QUIZ') => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState = { ...gameState, gameMode: mode };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
+  const handleUpdateLanguage = (lang: 'KO' | 'EN') => {
+    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
+    const newState = { ...gameState, language: lang };
+    setGameState(newState);
+    broadcastGameSync(newState);
+  };
+
   const GameHUD = () => {
     const isMyTurn = gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
     
     return (
       <div className="bg-purple-900/40 border-b border-purple-500/30 p-3">
         {gameState.status === 'WAITING' ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-2 text-purple-200 font-bold">
               <span className="animate-pulse">모집 중...</span>
               <span className="bg-purple-600/50 px-2 py-0.5 rounded text-xs">{gameState.remainingTime}초 남음</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-400">참가자: {gameState.players.length}명</span>
+            
+            <div className="flex flex-wrap justify-center items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">참가자:</span>
+                <span className="text-xs font-bold text-white bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
+                  {gameState.players.length}명
+                </span>
+              </div>
+
               {gameState.hostId === currentUserId && (
-                <div className="flex items-center gap-2 bg-gray-800 px-2 py-1 rounded-lg border border-gray-700">
-                  <span className="text-[10px] text-gray-400">제한시간:</span>
-                  <input
-                    type="range" min={MIN_TURN_TIME} max={MAX_SETTABLE_TIME} step="1"
-                    value={gameState.turnTimeLimit}
-                    onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
-                    className="w-20 h-1 accent-purple-500 cursor-pointer"
-                  />
-                  <span className="text-[10px] text-purple-300 w-6">{gameState.turnTimeLimit}s</span>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <div className="flex items-center gap-2 bg-gray-800/80 px-2 py-1.5 rounded-lg border border-gray-700">
+                    <span className="text-[10px] text-gray-400">제한시간:</span>
+                    <input
+                      type="range" min={MIN_TURN_TIME} max={MAX_SETTABLE_TIME} step="1"
+                      value={gameState.turnTimeLimit}
+                      onChange={(e) => handleUpdateTimeLimit(Number(e.target.value))}
+                      className="w-16 h-1 accent-purple-500 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-purple-300 w-6">{gameState.turnTimeLimit}s</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 bg-gray-800/80 px-2 py-1.5 rounded-lg border border-gray-700">
+                    <span className="text-[10px] text-gray-400">라운드:</span>
+                    <input
+                      type="range" min={1} max={20} step="1"
+                      value={gameState.maxRounds}
+                      onChange={(e) => handleUpdateMaxRounds(Number(e.target.value))}
+                      className="w-16 h-1 accent-purple-500 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-purple-300 w-6">{gameState.maxRounds}</span>
+                  </div>
+
+                  <button
+                    onClick={handleToggleStrictMode}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                      gameState.isStrictMode 
+                        ? 'bg-red-500/20 text-red-400 border-red-500/50' 
+                        : 'bg-gray-800 text-gray-400 border-gray-700'
+                    }`}
+                  >
+                    깐깐 모드 {gameState.isStrictMode ? 'ON' : 'OFF'}
+                  </button>
+
+                  <select
+                    value={gameState.language}
+                    onChange={(e) => handleUpdateLanguage(e.target.value as any)}
+                    className="bg-gray-800 text-cyan-300 text-[10px] font-bold border border-gray-700 rounded px-1.5 py-1 outline-none"
+                  >
+                    <option value="KO">KOREAN</option>
+                    <option value="EN">ENGLISH</option>
+                  </select>
+
+                  <select
+                    value={gameState.gameMode}
+                    onChange={(e) => handleUpdateGameMode(e.target.value as any)}
+                    className="bg-gray-800 text-purple-300 text-[10px] font-bold border border-gray-700 rounded px-1.5 py-1 outline-none"
+                  >
+                    <option value="WORD_CHAIN">끝말잇기</option>
+                    <option value="DRAWING_QUIZ">그림퀴즈</option>
+                  </select>
                 </div>
               )}
             </div>
           </div>
         ) : gameState.status === 'PLAYING' ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-purple-300 font-bold">현재 단어:</span>
-                <span className="text-lg text-white font-black tracking-widest">{gameState.currentWord}</span>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Round</span>
+                  <span className="text-lg font-black text-white leading-none">{gameState.round}/{gameState.maxRounds}</span>
+                </div>
+                <div className="h-8 w-px bg-purple-500/30 mx-1" />
+                <div className="flex flex-col">
+                  {gameState.gameMode === 'WORD_CHAIN' ? (
+                    <>
+                      <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Current Word</span>
+                      <span className="text-lg text-white font-black tracking-widest leading-none">{gameState.currentWord}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Mode</span>
+                      <span className="text-lg text-white font-black tracking-widest leading-none">그림 퀴즈</span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className={`px-3 py-1 rounded-full text-xs font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse' : 'bg-gray-800 text-gray-400'}`}>
-                {isMyTurn ? '내 차례!' : `${gameState.players[gameState.currentTurnIndex]?.name}님 차례`}
+              <div className="flex flex-col items-end gap-1">
+                <div className={`px-3 py-1 rounded-full text-[10px] font-bold ${isMyTurn ? 'bg-yellow-500 text-black animate-pulse shadow-lg shadow-yellow-500/20' : 'bg-gray-800 text-gray-400'}`}>
+                  {isMyTurn ? (gameState.gameMode === 'DRAWING_QUIZ' ? '당신은 출제자입니다!' : '내 차례!') : `${gameState.players[gameState.currentTurnIndex]?.name}님 차례`}
+                </div>
+                {gameState.gameMode === 'DRAWING_QUIZ' && isMyTurn && (
+                  <span className="text-xs text-yellow-400 font-bold animate-bounce">제시어: {gameState.quizWord}</span>
+                )}
               </div>
             </div>
+
+            {gameState.gameMode === 'DRAWING_QUIZ' && (
+              <DrawingCanvas 
+                isPainter={isMyTurn} 
+                onDraw={handleDraw} 
+                initialData={gameState.currentDrawing} 
+              />
+            )}
+
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full transition-all duration-1000 ${gameState.remainingTime < 4 ? 'bg-red-500' : 'bg-purple-500'}`}
                   style={{ width: `${(gameState.remainingTime / gameState.turnTimeLimit) * 100}%` }}
                 />
               </div>
-              <span className="text-[10px] font-mono text-purple-300 w-4">{gameState.remainingTime}s</span>
+              <span className="text-[10px] font-mono font-bold text-purple-300 w-6 text-right">{gameState.remainingTime}s</span>
             </div>
           </div>
         ) : (
@@ -919,8 +1275,50 @@ const sendMessage = async (e: FormEvent) => {
     );
   };
 
+  useEffect(() => {
+    if (gameState.status === 'PLAYING') {
+      if (bgmRef.current) {
+        bgmRef.current.volume = 0.3;
+        bgmRef.current.play().catch(e => console.log('BGM play failed:', e));
+      }
+    } else {
+      if (bgmRef.current) {
+        bgmRef.current.pause();
+        bgmRef.current.currentTime = 0;
+      }
+    }
+  }, [gameState.status]);
+
+  const MouseBubble = () => {
+    if (!lastMessageForBubble) return null;
+    const isEmoticon = parseEmoticonToken(lastMessageForBubble.content);
+
+    return (
+      <div 
+        className="fixed z-[9999] pointer-events-none transition-all duration-200 ease-out"
+        style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
+      >
+        <div className="bg-white/90 backdrop-blur-md border border-cyan-500/50 rounded-2xl px-3 py-1.5 shadow-xl max-w-[200px] animate-in zoom-in-50 fade-in duration-200">
+          <div className="text-[10px] font-bold text-cyan-600 mb-0.5 truncate">{lastMessageForBubble.author}</div>
+          {isEmoticon ? (
+            <img src={isEmoticon} className="w-12 h-12 object-contain mx-auto" alt="bubble-emoticon" />
+          ) : (
+            <div className="text-xs text-gray-800 break-words leading-tight">{lastMessageForBubble.content}</div>
+          )}
+          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white/90 border-t border-l border-cyan-500/50 rotate-45" />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+      <MouseBubble />
+      <audio 
+        ref={bgmRef} 
+        loop 
+        src="/emotions/audio/bgm_ver1.mp3" 
+      />
       {showRecruitmentPopup && gameState.status === 'WAITING' && <RecruitmentPopup />}
       
       <div className="p-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2">
