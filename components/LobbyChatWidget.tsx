@@ -527,22 +527,21 @@ export default function LobbyChatWidget() {
     send();
   }, []);
 
-  const handleGameInit = () => {
+  const handleGameInit = (mode: 'WORD_CHAIN' | 'DRAWING_QUIZ') => {
     if (gameState.status !== 'IDLE' && gameState.status !== 'ENDED') {
-      setFilterWarning('이미 끝말잇기 게임이 진행 중입니다.');
+      setFilterWarning('이미 게임이 진행 중입니다.');
       return;
     }
     const newState: GameState = {
       ...INITIAL_GAME_STATE,
       status: 'WAITING',
+      gameMode: mode,
       hostId: currentUserId,
       players: [{ id: currentUserId, name: displayName, score: 0 }],
       remainingTime: 30,
       turnTimeLimit: 10,
     };
     setGameState(newState);
-    // Slight delay to ensure state update is reflected in any closures if necessary, 
-    // and to give the broadcast system a breathing room
     setTimeout(() => broadcastGameSync(newState), 50);
   };
 
@@ -570,11 +569,27 @@ export default function LobbyChatWidget() {
     broadcastGameSync(newState);
   };
 
+  const settingsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleUpdateSettings = useCallback((updates: Partial<GameState>) => {
+    if (gameStateRef.current.status !== 'WAITING' || gameStateRef.current.hostId !== currentUserIdRef.current) return;
+
+    // 1. Update state immediately for local UI smoothness
+    setGameState(prev => {
+      const newState = { ...prev, ...updates };
+      
+      // 2. Debounce the broadcast to avoid network congestion while sliding
+      if (settingsTimeoutRef.current) clearTimeout(settingsTimeoutRef.current);
+      settingsTimeoutRef.current = setTimeout(() => {
+        broadcastGameSync(newState);
+      }, 150);
+
+      return newState;
+    });
+  }, [broadcastGameSync]);
+
   const handleUpdateTimeLimit = (limit: number) => {
-    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
-    const newState = { ...gameState, turnTimeLimit: limit };
-    setGameState(newState);
-    broadcastGameSync(newState);
+    handleUpdateSettings({ turnTimeLimit: limit });
   };
 
   const sendSystemMessage = useCallback(async (content: string) => {
@@ -831,7 +846,7 @@ export default function LobbyChatWidget() {
     // 한 방 단어 & 깐깐 모드 검사 (한국어만 또는 영어도 적용 가능)
     const lastCharOfInput = normalizedWord[normalizedWord.length - 1].toLowerCase();
     // For English, we need to check followUps in englishWordSets
-    const followUps = (isEnglish ? Object.values(englishWordSets).flat().filter(w => w.startsWith(lastCharOfInput)) 
+    const followUps = (isEnglish ? Array.from(englishWordSets[lastCharOfInput] || []) 
                                  : WORD_MAP[lastCharOfInput]) || [];
 
     if (followUps.length === 0) {
@@ -1051,11 +1066,16 @@ const sendMessage = async (e: FormEvent) => {
   if (!trimmed || isSendingRef.current) return;
 
   if (trimmed === '/끝말잇기') {
-    handleGameInit();
+    handleGameInit('WORD_CHAIN');
     setNewMessage('');
     return;
   }
 
+  if (trimmed === '/그림퀴즈') {
+    handleGameInit('DRAWING_QUIZ');
+    setNewMessage('');
+    return;
+  }
   // 게임 중 본인 턴일 때의 처리
   if (gameState.status === 'PLAYING') {
     if (gameState.gameMode === 'WORD_CHAIN') {
@@ -1179,10 +1199,7 @@ const sendMessage = async (e: FormEvent) => {
   );
 
   const handleUpdateMaxRounds = (max: number) => {
-    if (gameState.status !== 'WAITING' || gameState.hostId !== currentUserId) return;
-    const newState = { ...gameState, maxRounds: max };
-    setGameState(newState);
-    broadcastGameSync(newState);
+    handleUpdateSettings({ maxRounds: max });
   };
 
   const handleToggleStrictMode = () => {
@@ -1494,7 +1511,7 @@ const sendMessage = async (e: FormEvent) => {
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleGameInit}
+            onClick={() => handleGameInit('WORD_CHAIN')}
             disabled={gameState.status !== 'IDLE' && gameState.status !== 'ENDED'}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
               (gameState.status !== 'IDLE' && gameState.status !== 'ENDED')
@@ -1503,6 +1520,18 @@ const sendMessage = async (e: FormEvent) => {
             }`}
           >
             <RiGamepadLine className="w-3 h-3" /> 끝말잇기
+          </button>
+
+          <button
+            onClick={() => handleGameInit('DRAWING_QUIZ')}
+            disabled={gameState.status !== 'IDLE' && gameState.status !== 'ENDED'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              (gameState.status !== 'IDLE' && gameState.status !== 'ENDED')
+                ? 'bg-gray-800/50 text-gray-500 cursor-not-allowed'
+                : 'bg-orange-600/20 text-orange-300 border border-orange-500/30 hover:bg-orange-600/30'
+            }`}
+          >
+            <RiImageLine className="w-3 h-3" /> 그림퀴즈
           </button>
 
           <button
@@ -1603,8 +1632,10 @@ const sendMessage = async (e: FormEvent) => {
             rows={1}
             placeholder={
               gameState.status === 'PLAYING' && gameState.players[gameState.currentTurnIndex]?.id === currentUserId
-                ? `'${gameState.currentWord[gameState.currentWord.length - 1]}'로 시작하는 단어 입력!`
-                : '메시지 입력... (/끝말잇기 로 시작)'
+                ? (gameState.gameMode === 'WORD_CHAIN' 
+                    ? `'${gameState.currentWord[gameState.currentWord.length - 1]}'로 시작하는 단어 입력!` 
+                    : '제시어를 그려주세요!')
+                : '메시지 입력... (/끝말잇기, /그림퀴즈 가능)'
             }
             className="flex-1 resize-none overflow-hidden bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-all text-white placeholder-gray-500"
           />
