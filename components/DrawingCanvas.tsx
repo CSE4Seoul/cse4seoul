@@ -14,7 +14,7 @@ export default function DrawingCanvas({ isPainter, onDraw, initialData }: Drawin
   const lastPos = useRef({ x: 0, y: 0 });
   const pointBuffer = useRef<{ x: number, y: number }[]>([]);
   const initialDataRef = useRef(initialData);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | null>(null);
   const lastDrawTime = useRef<number>(0);
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function DrawingCanvas({ isPainter, onDraw, initialData }: Drawin
   useEffect(() => {
     requestRef.current = requestAnimationFrame(renderFrame);
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
     };
   }, [renderFrame]);
 
