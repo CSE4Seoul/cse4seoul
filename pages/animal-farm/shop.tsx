@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 
 const ITEMS = [
-  { id: 1, name: '빨간 사과', price: 100, desc: '포만감을 20 올려줍니다.', icon: '🍎', asset: 'apple.png' },
-  { id: 2, name: '전설의 영양제', price: 500, desc: '경험치를 100 올려줍니다.', icon: '🧪', asset: 'potion.png' },
-  { id: 3, name: '무지개 캔디', price: 300, desc: '기분을 최고로 만듭니다.', icon: '🍭', asset: 'candy.png' },
-  { id: 4, name: '황금 고구마', price: 150, desc: '매우 든든한 간식입니다.', icon: '🍠', asset: 'sweet_potato.png' },
-  { id: 5, name: '럭셔리 비타민', price: 1000, desc: '모든 스탯을 최대치로!', icon: '💊', asset: 'vitamin.png' },
-  { id: 6, name: '반짝이 모자', price: 2000, desc: '농장의 인싸가 됩니다.', icon: '🎩', asset: 'hat.png' },
+  { id: 'apple', name: '빨간 사과', price: 100, desc: '포만감을 20 올려줍니다.', icon: '🍎', asset: 'apple.png' },
+  { id: 'potion', name: '전설의 영양제', price: 500, desc: '경험치를 100 올려줍니다.', icon: '🧪', asset: 'potion.png' },
+  { id: 'candy', name: '무지개 캔디', price: 300, desc: '기분을 최고로 만듭니다.', icon: '🍭', asset: 'candy.png' },
+  { id: 'sweet_potato', name: '황금 고구마', price: 150, desc: '매우 든든한 간식입니다.', icon: '🍠', asset: 'sweet_potato.png' },
+  { id: 'vitamin', name: '럭셔리 비타민', price: 1000, desc: '모든 스탯을 최대치로!', icon: '💊', asset: 'vitamin.png' },
+  { id: 'hat', name: '반짝이 모자', price: 2000, desc: '농장의 인싸가 됩니다.', icon: '🎩', asset: 'hat.png' },
 ];
 
 const AssetDisplay = ({ src, alt, fallbackEmoji, className }: { src: string, alt: string, fallbackEmoji: string, className?: string }) => {
@@ -36,15 +36,51 @@ const AssetDisplay = ({ src, alt, fallbackEmoji, className }: { src: string, alt
 };
 
 export default function AnimalFarmShop() {
-  const [points, setPoints] = useState(1500);
+  const [points, setPoints] = useState<number | null>(null);
   const [selectedItem, setSelectedItem] = useState<typeof ITEMS[0] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleBuy = () => {
-    if (!selectedItem) return;
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/animal-farm/user');
+        if (res.ok) {
+          const data = await res.json();
+          setPoints(data.points);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user points:', err);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleBuy = async () => {
+    if (!selectedItem || points === null) return;
     if (points < selectedItem.price) return alert("포인트가 부족해요!");
-    setPoints(prev => prev - selectedItem.price);
-    setSelectedItem(null);
-    alert(`${selectedItem.name} 구매 완료!`);
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/animal-farm/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: selectedItem.id, price: selectedItem.price }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        setPoints(result.newPoints);
+        setSelectedItem(null);
+        alert(`${selectedItem.name} 구매 완료! 인벤토리에 추가되었습니다.`);
+      } else {
+        alert(result.message || "구매 실패");
+      }
+    } catch (err) {
+      console.error('Purchase failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -68,7 +104,7 @@ export default function AnimalFarmShop() {
               <Link href="/animal-farm/explore" className="px-5 py-2.5 bg-white text-slate-500 rounded-2xl font-black border border-slate-200 hover:bg-slate-50 transition-all">Explore</Link>
             </nav>
             <div className="bg-yellow-300 px-6 py-2.5 rounded-2xl border-b-4 border-yellow-500 font-black text-yellow-900 shadow-md">
-              <span className="text-lg">{points.toLocaleString()}</span> <span className="text-[10px] opacity-70">POINTS</span>
+              <span className="text-lg">{points !== null ? points.toLocaleString() : '---'}</span> <span className="text-[10px] opacity-70">POINTS</span>
             </div>
           </div>
         </header>
@@ -103,7 +139,7 @@ export default function AnimalFarmShop() {
         </main>
       </div>
 
-      {/* 결제 확인 모달: 더 세련된 애니메이션과 디자인 */}
+      {/* 결제 확인 모달 */}
       {selectedItem && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
           <div className="bg-white rounded-[3.5rem] p-10 max-w-md w-full border-[12px] border-white shadow-2xl transform animate-in zoom-in duration-300">
@@ -125,7 +161,7 @@ export default function AnimalFarmShop() {
             
             <div className="bg-slate-50 rounded-[2.5rem] p-8 mb-8 space-y-4 border-2 border-slate-100 shadow-inner">
               <div className="flex justify-between items-center text-xs font-black text-slate-400 uppercase tracking-widest">
-                <span>Current Balance</span> <span className="text-slate-800 text-sm">{points.toLocaleString()} P</span>
+                <span>Current Balance</span> <span className="text-slate-800 text-sm">{points?.toLocaleString()} P</span>
               </div>
               <div className="flex justify-between items-center text-xs font-black text-rose-400 uppercase tracking-widest">
                 <span>Item Price</span> <span className="text-rose-500 text-sm">- {selectedItem.price.toLocaleString()} P</span>
@@ -133,7 +169,7 @@ export default function AnimalFarmShop() {
               <div className="h-px bg-slate-200" />
               <div className="flex justify-between items-center font-black text-slate-800">
                 <span className="text-xs uppercase tracking-widest text-slate-400">Total After</span> 
-                <span className="text-2xl text-blue-600">{(points - selectedItem.price).toLocaleString()} <span className="text-xs">P</span></span>
+                <span className="text-2xl text-blue-600">{(points! - selectedItem.price).toLocaleString()} <span className="text-xs">P</span></span>
               </div>
             </div>
 
@@ -141,10 +177,10 @@ export default function AnimalFarmShop() {
               <button onClick={() => setSelectedItem(null)} className="flex-1 py-5 bg-slate-100 rounded-[2rem] font-black text-slate-500 hover:bg-slate-200 transition-colors shadow-sm">Cancel</button>
               <button 
                 onClick={handleBuy}
-                disabled={points < selectedItem.price}
+                disabled={loading || (points! < selectedItem.price)}
                 className="flex-1 py-5 bg-orange-500 rounded-[2rem] font-black text-white shadow-[0_8px_0_0_#c2410c] hover:bg-orange-400 active:translate-y-1 active:shadow-none transition-all disabled:bg-slate-300 disabled:shadow-none"
               >
-                Buy Now
+                {loading ? 'Processing...' : 'Buy Now'}
               </button>
             </div>
           </div>

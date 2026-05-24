@@ -36,6 +36,7 @@ export default function AnimalFarmExplore() {
   const [exploringId, setExploringId] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [canClaim, setCanClaim] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -55,11 +56,31 @@ export default function AnimalFarmExplore() {
     setCanClaim(false);
   };
 
-  const claimReward = () => {
-    const region = REGIONS.find(r => r.id === exploringId);
-    alert(`${region?.reward}를 수령했습니다!`);
-    setExploringId(null);
-    setCanClaim(false);
+  const claimReward = async () => {
+    if (!exploringId) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/animal-farm/explore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ regionId: exploringId }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        alert(`${result.message}\n보상: ${result.rewardPoints}P ${result.rewardItemId ? `+ ${result.rewardItemId}` : ''}`);
+        setExploringId(null);
+        setCanClaim(false);
+      } else {
+        alert(result.message || "보상 수령 실패");
+      }
+    } catch (err) {
+      console.error('Claim reward failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -102,7 +123,7 @@ export default function AnimalFarmExplore() {
               
               return (
                 <div key={region.id} className="group relative bg-white rounded-[3.5rem] p-10 border-b-[10px] border-slate-200 flex flex-col lg:flex-row items-center justify-between gap-10 shadow-2xl transition-all hover:border-indigo-200">
-                  {/* 진행 중 오버레이: 더 고급스러운 디자인 */}
+                  {/* 진행 중 오버레이 */}
                   {isThisExploring && (
                     <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl z-30 flex flex-col items-center justify-center text-white p-10 text-center animate-in fade-in duration-500 rounded-[2.5rem] m-2">
                       {canClaim ? (
@@ -110,12 +131,16 @@ export default function AnimalFarmExplore() {
                           <div className="w-32 h-32 bg-yellow-400 rounded-full flex items-center justify-center text-6xl mx-auto mb-6 shadow-[0_0_40px_rgba(250,204,21,0.4)] animate-bounce">🎁</div>
                           <p className="text-4xl font-black mb-2 tracking-tighter text-yellow-300 italic uppercase">Mission Clear!</p>
                           <p className="text-sm text-slate-400 mb-8 font-bold uppercase tracking-[0.3em]">Reward is Waiting for You</p>
-                          <button onClick={claimReward} className="px-16 py-5 bg-white text-slate-900 rounded-[2rem] font-black shadow-[0_8px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-1 active:shadow-none transition-all text-lg">
-                            Claim Rewards
+                          <button 
+                            onClick={claimReward} 
+                            disabled={loading}
+                            className="px-16 py-5 bg-white text-slate-900 rounded-[2rem] font-black shadow-[0_8px_0_0_#cbd5e1] hover:bg-slate-50 active:translate-y-1 active:shadow-none transition-all text-lg disabled:opacity-50"
+                          >
+                            {loading ? 'Claiming...' : 'Claim Rewards'}
                           </button>
                         </div>
                       ) : (
-                        <div className="w-full max-w-sm space-y-8">
+                        <div className="w-full max-sm space-y-8">
                           <div>
                             <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-[0.5em] animate-pulse">Navigating to {region.name}...</p>
                             <p className="text-7xl font-black tracking-widest font-mono text-white mb-6 italic">{formatTime(timeLeft)}</p>

@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { UserGameData, Animal } from '../api/animal-farm/user';
 
 type AnimalStatus = 'IDLE' | 'TRAINING' | 'EXPLORING' | 'EATING';
-
-
 
 const AssetDisplay = ({ src, alt, fallbackEmoji, width, height, className }: { src: string, alt: string, fallbackEmoji: string, width: number, height: number, className?: string }) => {
   const [error, setError] = useState(false);
@@ -34,13 +33,14 @@ const AssetDisplay = ({ src, alt, fallbackEmoji, width, height, className }: { s
 };
 
 export default function AnimalFarmMain() {
-  const [points, setPoints] = useState(1500);
-  const [level, setLevel] = useState(5);
-  const [exp, setExp] = useState(120);
-  const [hunger, setHunger] = useState(60);
+  const [gameData, setGameData] = useState<UserGameData | null>(null);
+  const [selectedAnimalIndex, setSelectedAnimalIndex] = useState(0);
   const [status, setStatus] = useState<AnimalStatus>('IDLE');
   const [message, setMessage] = useState("오늘도 기분 좋은 하루예요! 🐾");
   const [showHeart, setShowHeart] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const currentAnimal = gameData?.animals[selectedAnimalIndex];
 
   const randomMessages = [
     "배가 조금 고픈 것 같아요.. 🍎",
@@ -49,48 +49,117 @@ export default function AnimalFarmMain() {
     "훈련을 하면 더 강해질 수 있어요!",
   ];
 
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/animal-farm/user');
+      if (res.ok) {
+        const data: UserGameData = await res.json();
+        setGameData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch game data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
-      if (status === 'IDLE') {
+      if (status === 'IDLE' && !loading) {
         setMessage(randomMessages[Math.floor(Math.random() * randomMessages.length)]);
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, loading]);
 
-  const handleFeed = () => {
-    if (status !== 'IDLE') return;
-    if (points < 50) return alert("포인트가 부족해요!");
+  const handleAction = async (actionType: 'train' | 'feed' | 'pet') => {
+    if (!currentAnimal || status !== 'IDLE') return;
 
-    setStatus('EATING');
-    setPoints(prev => prev - 50);
-    setMessage("얌냠! 너무 맛있어요! 히히 🍎");
-    setShowHeart(true);
+    if (actionType === 'feed' && (gameData?.points || 0) < 50) {
+      return alert("포인트가 부족해요!");
+    }
 
-    setTimeout(() => {
-      setHunger(prev => Math.min(prev + 20, 100));
+    if (actionType === 'pet') {
+      setMessage("주인님! 더 쓰다듬어 주세요! 히히 ✨");
+      setShowHeart(true);
+      setTimeout(() => setShowHeart(false), 1500);
+      return;
+    }
+
+    const prevStatus = status;
+    setStatus(actionType === 'train' ? 'TRAINING' : 'EATING');
+    setMessage(actionType === 'train' ? "영차 영차! 열심히 훈련 중이에요! 💪" : "얌냠! 너무 맛있어요! 히히 🍎");
+    if (actionType === 'feed') setShowHeart(true);
+
+    try {
+      const res = await fetch('/api/animal-farm/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ animalId: currentAnimal.id, actionType }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        setTimeout(() => {
+          setGameData(prev => {
+            if (!prev) return null;
+            const newAnimals = [...prev.animals];
+            newAnimals[selectedAnimalIndex] = {
+              ...newAnimals[selectedAnimalIndex],
+              exp: result.results.newExp,
+              level: result.results.newLevel,
+              hunger: result.results.newHunger,
+            };
+            return {
+              ...prev,
+              points: result.results.newPoints,
+              animals: newAnimals,
+            };
+          });
+          setStatus('IDLE');
+          setShowHeart(false);
+          setMessage(actionType === 'train' ? "훈련 끝! 한층 더 성장한 기분이에요! ✨" : "배가 불러요! 기운이 나네요! 🍎");
+        }, 1500);
+      } else {
+        alert(result.message || "액션 실패");
+        setStatus('IDLE');
+        setShowHeart(false);
+      }
+    } catch (err) {
+      console.error('Action failed:', err);
       setStatus('IDLE');
       setShowHeart(false);
-    }, 1500);
+    }
   };
 
-  const handleTrain = () => {
-    if (status !== 'IDLE') return;
-    setStatus('TRAINING');
-    setMessage("영차 영차! 열심히 훈련 중이에요! 💪");
-    
-    setTimeout(() => {
-      setExp(prev => {
-        if (prev + 50 >= 500) {
-          setLevel(l => l + 1);
-          return 0;
-        }
-        return prev + 50;
-      });
-      setStatus('IDLE');
-      setMessage("훈련 끝! 한층 더 성장한 기분이에요! ✨");
-    }, 2000);
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 font-black">농장 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!gameData || gameData.animals.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
+        <div className="text-center p-12 bg-white rounded-[3rem] shadow-xl border border-slate-200 max-w-md">
+          <div className="text-6xl mb-6">🐣</div>
+          <h2 className="text-2xl font-black mb-4">입양된 동물이 없어요!</h2>
+          <p className="text-slate-500 mb-8 font-medium">상점에서 새로운 친구를 입양하거나 잠시만 기다려 주세요.</p>
+          <Link href="/animal-farm/shop" className="px-8 py-4 bg-pink-500 text-white rounded-2xl font-black shadow-lg shadow-pink-200 hover:bg-pink-600 transition-colors">상점으로 가기</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-['Jua'] text-slate-700 selection:bg-pink-100">
@@ -121,7 +190,7 @@ export default function AnimalFarmMain() {
             <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block" />
             <div className="flex items-center gap-2 bg-yellow-400/10 px-4 py-1.5 rounded-2xl border border-yellow-400/20">
               <span className="text-lg">💰</span>
-              <span className="text-yellow-700 font-black">{points.toLocaleString()}</span>
+              <span className="text-yellow-700 font-black">{gameData.points.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -135,31 +204,56 @@ export default function AnimalFarmMain() {
             <div className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-xl shadow-slate-200/50">
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-14 h-14 bg-gradient-to-br from-pink-400 to-rose-500 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-pink-200">
-                  {level >= 5 ? '👑' : '⭐'}
+                  {currentAnimal.level >= 5 ? '👑' : '⭐'}
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Butler Rank</p>
-                  <p className="text-xl font-black tracking-tight">Level {level}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{currentAnimal.name}</p>
+                  <p className="text-xl font-black tracking-tight">Level {currentAnimal.level}</p>
                 </div>
               </div>
 
               <div className="space-y-6">
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <span>Hunger</span> <span>{hunger}%</span>
+                    <span>Hunger</span> <span>{currentAnimal.hunger}%</span>
                   </div>
                   <div className="h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-                    <div className="h-full bg-orange-400 transition-all duration-700" style={{ width: `${hunger}%` }} />
+                    <div className="h-full bg-orange-400 transition-all duration-700" style={{ width: `${currentAnimal.hunger}%` }} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <span>Exp</span> <span>{exp}/500</span>
+                    <span>Exp</span> <span>{currentAnimal.exp}/500</span>
                   </div>
                   <div className="h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-                    <div className="h-full bg-pink-500 transition-all duration-700" style={{ width: `${(exp / 500) * 100}%` }} />
+                    <div className="h-full bg-pink-500 transition-all duration-700" style={{ width: `${(currentAnimal.exp / 500) * 100}%` }} />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* 동물 선택 목록 */}
+            <div className="bg-white rounded-[2rem] p-6 border border-slate-200 shadow-lg">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 px-2">나의 동물 친구들</h3>
+              <div className="space-y-2">
+                {gameData.animals.map((animal, idx) => (
+                  <button
+                    key={animal.id}
+                    onClick={() => {
+                      setSelectedAnimalIndex(idx);
+                      setMessage(`${animal.name}(이)랑 놀아볼까요? ✨`);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all ${selectedAnimalIndex === idx ? 'bg-pink-50 border-2 border-pink-100 shadow-inner' : 'hover:bg-slate-50 border-2 border-transparent'}`}
+                  >
+                    <div className="w-10 h-10 relative bg-white rounded-xl border border-slate-100 overflow-hidden">
+                      <Image src={animal.imageUrl} alt={animal.name} fill className="object-contain p-1" />
+                    </div>
+                    <div className="text-left">
+                      <p className={`text-xs font-black ${selectedAnimalIndex === idx ? 'text-pink-600' : 'text-slate-600'}`}>{animal.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Lv.{animal.level} {animal.species}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -195,11 +289,10 @@ export default function AnimalFarmMain() {
                   status === 'TRAINING' ? 'animate-bounce scale-110' : 
                   status === 'EATING' ? 'animate-pulse scale-105' : 'hover:scale-105'
                 }`}>
-                  {/* 사진 크기 조절: 부모 컨테이너에 맞춰 object-contain 처리 */}
                   <AssetDisplay 
-                    src="/assets/animal-farm/animals/pig.png" 
-                    alt="Piggy" 
-                    fallbackEmoji="🐷"
+                    src={currentAnimal.imageUrl} 
+                    alt={currentAnimal.name} 
+                    fallbackEmoji="🐾"
                     width={280}
                     height={280}
                     className="z-10 drop-shadow-[0_20px_50px_rgba(0,0,0,0.1)]"
@@ -213,7 +306,7 @@ export default function AnimalFarmMain() {
               <div className="p-10 bg-slate-50/50 backdrop-blur-md border-t border-slate-100">
                 <div className="flex flex-wrap justify-center gap-6">
                   <button 
-                    onClick={handleFeed} 
+                    onClick={() => handleAction('feed')} 
                     disabled={status !== 'IDLE'}
                     className="group relative flex flex-col items-center gap-3 disabled:opacity-50"
                   >
@@ -224,7 +317,7 @@ export default function AnimalFarmMain() {
                   </button>
 
                   <button 
-                    onClick={() => setMessage("주인님! 더 쓰다듬어 주세요! 히히 ✨")} 
+                    onClick={() => handleAction('pet')} 
                     disabled={status !== 'IDLE'}
                     className="group relative flex flex-col items-center gap-3 disabled:opacity-50"
                   >
@@ -235,7 +328,7 @@ export default function AnimalFarmMain() {
                   </button>
 
                   <button 
-                    onClick={handleTrain} 
+                    onClick={() => handleAction('train')} 
                     disabled={status !== 'IDLE'}
                     className="group relative flex flex-col items-center gap-3 disabled:opacity-50"
                   >
