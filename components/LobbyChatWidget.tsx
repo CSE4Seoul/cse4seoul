@@ -761,7 +761,9 @@ export default function LobbyChatWidget() {
         };
         setGameState(endState);
         broadcastGameSync(endState);
-        await sendSystemMessage(`게임 종료! 최종 우승자: ${finalWinner.name}`);
+        if (gameState.hostId === currentUserId) {
+          await sendSystemMessage(`게임 종료! 최종 우승자: ${finalWinner.name}`);
+        }
       } else {
         const nextIndex = gameState.currentTurnIndex % remainingPlayers.length;
         const newState: GameState = {
@@ -904,7 +906,9 @@ export default function LobbyChatWidget() {
       };
       setGameState(endState);
       broadcastGameSync(endState);
-      sendSystemMessage(`모든 라운드(${gameState.maxRounds})가 종료되었습니다! 우승자: ${finalWinner.name}`);
+      if (gameState.hostId === currentUserId) {
+        sendSystemMessage(`모든 라운드(${gameState.maxRounds})가 종료되었습니다! 우승자: ${finalWinner.name}`);
+      }
       return;
     }
     
@@ -1245,7 +1249,9 @@ export default function LobbyChatWidget() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-gray-900 border border-purple-500/50 rounded-2xl p-6 shadow-2xl w-80 text-center">
         <RiGamepadLine className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-bounce" />
-        <h4 className="text-xl font-bold text-white mb-2">끝말잇기 모집 중!</h4>
+        <h4 className="text-xl font-bold text-white mb-2">
+          {gameState.gameMode === 'DRAWING_QUIZ' ? '그림퀴즈' : '끝말잇기'} 모집 중!
+        </h4>
         <p className="text-gray-400 text-sm mb-6">함께 게임을 즐기시겠습니까?</p>
         <div className="flex gap-3">
           <button

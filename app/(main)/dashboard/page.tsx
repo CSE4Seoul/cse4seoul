@@ -26,6 +26,24 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-6 md:p-12 relative overflow-hidden">
+      {/* 동물농장 플로팅 위젯 */}
+      <Link
+        href="/animal-farm"
+        className="fixed bottom-10 right-10 z-50 group flex flex-col items-center gap-2 transition-all duration-300 hover:scale-110"
+      >
+        <div className="relative">
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white text-pink-600 text-[10px] font-black px-2 py-1 rounded-full shadow-lg border border-pink-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+            놀러와! 🐾
+          </div>
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 border-4 border-white shadow-[0_0_20px_rgba(236,72,153,0.4)] flex items-center justify-center text-3xl group-hover:animate-bounce transition-all">
+            🐶
+          </div>
+        </div>
+        <span className="bg-white/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-pink-600 border border-pink-100 shadow-sm">
+          동물농장
+        </span>
+      </Link>
+
       {/* 배경 데코레이션 */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] -z-10" />
 
@@ -195,7 +213,26 @@ export default async function DashboardPage() {
         </div>
 
         {/* 전술 기록 및 작전 채널 (전체 너비) */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 동물농장 카드: 신규 추가 */}
+          <Link
+            href="/animal-farm"
+            className="group flex flex-col p-6 rounded-2xl bg-gradient-to-br from-pink-900/20 to-rose-900/20 border border-pink-800/50 hover:border-pink-500/60 transition-all hover:shadow-[0_0_30px_rgba(236,72,153,0.3)]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-3xl group-hover:animate-bounce">🐾</span>
+              <span className="text-xs text-pink-400 group-hover:translate-x-1 transition-transform">
+                입장하기 →
+              </span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-1">조의ver 동물농장</h3>
+            <p className="text-sm text-gray-400">지친 일상 속, 나만의 동물 친구들과 함께하는 힐링 타임.</p>
+            <div className="mt-4 flex items-center gap-2 text-xs text-pink-500 font-bold">
+              <span className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-pulse"></span>
+              NEW 콘텐츠 오픈!
+            </div>
+          </Link>
+
           {/* 게시판 카드 */}
           <Link
             href="/board"

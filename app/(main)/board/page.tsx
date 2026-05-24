@@ -45,6 +45,26 @@ export default async function BoardPage() {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        {/* 동물농장 플로팅 위젯: 직관적인 게임 진입점 */}
+        <Link
+          href="/animal-farm"
+          className="fixed bottom-10 right-10 z-50 group flex flex-col items-center gap-2 transition-all duration-300 hover:scale-110"
+        >
+          <div className="relative">
+            {/* 알림 배지 느낌의 말풍선 */}
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white text-pink-600 text-[10px] font-black px-2 py-1 rounded-full shadow-lg border border-pink-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+              놀러와! 🐾
+            </div>
+            {/* 메인 위젯 바디 */}
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 border-4 border-white shadow-[0_0_20px_rgba(236,72,153,0.4)] flex items-center justify-center text-3xl group-hover:animate-bounce transition-all">
+              🐶
+            </div>
+          </div>
+          <span className="bg-white/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-pink-600 border border-pink-100 shadow-sm">
+            동물농장
+          </span>
+        </Link>
+
         {/* 헤더 영역 */}
         <div className="mb-12">
           {/* 상단 네비게이션 */}
@@ -85,16 +105,16 @@ export default async function BoardPage() {
             </div>
 
             <Link
-  href="/board/write"
-  className="group relative px-8 py-4 rounded-2xl font-bold transition-all duration-500 bg-gradient-to-r from-white to-gray-100 border border-gray-300/50 hover:border-gray-400/50 hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] overflow-hidden"
->
-  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-800/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-  <span className="flex items-center gap-3 relative z-10 text-gray-900">
-    <Zap className="w-5 h-5 group-hover:rotate-12 group-hover:scale-110 transition-all text-gray-700" />
-    <span className="text-lg">전술 기록 작성</span>
-    <span className="text-gray-600 text-xl">✏️</span>
-  </span>
-</Link>
+              href="/board/write"
+              className="group relative px-8 py-4 rounded-2xl font-bold transition-all duration-500 bg-gradient-to-r from-white to-gray-100 border border-gray-300/50 hover:border-gray-400/50 hover:shadow-[0_0_40px_rgba(255,255,255,0.5)] overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-800/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+              <span className="flex items-center gap-3 relative z-10 text-gray-900">
+                <Zap className="w-5 h-5 group-hover:rotate-12 group-hover:scale-110 transition-all text-gray-700" />
+                <span className="text-lg">전술 기록 작성</span>
+                <span className="text-gray-600 text-xl">✏️</span>
+              </span>
+            </Link>
           </div>
 
           {/* 상태 요약 카드 */}
