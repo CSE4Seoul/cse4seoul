@@ -40,8 +40,6 @@ export default function AnimalFarmMain() {
   const [showHeart, setShowHeart] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const currentAnimal = gameData?.animals[selectedAnimalIndex];
-
   const randomMessages = [
     "배가 조금 고픈 것 같아요.. 🍎",
     "탐험을 떠나면 보물을 찾을 수 있을까요?",
@@ -75,6 +73,34 @@ export default function AnimalFarmMain() {
     }, 5000);
     return () => clearInterval(interval);
   }, [status, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 font-black">농장 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!gameData || gameData.animals.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
+        <div className="text-center p-12 bg-white rounded-[3rem] shadow-xl border border-slate-200 max-w-md">
+          <div className="text-6xl mb-6">🐣</div>
+          <h2 className="text-2xl font-black mb-4">입양된 동물이 없어요!</h2>
+          <p className="text-slate-500 mb-8 font-medium">상점에서 새로운 친구를 입양하거나 잠시만 기다려 주세요.</p>
+          <Link href="/animal-farm/shop" className="px-8 py-4 bg-pink-500 text-white rounded-2xl font-black shadow-lg shadow-pink-200 hover:bg-pink-600 transition-colors">상점으로 가기</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const currentAnimal = gameData.animals[selectedAnimalIndex] || gameData.animals[0];
+
+  if (!currentAnimal) return null;
 
   const handleAction = async (actionType: 'train' | 'feed' | 'pet') => {
     if (!currentAnimal || status !== 'IDLE') return;
@@ -136,30 +162,6 @@ export default function AnimalFarmMain() {
       setShowHeart(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500 font-black">농장 데이터를 불러오는 중...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!gameData || gameData.animals.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Jua']">
-        <div className="text-center p-12 bg-white rounded-[3rem] shadow-xl border border-slate-200 max-w-md">
-          <div className="text-6xl mb-6">🐣</div>
-          <h2 className="text-2xl font-black mb-4">입양된 동물이 없어요!</h2>
-          <p className="text-slate-500 mb-8 font-medium">상점에서 새로운 친구를 입양하거나 잠시만 기다려 주세요.</p>
-          <Link href="/animal-farm/shop" className="px-8 py-4 bg-pink-500 text-white rounded-2xl font-black shadow-lg shadow-pink-200 hover:bg-pink-600 transition-colors">상점으로 가기</Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-['Jua'] text-slate-700 selection:bg-pink-100">
