@@ -945,7 +945,11 @@ export default function LobbyChatWidget() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages' }, (payload) => {
         if (isStale()) return;
         const newMsg = payload.new as LobbyMessage;
-        setMessages(prev => [...prev, newMsg].slice(-MAX_MESSAGES));
+        
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg].slice(-MAX_MESSAGES);
+        });
         
         // Update bubble
         setLastMessageForBubble({ content: newMsg.content, author: newMsg.author_name });
@@ -1036,119 +1040,183 @@ export default function LobbyChatWidget() {
 
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
-    isSendingRef.current = true;
-    setIsSending(true);
-
-    const content = `[emoticon:${keyword}]`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
 
     try {
-      await supabase.from('lobby_messages').insert({
+      isSendingRef.current = true;
+      setIsSending(true);
+
+      const content = `[emoticon:${keyword}]`;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1);
+
+      // 낙관적 업데이트: 서버 응답 전 화면에 먼저 표시
+      const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const optimisticMsg: LobbyMessage = {
+        id: tempId,
         content,
         author_name: displayName,
-        message_type: 'emoticon',
+        created_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
-        author_avatar_url: isAnonymousMode ? null : avatarUrl,
-      });
-      setNewMessage('');
-    } catch {
-      setFilterWarning('⚠️ 이모티콘 전송에 실패했습니다.');
+        message_type: 'emoticon',
+        author_avatar_url: isAnonymousMode ? undefined : (avatarUrl || undefined),
+      };
+      setMessages(prev => [...prev, optimisticMsg].slice(-MAX_MESSAGES));
+
+      try {
+        const { data, error } = await supabase.from('lobby_messages').insert({
+          id: tempId,
+          content,
+          author_name: displayName,
+          expires_at: expiresAt.toISOString()
+        }).select().single();
+
+        if (error) throw error;
+        
+        if (data) {
+          setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
+        }
+      } catch (err: any) {
+        console.error(`이모티콘 전송 실패:`, err);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+        setFilterWarning(`⚠️ 이모티콘 전송 실패: ${err.message || '다시 시도해주세요.'}`);
+      }
+    } catch (globalErr: any) {
+      console.error(`이모티콘 함수 실행 오류:`, globalErr);
     } finally {
       isSendingRef.current = false;
       setIsSending(false);
     }
   };
-// ── 메시지 전송 ──────────────────────────────
-const sendMessage = async (e: FormEvent) => {
-  e.preventDefault();
-  const trimmed = newMessage.trim();
-  if (!trimmed || isSendingRef.current) return;
 
-  if (trimmed === '/끝말잇기') {
-    handleGameInit('WORD_CHAIN');
-    setNewMessage('');
-    return;
-  }
+  // ── 메시지 전송 ──────────────────────────────
+  const sendMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    alert('DEBUG: sendMessage 호출됨');
+    const trimmed = newMessage.trim();
+    if (!trimmed) return;
 
-  if (trimmed === '/그림퀴즈') {
-    handleGameInit('DRAWING_QUIZ');
-    setNewMessage('');
-    return;
-  }
-  // 게임 중 본인 턴일 때의 처리
-  if (gameState.status === 'PLAYING') {
-    if (gameState.gameMode === 'WORD_CHAIN') {
-      if (gameState.players[gameState.currentTurnIndex]?.id === currentUserId) {
-        const error = validateWord(trimmed);
-        if (!error) {
-          submitWord(trimmed);
-          setNewMessage('');
-          return;
-        }
-      }
-    } else {
-      // Drawing Quiz: any non-painter can guess
-      const isPainter = gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
-      if (!isPainter && (trimmed === gameState.quizWord || trimmed.replace(/\s/g, '') === gameState.quizWord.replace(/\s/g, ''))) {
-        // 정답을 맞힘!
-        if (gameState.hostId === currentUserId) {
-          handleQuizSuccess(displayName);
-        } else {
-          // 호스트가 아니면 호스트에게 알림 (또는 브로드캐스트)
-          gameChannel.current?.send({
-            type: 'broadcast',
-            event: 'quiz_success',
-            payload: { winner: displayName }
-          });
-        }
+    if (isSendingRef.current) {
+      alert('현재 메시지를 전송 중입니다. 잠시만 기다려주세요.');
+      return;
+    }
+
+    try {
+      isSendingRef.current = true;
+      setIsSending(true);
+
+      if (trimmed === '/끝말잇기') {
+        handleGameInit('WORD_CHAIN');
         setNewMessage('');
         return;
       }
-    }
-  }
 
-  const emoticonKeyword = matchEmoticonCommand(trimmed);
+      if (trimmed === '/그림퀴즈') {
+        handleGameInit('DRAWING_QUIZ');
+        setNewMessage('');
+        return;
+      }
 
-    if (emoticonKeyword) {
-      await handleEmoticonSend(emoticonKeyword);
-      return;
-    }
-
-    if (containsBadWord(trimmed)) {
-      setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
-      return;
-    }
-
-    isSendingRef.current = true;
-    setIsSending(true);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
-    
-    try {
-      const { data, error } = await supabase.from('lobby_messages').insert({ 
-        content: trimmed, 
-        author_name: displayName, 
-        message_type: 'text', 
-        expires_at: expiresAt.toISOString(),
-        author_avatar_url: isAnonymousMode ? null : avatarUrl,
-      }).select().single();
-      
-      if (!error && data) {
-        if (gameState.status !== 'PLAYING') {
-          if (trimmed.startsWith('/ai ')) {
-            const aiResponse = await askOllama(trimmed.replace('/ai ', ''));
-            await sendAiMessage(aiResponse);
-          } else if (isAiMode && !isAiProcessing) {
-            const aiResponse = await askOllama(trimmed);
-            await sendAiMessage(aiResponse);
+      // 게임 중 본인 턴일 때의 처리
+      if (gameState.status === 'PLAYING') {
+        if (gameState.gameMode === 'WORD_CHAIN') {
+          if (gameState.players[gameState.currentTurnIndex]?.id === currentUserId) {
+            const error = validateWord(trimmed);
+            if (!error) {
+              submitWord(trimmed);
+              setNewMessage('');
+              return;
+            }
+          }
+        } else {
+          const isPainter = gameState.players[gameState.currentTurnIndex]?.id === currentUserId;
+          if (!isPainter && (trimmed === gameState.quizWord || trimmed.replace(/\s/g, '') === gameState.quizWord.replace(/\s/g, ''))) {
+            if (gameState.hostId === currentUserId) {
+              handleQuizSuccess(displayName);
+            } else {
+              gameChannel.current?.send({
+                type: 'broadcast',
+                event: 'quiz_success',
+                payload: { winner: displayName }
+              });
+            }
+            setNewMessage('');
+            return;
           }
         }
       }
-    } catch {
-      setFilterWarning('⚠️ 메시지 전송에 실패했습니다.');
-    } finally {
+
+      const emoticonKeyword = matchEmoticonCommand(trimmed);
+      if (emoticonKeyword) {
+        await handleEmoticonSend(emoticonKeyword);
+        return;
+      }
+
+      if (containsBadWord(trimmed)) {
+        setFilterWarning('⚠️ 부적절한 표현이 포함되어 있습니다.');
+        return;
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1);
+      
+      // 낙관적 업데이트
+      const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const optimisticMsg: LobbyMessage = {
+        id: tempId,
+        content: trimmed,
+        author_name: displayName,
+        created_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+      };
+      
+      setMessages(prev => [...prev, optimisticMsg].slice(-MAX_MESSAGES));
       setNewMessage('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+      let attempt = 0;
+      const maxAttempts = 2;
+      let success = false;
+
+      while (attempt < maxAttempts && !success) {
+        try {
+          const { data, error } = await supabase.from('lobby_messages').insert({ 
+            content: trimmed, 
+            author_name: displayName, 
+            expires_at: expiresAt.toISOString()
+          }).select().single();
+          
+          if (error) throw error;
+          
+          if (data) {
+            setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
+            success = true;
+
+            if (gameState.status !== 'PLAYING') {
+              if (trimmed.startsWith('/ai ')) {
+                const aiResponse = await askOllama(trimmed.replace('/ai ', ''));
+                await sendAiMessage(aiResponse);
+              } else if (isAiMode && !isAiProcessing) {
+                const aiResponse = await askOllama(trimmed);
+                await sendAiMessage(aiResponse);
+              }
+            }
+          }
+        } catch (err: any) {
+          console.error(`메시지 전송 실패 (시도 ${attempt + 1}):`, err);
+          attempt++;
+          if (attempt === maxAttempts) {
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            const errorMsg = err.message || JSON.stringify(err);
+            setFilterWarning(`⚠️ 전송 실패: ${errorMsg}`);
+            alert(`DB 저장 에러: ${errorMsg}`);
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+    } catch (globalErr: any) {
+      alert(`함수 실행 오류: ${globalErr.message}`);
+    } finally {
       isSendingRef.current = false;
       setIsSending(false);
     }
