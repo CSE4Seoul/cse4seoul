@@ -1091,7 +1091,6 @@ export default function LobbyChatWidget() {
   // ── 메시지 전송 ──────────────────────────────
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    alert('DEBUG: sendMessage 호출됨');
     const trimmed = newMessage.trim();
     if (!trimmed) return;
 
