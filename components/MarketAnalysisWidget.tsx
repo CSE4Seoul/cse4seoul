@@ -213,7 +213,7 @@ export default function MarketAnalysisWidget({ symbol, title, isFX = false, onCl
       risks.push('현재가가 볼린저 밴드 하단을 하향 이탈했습니다. 투매에 의한 언더슈팅 가능성이 있으나 분할 매수 관점은 유효합니다.');
     }
 
-    const volMA20 = getMA(volumes, n, 20);
+    const volMA20 = getMA(volumes, 20);
     const currentVol = volumes[n - 1];
     const volChange = volMA20 > 0 ? (currentVol / volMA20) * 100 : 0;
 

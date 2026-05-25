@@ -298,7 +298,7 @@ export default function ExchangeRateWidget() {
     }
 
     // 6. 거래량 필터 및 자산별 특화 로직
-    const volMA20 = getMA(volumes, n, 20);
+    const volMA20 = getMA(volumes, 20);
     const currentVol = volumes[n - 1];
     const volChange = volMA20 > 0 ? (currentVol / volMA20) * 100 : 0;
 
