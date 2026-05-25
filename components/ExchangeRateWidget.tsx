@@ -27,7 +27,7 @@ interface DataPoint {
   regression?: number;
 }
 
-type MarketType = 'USD/KRW' | 'NASDAQ' | 'S&P 500';
+type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500';
 type Period = '1D' | '1W' | '1M' | '3M';
 
 export default function ExchangeRateWidget() {
@@ -79,6 +79,8 @@ export default function ExchangeRateWidget() {
 
       if (marketType === 'USD/KRW') {
         symbol = 'USDKRW=X';
+      } else if (marketType === 'EUR/KRW') {
+        symbol = 'EURKRW=X';
       } else if (marketType === 'NASDAQ') {
         symbol = '^IXIC';
       } else {
@@ -152,11 +154,11 @@ export default function ExchangeRateWidget() {
           <p className="text-[10px] text-cyan-500 font-bold mb-1">{payload[0].payload.date}</p>
           <div className="flex flex-col gap-1">
             <p className="text-sm font-black text-white">
-              {marketType === 'USD/KRW' ? '₩' : '$'}{payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+              {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 1 })}
             </p>
             {showRegression && (
               <p className="text-[10px] text-purple-400 font-bold">
-                TREND: {marketType === 'USD/KRW' ? '₩' : '$'}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                TREND: {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
               </p>
             )}
           </div>
@@ -189,7 +191,7 @@ export default function ExchangeRateWidget() {
         </div>
         <h2 className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
           <span className="opacity-40 select-none">/</span>
-          {marketType === 'USD/KRW' ? (
+          {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? (
             <><span>시장</span><span className="text-cyan-500">환율</span></>
           ) : (
             <span>{marketType}</span>
@@ -200,7 +202,7 @@ export default function ExchangeRateWidget() {
       {/* 2. Control Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
         <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar w-full sm:w-auto">
-          {(['USD/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
+          {(['USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
             <button
               key={type}
               onClick={() => setMarketType(type)}
@@ -210,7 +212,7 @@ export default function ExchangeRateWidget() {
                   : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
               }`}
             >
-              {type === 'USD/KRW' && <RiExchangeLine />}
+              {(type === 'USD/KRW' || type === 'EUR/KRW') && <RiExchangeLine />}
               {type === 'NASDAQ' && <RiStockLine />}
               {type === 'S&P 500' && <RiLineChartLine />}
               {type}
@@ -237,10 +239,10 @@ export default function ExchangeRateWidget() {
       <div className="relative z-10">
         <div className="flex items-baseline gap-3">
           <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
-            {currentValue ? `${marketType === 'USD/KRW' ? '₩' : ''}${currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : '---'}
+            {currentValue ? `${(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : ''}${currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : '---'}
           </span>
           <span className="text-sm text-gray-500 font-bold uppercase tracking-widest">
-            {marketType === 'USD/KRW' ? 'KRW / USD' : 'Index Points'}
+            {marketType === 'USD/KRW' ? 'KRW / USD' : marketType === 'EUR/KRW' ? 'KRW / EUR' : 'Index Points'}
           </span>
         </div>
         
