@@ -6,7 +6,9 @@ import {
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
   RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiRefreshLine,
   RiEmotionLine, RiImageLine, RiArrowDownSLine, RiArrowUpSLine,
+  RiPercentLine,
 } from 'react-icons/ri';
+import { wasmService } from '@/lib/wasm-service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // ─────────────────────────────────────────────
@@ -300,6 +302,73 @@ const INITIAL_GAME_STATE: GameState = {
 };
 
 // ─────────────────────────────────────────────
+// CalculatorPanel sub-component
+// ─────────────────────────────────────────────
+
+function CalculatorPanel({ 
+  wins, setWins, losses, setLosses, target, setTarget, result, onCalculate, onClose 
+}: { 
+  wins: number, setWins: (v: number) => void,
+  losses: number, setLosses: (v: number) => void,
+  target: number, setTarget: (v: number) => void,
+  result: number | null,
+  onCalculate: () => void,
+  onClose: () => void
+}) {
+  return (
+    <div className="bg-gray-800/80 border-b border-gray-700 p-4 animate-in slide-in-from-top duration-200">
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+          <RiPercentLine /> 승률 계산기 (Wasm)
+        </h4>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300">
+          <RiCloseLine className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-500 font-bold uppercase">Wins</label>
+          <input 
+            type="number" value={wins} onChange={e => setWins(parseInt(e.target.value) || 0)}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-500 font-bold uppercase">Losses</label>
+          <input 
+            type="number" value={losses} onChange={e => setLosses(parseInt(e.target.value) || 0)}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-500 font-bold uppercase">Target %</label>
+          <input 
+            type="number" value={target} onChange={e => setTarget(parseFloat(e.target.value) || 0)}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-white"
+          />
+        </div>
+      </div>
+      <div className="mt-4 flex items-center justify-between">
+        <button 
+          onClick={onCalculate}
+          className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+        >
+          계산하기
+        </button>
+        {result !== null && (
+          <div className="text-right">
+            <span className="text-[10px] text-gray-500 block uppercase">Required Wins</span>
+            <span className={`text-lg font-black ${result === -1 ? 'text-red-400' : 'text-green-400'}`}>
+              {result === -1 ? '불가능' : result === 0 ? '이미 달성' : `${result}승 더 필요`}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
 
@@ -353,6 +422,18 @@ export default function LobbyChatWidget() {
   // BGM
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const [isBgmReady, setIsBgmReady] = useState(false);
+
+  // Wasm Calculator States
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcWins, setCalcWins] = useState<number>(0);
+  const [calcLosses, setCalcLosses] = useState<number>(0);
+  const [calcTarget, setCalcTarget] = useState<number>(50);
+  const [calcResult, setCalcResult] = useState<number | null>(null);
+
+  const handleCalculate = async () => {
+    const result = await wasmService.calculateRequiredWins(calcWins, calcLosses, calcTarget);
+    setCalcResult(result);
+  };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -1609,6 +1690,17 @@ export default function LobbyChatWidget() {
 
           <button
             type="button"
+            onClick={() => setShowCalculator(prev => !prev)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              showCalculator ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
+                             : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <RiPercentLine className="w-3 h-3" /> 승률 계산기
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAutoScrollEnabled(prev => !prev)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
               autoScrollEnabled ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
@@ -1652,6 +1744,18 @@ export default function LobbyChatWidget() {
           </button>
         </div>
       </div>
+
+      {/* ── 승률 계산기 패널 ── */}
+      {showCalculator && (
+        <CalculatorPanel 
+          wins={calcWins} setWins={setCalcWins}
+          losses={calcLosses} setLosses={setCalcLosses}
+          target={calcTarget} setTarget={setCalcTarget}
+          result={calcResult}
+          onCalculate={handleCalculate}
+          onClose={() => setShowCalculator(false)}
+        />
+      )}
 
       {/* ── 메시지 목록 ── */}
       <div 

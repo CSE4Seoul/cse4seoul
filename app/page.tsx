@@ -14,6 +14,7 @@ import {
   RiCloseLine
 } from 'react-icons/ri';
 import LobbyChatWidget from '@/components/LobbyChatWidget';
+import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 
 // DB에서 가져올 게시글 타입 정의
 interface Post {
@@ -207,10 +208,19 @@ export default function Home() {
           </div>
         </motion.div>
 
-        {/* 🔥 로비 채팅 위젯 (임포트된 컴포넌트 사용) */}
-        <motion.div variants={fadeInUp} className="mt-24">
-          <LobbyChatWidget />
-        </motion.div>
+        {/* 🔥 환율 정보 및 로비 채팅 위젯 */}
+        <div className="mt-24 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+            <motion.div variants={fadeInUp}>
+              <ExchangeRateWidget />
+            </motion.div>
+          </div>
+          <div className="lg:col-span-2">
+            <motion.div variants={fadeInUp}>
+              <LobbyChatWidget />
+            </motion.div>
+          </div>
+        </div>
 
         {/* 설립자 정보 */}
         <motion.div
