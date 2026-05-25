@@ -29,6 +29,11 @@ class WasmService {
       
       const module = await initModule();
       
+      // Wait for the module to be ready if it has a .then or is a promise
+      if (module.ready) {
+        await module.ready;
+      }
+      
       this.modules.set(name, module);
       return module;
     } catch (error) {
@@ -47,6 +52,39 @@ class WasmService {
     // Use cwrap to get a typed function
     const calculate = module.cwrap('calculateRequiredWins', 'number', ['number', 'number', 'number']);
     return calculate(win, lose, targetPercent);
+  }
+
+  /**
+   * Helper for market analysis using Wasm
+   */
+  async analyzeMarketWasm(prices: number[], volumes: number[], marketType: number): Promise<number | null> {
+    const module = await this.getModule('marketanalysis');
+    if (!module) return null;
+
+    const n = prices.length;
+    
+    // 1. Allocate memory for arrays
+    const pricePtr = module._malloc(n * 8); // double is 8 bytes
+    const volPtr = module._malloc(n * 8);
+
+    // 2. Fill memory
+    module.HEAPF64.set(new Float64Array(prices), pricePtr / 8);
+    module.HEAPF64.set(new Float64Array(volumes), volPtr / 8);
+
+    try {
+      // 3. Call Wasm function
+      // analyzeMarket(double* prices, double* volumes, int n, int marketType)
+      const analyze = module.cwrap('analyzeMarket', 'number', ['number', 'number', 'number', 'number']);
+      const score = analyze(pricePtr, volPtr, n, marketType);
+      return score;
+    } catch (error) {
+      console.error('[WasmService] Error in analyzeMarketWasm:', error);
+      return null;
+    } finally {
+      // 4. Free memory
+      module._free(pricePtr);
+      module._free(volPtr);
+    }
   }
 }
 

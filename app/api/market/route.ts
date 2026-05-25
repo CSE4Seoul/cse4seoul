@@ -33,6 +33,7 @@ export async function GET(req: Request) {
     const timestamps = result.timestamp || [];
     const indicators = result.indicators?.quote?.[0] || {};
     const quotes = indicators.close || [];
+    const volumes = indicators.volume || [];
 
     if (timestamps.length === 0) {
       return NextResponse.json({
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
     const formattedData = timestamps.map((timestamp: number, index: number) => ({
       timestamp: timestamp * 1000, // Convert to ms
       value: quotes[index],
+      volume: volumes[index] || 0,
     })).filter((item: any) => item.value !== null && item.value !== undefined);
 
     return NextResponse.json({

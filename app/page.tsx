@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, Variants, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
+import { User } from '@supabase/supabase-js';
 import { 
   RiChat3Line, 
   RiFileList3Line, 
@@ -28,7 +29,7 @@ export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const supabase = createClient();
 
   // 사용자 정보 불러오기
@@ -79,6 +80,11 @@ export default function Home() {
 
   const closeModal = () => setIsModalOpen(false);
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-black px-4 text-white">
       {/* 배경 그라디언트 & 그리드 */}
@@ -103,12 +109,12 @@ export default function Home() {
               </div>
               <div className="flex gap-3">
                 {user ? (
-                  <Link
-                    href="/auth/signout"
+                  <button
+                    onClick={handleSignOut}
                     className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 transition-all"
                   >
                     로그아웃
-                  </Link>
+                  </button>
                 ) : (
                   <>
                     <Link
@@ -151,7 +157,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
-                href="/login"
+                href={user ? "/dashboard" : "/login"}
                 className="rounded-xl bg-white px-8 py-4 font-bold text-black transition-colors hover:bg-gray-200 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
               >
                 시스템 접속하기
@@ -206,7 +212,7 @@ export default function Home() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">📢 최근 게시글</h2>
-              <Link href="/login" className="text-sm text-cyan-400 hover:underline">
+              <Link href={user ? "/board" : "/login"} className="text-sm text-cyan-400 hover:underline">
                 더 보기 →
               </Link>
             </div>
@@ -218,7 +224,7 @@ export default function Home() {
               ) : (
                 recentPosts.map((post) => (
                   <Link 
-                    href="/login"
+                    href={user ? `/board/${post.id}` : "/login"}
                     key={post.id} 
                     className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer"
                   >

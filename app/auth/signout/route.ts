@@ -9,13 +9,12 @@ export async function POST(req: NextRequest) {
   await supabase.auth.signOut();
 
   // 2. 로그인 페이지로 튕겨내기
-  const url = req.nextUrl.clone();
-  url.pathname = '/login';
+  const loginUrl = new URL('/login', req.url);
   
   // 3. 페이지 캐시 날리기 (중요)
   revalidatePath('/', 'layout');
 
-  return NextResponse.redirect(url, {
-    status: 301,
+  return NextResponse.redirect(loginUrl, {
+    status: 303,
   });
 }

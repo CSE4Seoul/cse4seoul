@@ -24,7 +24,8 @@ compile_wasm() {
     $EMCC "$src_file" -o "$out_js" \
         -s MODULARIZE=1 \
         -s EXPORT_ES6=1 \
-        -s EXPORTED_RUNTIME_METHODS='["cwrap"]' \
+        -s EXPORTED_RUNTIME_METHODS='["cwrap", "ccall", "HEAPF64", "HEAP32"]' \
+        -s EXPORTED_FUNCTIONS='["_malloc", "_free"]' \
         -s ALLOW_MEMORY_GROWTH=1 \
         -s SINGLE_FILE=1 \
         -O3

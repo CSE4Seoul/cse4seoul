@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   AreaChart,
   Area,
@@ -16,7 +16,6 @@ import {
   RiArrowUpSLine, 
   RiArrowDownSLine, 
   RiTimeLine,
-  RiStockLine,
   RiLineChartLine,
   RiPulseLine,
   RiInformationLine
@@ -35,7 +34,6 @@ interface DataPoint {
   ma120?: number;
 }
 
-type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500';
 type Period = '1D' | '1W' | '1M' | '3M' | 'CUSTOM' | 'STANDARD';
 
 interface AnalysisResult {
@@ -46,8 +44,14 @@ interface AnalysisResult {
   risks: string[];
 }
 
-export default function ExchangeRateWidget() {
-  const [marketType, setMarketType] = useState<MarketType>('USD/KRW');
+interface MarketAnalysisWidgetProps {
+  symbol: string;
+  title: string;
+  isFX?: boolean; // For styling and analysis weighting (0 for Stock, 1 for FX)
+  onClose?: () => void;
+}
+
+export default function MarketAnalysisWidget({ symbol, title, isFX = false, onClose }: MarketAnalysisWidgetProps) {
   const [data, setData] = useState<DataPoint[]>([]);
   const [currentValue, setCurrentValue] = useState<number | null>(null);
   const [change, setChange] = useState<{ value: number; percent: number } | null>(null);
@@ -61,11 +65,7 @@ export default function ExchangeRateWidget() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
-  useEffect(() => {
-    fetchMarketData();
-  }, [marketType, period, customDays, showAnalysis]);
-
-  const calculateRegression = (pts: DataPoint[]) => {
+  const calculateRegression = useCallback((pts: DataPoint[]) => {
     const n = pts.length;
     if (n < 2) return pts.map(p => ({ ...p, regression: p.value || 0, regressionGap: 0 }));
 
@@ -92,88 +92,9 @@ export default function ExchangeRateWidget() {
         regressionGap: p.value !== null ? ((p.value - regValue) / regValue) * 100 : 0,
       };
     });
-  };
+  }, []);
 
-  const fetchMarketData = async () => {
-    if (showAnalysis && data.length > 0) {
-      setIsAnalysisLoading(true);
-    } else {
-      setIsLoading(true);
-    }
-    setError(null);
-    try {
-      let symbol = '';
-      let interval = '1d';
-      let range = '1mo';
-
-      if (marketType === 'USD/KRW') {
-        symbol = 'USDKRW=X';
-      } else if (marketType === 'EUR/KRW') {
-        symbol = 'EURKRW=X';
-      } else if (marketType === 'NASDAQ') {
-        symbol = '^IXIC';
-      } else {
-        symbol = '^GSPC';
-      }
-
-      if (period === '1D') {
-        interval = '1h';
-        range = showAnalysis ? '1mo' : '1d';
-      } else if (period === '1W') {
-        interval = '1h';
-        range = showAnalysis ? '1mo' : '5d';
-      } else if (period === '1M') {
-        interval = '1d';
-        range = showAnalysis ? '1y' : '1mo';
-      } else if (period === '3M') {
-        interval = '1d';
-        range = showAnalysis ? '2y' : '3mo';
-      } else if (period === 'STANDARD') {
-        interval = '1d';
-        range = '1y';
-      } else {
-        // CUSTOM period
-        interval = customDays > 60 ? '1wk' : customDays > 7 ? '1d' : '1h';
-        range = `${showAnalysis ? Math.max(customDays + 150, customDays * 3) : customDays}d`;
-      }
-
-      const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&interval=${interval}&range=${range}`);
-      const json = await res.json();
-
-      if (json.error) throw new Error(json.error);
-
-      const formattedData: DataPoint[] = json.data.map((item: { timestamp: string; value: number; volume: number }) => {
-        const d = new Date(item.timestamp);
-        let dateLabel = '';
-        if (period === '1D' || (period === 'CUSTOM' && customDays <= 1)) {
-          dateLabel = `${d.getHours().toString().padStart(2, '0')}:00`;
-        } else if (period === '1W' || (period === 'CUSTOM' && customDays <= 7)) {
-          dateLabel = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
-        } else if (period === 'STANDARD') {
-          dateLabel = `${d.getFullYear() % 100}/${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-        } else {
-          dateLabel = `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
-        }
-        return {
-          date: dateLabel,
-          value: item.value,
-          volume: item.volume,
-        };
-      });
-
-      await processFormattedData(formattedData);
-    } catch (err: unknown) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-      setIsAnalysisLoading(false);
-    }
-  };
-
-  const calculateAnalysis = (pts: DataPoint[]) => {
-    // 120일 이평선을 위해 최소 120개 필요하나, 
-    // 데이터가 약간 부족해도 60일선 등 가용한 정보로 분석하기 위해 임계치를 100으로 조정
+  const calculateAnalysis = useCallback((pts: DataPoint[]) => {
     if (pts.length < 100) return null;
 
     const values = pts.map(p => p.value || 0);
@@ -230,7 +151,6 @@ export default function ExchangeRateWidget() {
     const reasons: string[] = [];
     const risks: string[] = [];
 
-    // 1. 배열 상태
     if (ma5 > ma20 && ma20 > ma60 && ma60 > ma120) {
       score += 3;
       reasons.push('강한 정배열 ($5 > 20 > 60 > 120$): 장기적인 우상향 흐름이 매우 뚜렷함 (+3)');
@@ -239,7 +159,6 @@ export default function ExchangeRateWidget() {
       reasons.push('강한 역배열 ($5 < 20 < 60 < 120$): 하락 추세가 강력하게 형성됨 (-3)');
     }
 
-    // 2. 크로스 모멘텀 & 휩소 필터
     let goldenCross = false;
     let deadCross = false;
     for (let i = 0; i < 3; i++) {
@@ -263,7 +182,6 @@ export default function ExchangeRateWidget() {
       reasons.push(`데드크로스 확인: 최근 3봉 이내 단기 이평선 하향 이탈 (${crossScore === 2 ? '신뢰도 높음' : '기울기 보수적'}) (-${crossScore})`);
     }
 
-    // 3. 기울기 동조
     const s5 = getSlope(values, 5);
     const s60 = getSlope(values, 60);
     const s120 = getSlope(values, 120);
@@ -276,7 +194,6 @@ export default function ExchangeRateWidget() {
       reasons.push('기울기 동조 (음수): 모든 기간의 이평선이 우하향하며 하락 압력 가중 (-2)');
     }
 
-    // 4. RSI 과열 브레이크
     if (rsi >= 70) {
       score -= 2;
       reasons.push(`RSI 과매수 경고 (${rsi.toFixed(1)}): 단기 고점 과열 상태로 인한 조정 가능성 반영 (-2)`);
@@ -285,7 +202,6 @@ export default function ExchangeRateWidget() {
       reasons.push(`RSI 과매도 신호 (${rsi.toFixed(1)}): 기술적 반등이 기대되는 낙폭 과대 구간 (+2)`);
     }
 
-    // 5. 볼린저 밴드 & 현재가 위치
     const current = values[n - 1];
     if (current > bbUpper) {
       score -= 1;
@@ -297,12 +213,11 @@ export default function ExchangeRateWidget() {
       risks.push('현재가가 볼린저 밴드 하단을 하향 이탈했습니다. 투매에 의한 언더슈팅 가능성이 있으나 분할 매수 관점은 유효합니다.');
     }
 
-    // 6. 거래량 필터 및 자산별 특화 로직
     const volMA20 = getMA(volumes, n, 20);
     const currentVol = volumes[n - 1];
     const volChange = volMA20 > 0 ? (currentVol / volMA20) * 100 : 0;
 
-    if (marketType === 'NASDAQ' || marketType === 'S&P 500') {
+    if (!isFX) {
       if (volChange >= 150) {
         if (current > values[n - 2]) {
           score += 1;
@@ -313,7 +228,6 @@ export default function ExchangeRateWidget() {
         }
       }
     } else {
-      // 외환: 장기 추세 가중
       if (s60 > 0 && s120 > 0) {
         score += 1;
         reasons.push('FX 장기 추세 가산점: 60/120일 선의 견고한 우상향 유지 (+1)');
@@ -341,22 +255,18 @@ export default function ExchangeRateWidget() {
       strength: Math.min(100, Math.max(0, (score + 9) * 5.5)),
       risks
     };
-  };
+  }, [isFX]);
 
-  const processFormattedData = async (formattedData: DataPoint[]) => {
+  const processFormattedData = useCallback(async (formattedData: DataPoint[]) => {
     if (formattedData.length > 0) {
-      // 1. Wasm 기반 분석 (속도 최적화)
       const prices = formattedData.map(d => d.value || 0);
       const volumes = formattedData.map(d => d.volume || 0);
-      const marketTypeInt = (marketType === 'NASDAQ' || marketType === 'S&P 500') ? 0 : 1;
+      const marketTypeInt = isFX ? 1 : 0;
       
       const wasmScore = await wasmService.analyzeMarketWasm(prices, volumes, marketTypeInt);
-      
-      // 2. JS 기반 분석 (상세 사유 추출용)
       const jsAnalysis = calculateAnalysis(formattedData);
       
       if (wasmScore !== null && jsAnalysis) {
-        // Wasm 점수를 우선하되, 사유와 리스크는 JS에서 보완
         setAnalysisResult({
           ...jsAnalysis,
           score: wasmScore,
@@ -370,7 +280,6 @@ export default function ExchangeRateWidget() {
         setAnalysisResult(jsAnalysis);
       }
 
-      // 디스플레이용 데이터 (분석용으로 더 많이 가져온 경우 최근 것만 슬라이스)
       const targetCount = period === '1D' ? 24 : period === '1W' ? 120 : period === '1M' ? 30 : period === '3M' ? 90 : period === 'STANDARD' ? 300 : customDays;
       const displayData = showAnalysis ? formattedData.slice(-targetCount) : formattedData;
 
@@ -393,7 +302,76 @@ export default function ExchangeRateWidget() {
         setRegressionChange({ value: regDiff, percent: regPercent });
       }
     }
-  };
+  }, [calculateAnalysis, calculateRegression, isFX, period, showAnalysis, customDays]);
+
+  const fetchMarketData = useCallback(async () => {
+    if (showAnalysis && data.length > 0) {
+      setIsAnalysisLoading(true);
+    } else {
+      setIsLoading(true);
+    }
+    setError(null);
+    try {
+      let interval = '1d';
+      let range = '1mo';
+
+      if (period === '1D') {
+        interval = '1h';
+        range = showAnalysis ? '1mo' : '1d';
+      } else if (period === '1W') {
+        interval = '1h';
+        range = showAnalysis ? '1mo' : '5d';
+      } else if (period === '1M') {
+        interval = '1d';
+        range = showAnalysis ? '1y' : '1mo';
+      } else if (period === '3M') {
+        interval = '1d';
+        range = showAnalysis ? '2y' : '3mo';
+      } else if (period === 'STANDARD') {
+        interval = '1d';
+        range = '1y';
+      } else {
+        interval = customDays > 60 ? '1wk' : customDays > 7 ? '1d' : '1h';
+        range = `${showAnalysis ? Math.max(customDays + 150, customDays * 3) : customDays}d`;
+      }
+
+      const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&interval=${interval}&range=${range}`);
+      const json = await res.json();
+
+      if (json.error) throw new Error(json.error);
+
+      const formattedData: DataPoint[] = json.data.map((item: { timestamp: string; value: number; volume: number }) => {
+        const d = new Date(item.timestamp);
+        let dateLabel = '';
+        if (period === '1D' || (period === 'CUSTOM' && customDays <= 1)) {
+          dateLabel = `${d.getHours().toString().padStart(2, '0')}:00`;
+        } else if (period === '1W' || (period === 'CUSTOM' && customDays <= 7)) {
+          dateLabel = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
+        } else if (period === 'STANDARD') {
+          dateLabel = `${d.getFullYear() % 100}/${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+        } else {
+          dateLabel = `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+        }
+        return {
+          date: dateLabel,
+          value: item.value,
+          volume: item.volume,
+        };
+      });
+
+      await processFormattedData(formattedData);
+    } catch (err: unknown) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : '데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+      setIsAnalysisLoading(false);
+    }
+  }, [symbol, period, customDays, showAnalysis, processFormattedData, data.length]);
+
+  useEffect(() => {
+    fetchMarketData();
+  }, [fetchMarketData]);
 
   interface TooltipProps {
     active?: boolean;
@@ -410,12 +388,12 @@ export default function ExchangeRateWidget() {
           <p className="text-[10px] text-cyan-500 font-bold mb-1">{payload[0].payload.date}</p>
           <div className="flex flex-col gap-1">
             <p className="text-sm font-black text-white">
-              {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+              {isFX ? '₩' : '$'}{payload[0].value?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
             </p>
             {showRegression && (
               <div className="flex flex-col gap-0.5 mt-1 border-t border-purple-500/20 pt-1">
                 <p className="text-[10px] text-purple-400 font-bold">
-                  TREND: {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                  TREND: {isFX ? '₩' : '$'}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
                 </p>
                 <p className={`text-[9px] font-black ${(payload[0].payload.regressionGap ?? 0) >= 0 ? 'text-purple-300' : 'text-pink-400'}`}>
                   GAP: {(payload[0].payload.regressionGap ?? 0) >= 0 ? '+' : ''}{payload[0].payload.regressionGap?.toFixed(2)}%
@@ -431,7 +409,6 @@ export default function ExchangeRateWidget() {
 
   return (
     <div className="group relative rounded-3xl border border-white/10 bg-gray-900/40 p-6 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col gap-6">
-      {/* 1. Header Section */}
       <div className="relative z-10 flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -442,9 +419,7 @@ export default function ExchangeRateWidget() {
             <button
               onClick={() => setShowRegression(!showRegression)}
               className={`px-3 py-1 rounded-full text-[9px] font-black transition-all flex items-center gap-1.5 ${
-                showRegression 
-                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20' 
-                  : 'bg-white/5 text-gray-500 hover:text-gray-300'
+                showRegression ? 'bg-purple-600 text-white shadow-lg' : 'bg-white/5 text-gray-500 hover:text-gray-300'
               }`}
             >
               <RiPulseLine className={showRegression ? 'animate-pulse' : ''} />
@@ -453,9 +428,7 @@ export default function ExchangeRateWidget() {
             <button
               onClick={() => setShowAnalysis(!showAnalysis)}
               className={`px-3 py-1 rounded-full text-[9px] font-black transition-all flex items-center gap-1.5 ${
-                showAnalysis 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                  : 'bg-white/5 text-gray-500 hover:text-gray-300'
+                showAnalysis ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-gray-500 hover:text-gray-300'
               }`}
             >
               <RiLineChartLine className={showAnalysis ? 'animate-bounce' : ''} />
@@ -463,37 +436,20 @@ export default function ExchangeRateWidget() {
             </button>
           </div>
         </div>
-        <h2 className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
-          <span className="opacity-40 select-none">/</span>
-          {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? (
-            <><span>시장</span><span className="text-cyan-500">환율</span></>
-          ) : (
-            <span>{marketType}</span>
+        <div className="flex items-center justify-between">
+          <h2 className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
+            <span className="opacity-40 select-none">/</span>
+            <span>{title}</span>
+          </h2>
+          {onClose && (
+            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+              <RiInformationLine className="text-xl rotate-45" />
+            </button>
           )}
-        </h2>
+        </div>
       </div>
 
-      {/* 2. Control Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
-        <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar w-full sm:w-auto">
-          {(['USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => setMarketType(type)}
-              className={`px-4 py-2 rounded-xl text-[11px] font-black transition-all duration-300 flex items-center gap-2 flex-shrink-0 ${
-                marketType === type 
-                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' 
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-              }`}
-            >
-              {(type === 'USD/KRW' || type === 'EUR/KRW') && <RiExchangeLine />}
-              {type === 'NASDAQ' && <RiStockLine />}
-              {type === 'S&P 500' && <RiLineChartLine />}
-              {type}
-            </button>
-          ))}
-        </div>
-
         <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 items-center">
           {(['1D', '1W', '1M', '3M', 'CUSTOM', 'STANDARD'] as Period[]).map((p) => (
             <button
@@ -514,7 +470,7 @@ export default function ExchangeRateWidget() {
                 max="365"
                 value={customDays}
                 onChange={(e) => setCustomDays(Number(e.target.value))}
-                className="w-12 bg-black/40 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] font-black text-cyan-400 focus:outline-none focus:border-cyan-500/50"
+                className="w-12 bg-black/40 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] font-black text-cyan-400 focus:outline-none"
               />
               <span className="text-[10px] text-gray-500 font-black">DAYS</span>
             </div>
@@ -522,14 +478,13 @@ export default function ExchangeRateWidget() {
         </div>
       </div>
 
-      {/* 3. Main Value Section */}
       <div className="relative z-10">
         <div className="flex items-baseline gap-3">
           <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
-            {currentValue ? `${(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : ''}${currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : '---'}
+            {currentValue ? `${isFX ? '₩' : ''}${currentValue.toLocaleString(undefined, { maximumFractionDigits: isFX ? 1 : 2 })}` : '---'}
           </span>
           <span className="text-sm text-gray-500 font-bold uppercase tracking-widest">
-            {marketType === 'USD/KRW' ? 'KRW / USD' : marketType === 'EUR/KRW' ? 'KRW / EUR' : 'Index Points'}
+            {symbol}
           </span>
         </div>
         
@@ -540,27 +495,20 @@ export default function ExchangeRateWidget() {
             }`}>
               {change.value >= 0 ? <RiArrowUpSLine /> : <RiArrowDownSLine />}
               {Math.abs(change.percent).toFixed(2)}%
-              <span className="ml-2 opacity-60">({change.value >= 0 ? '+' : '-'}{Math.abs(change.value).toFixed(1)})</span>
+              <span className="ml-2 opacity-60">({change.value >= 0 ? '+' : '-'}{Math.abs(change.value).toFixed(isFX ? 1 : 2)})</span>
             </div>
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Live Market Data</span>
-          </div>
-        )}
-
-        {showRegression && regressionChange && (
-          <div className="flex items-center gap-3 mt-2 animate-in fade-in slide-in-from-left-4 duration-500">
-            <div className={`flex items-center px-3 py-1 rounded-full text-[11px] font-black ${
-              regressionChange.percent >= 0 ? 'bg-purple-500/10 text-purple-400' : 'bg-pink-500/10 text-pink-400'
-            } border border-purple-500/20 shadow-lg shadow-purple-500/10`}>
-              <RiPulseLine className="animate-pulse mr-1.5" />
-              TREND GAP: {regressionChange.percent >= 0 ? '+' : ''}{regressionChange.percent.toFixed(2)}%
-            </div>
-            <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Vs Regression Line</span>
+            {showRegression && regressionChange && (
+              <div className={`flex items-center px-3 py-1 rounded-full text-[11px] font-black ${
+                regressionChange.percent >= 0 ? 'bg-purple-500/10 text-purple-400' : 'bg-pink-500/10 text-pink-400'
+              } border border-purple-500/20 shadow-lg shadow-purple-500/10`}>
+                <RiPulseLine className="animate-pulse mr-1.5" />
+                GAP: {regressionChange.percent >= 0 ? '+' : ''}{regressionChange.percent.toFixed(2)}%
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* 4. Chart Section */}
       <div className="h-[250px] w-full relative z-10">
         {isLoading ? (
           <div className="h-full w-full flex items-center justify-center">
@@ -588,7 +536,7 @@ export default function ExchangeRateWidget() {
                 tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 800 }}
                 dy={15}
               />
-              <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+              <YAxis hide domain={['dataMin - 1', 'dataMax + 1']} />
               <Tooltip content={<CustomTooltip />} />
               <Area
                 type="monotone"
@@ -615,7 +563,6 @@ export default function ExchangeRateWidget() {
         )}
       </div>
 
-      {/* 5. Analysis Report Section */}
       {showAnalysis && (
         <div className="relative z-10 bg-black/40 rounded-2xl border border-white/5 p-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex items-center gap-2 mb-4">
@@ -632,7 +579,7 @@ export default function ExchangeRateWidget() {
               </div>
             </div>
           ) : !analysisResult ? (
-            <div className="text-[10px] text-gray-500 font-bold py-4">분석 데이터를 계산 중이거나 데이터가 부족합니다 (최소 120개 필요).</div>
+            <div className="text-[10px] text-gray-500 font-bold py-4">분석 데이터를 계산 중이거나 데이터가 부족합니다 (최소 100개 필요).</div>
           ) : (
             <div className="flex flex-col gap-6">
               <div className="flex items-center justify-between">
@@ -684,14 +631,13 @@ export default function ExchangeRateWidget() {
           
           <div className="mt-6 pt-4 border-t border-white/5">
             <p className="text-[9px] text-gray-600 font-medium leading-relaxed italic">
-              ※ 본 분석 결과는 기술적 분석 지표(이동평균선, 기울기, 거래량 등)를 활용한 객관적 데이터 제공을 목적으로 하며, 투자를 권장하거나 종목을 추천하는 것이 아닙니다. 
+              ※ 본 분석 결과는 기술적 분석 지표(이동평균선, RSI, 볼린저 밴드 등)를 활용한 객관적 데이터 제공을 목적으로 하며, 투자를 권장하거나 종목을 추천하는 것이 아닙니다. 
               투자 결정은 본인의 판단과 책임 하에 이루어져야 하며, 과거의 수익률이 미래의 수익을 보장하지 않습니다.
             </p>
           </div>
         </div>
       )}
 
-      {/* 6. Footer Refresh */}
       <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-end relative z-10">
         <button 
           onClick={fetchMarketData}
@@ -702,7 +648,6 @@ export default function ExchangeRateWidget() {
         </button>
       </div>
 
-      {/* Background Decorative Element */}
       <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-cyan-500/5 blur-[100px] rounded-full pointer-events-none" />
     </div>
   );
