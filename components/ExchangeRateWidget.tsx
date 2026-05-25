@@ -73,56 +73,60 @@ export default function ExchangeRateWidget() {
     setIsLoading(true);
     setError(null);
     try {
+      let symbol = '';
+      let interval = '1d';
+      let range = '1mo';
+
       if (marketType === 'USD/KRW') {
-        await fetchForex();
+        symbol = 'USDKRW=X';
+      } else if (marketType === 'NASDAQ') {
+        symbol = '^IXIC';
       } else {
-        await fetchStockIndex();
+        symbol = '^GSPC';
       }
-    } catch (err) {
-      setError('데이터를 불러오는데 실패했습니다.');
+
+      if (period === '1D') {
+        interval = '1h';
+        range = '1d';
+      } else if (period === '1W') {
+        interval = '1h';
+        range = '5d';
+      } else if (period === '1M') {
+        interval = '1d';
+        range = '1mo';
+      } else {
+        interval = '1d';
+        range = '3mo';
+      }
+
+      const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&interval=${interval}&range=${range}`);
+      const json = await res.json();
+
+      if (json.error) throw new Error(json.error);
+
+      const formattedData: DataPoint[] = json.data.map((item: any) => {
+        const d = new Date(item.timestamp);
+        let dateLabel = '';
+        if (period === '1D') {
+          dateLabel = `${d.getHours().toString().padStart(2, '0')}:00`;
+        } else if (period === '1W') {
+          dateLabel = `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
+        } else {
+          dateLabel = `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+        }
+        return {
+          date: dateLabel,
+          value: item.value,
+        };
+      });
+
+      processFormattedData(formattedData);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || '데이터를 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fetchForex = async () => {
-    const today = new Date();
-    let startDate = new Date();
-    if (period === '1D') startDate.setDate(today.getDate() - 5);
-    else if (period === '1W') startDate.setDate(today.getDate() - 10);
-    else if (period === '1M') startDate.setMonth(today.getMonth() - 1);
-    else if (period === '3M') startDate.setMonth(today.getMonth() - 3);
-
-    const startStr = startDate.toISOString().split('T')[0];
-    const res = await fetch(`https://api.frankfurter.dev/v1/${startStr}..?from=USD&to=KRW`);
-    const json = await res.json();
-    
-    if (json.rates) {
-      const entries = Object.entries(json.rates);
-      const formattedData: DataPoint[] = entries.map(([date, rates]: any) => ({
-        date: date.slice(5),
-        value: rates.KRW,
-      }));
-      
-      processFormattedData(formattedData);
-    }
-  };
-
-  const fetchStockIndex = async () => {
-    const baseValue = marketType === 'NASDAQ' ? 18000 : 5000;
-    const count = period === '1D' ? 7 : period === '1W' ? 14 : period === '1M' ? 30 : 90;
-    
-    const mockData: DataPoint[] = [];
-    for (let i = 0; i < count; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() - (count - i));
-      mockData.push({
-        date: `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`,
-        value: baseValue + Math.random() * 500 - 250 + (i * 10),
-      });
-    }
-    
-    processFormattedData(mockData);
   };
 
   const processFormattedData = (formattedData: DataPoint[]) => {
