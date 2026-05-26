@@ -5,11 +5,13 @@
 ## 1. 구조 및 경로
 
 - **C++ 소스 파일**: `components/*.cpp`
-  - 예: `components/Winpercent.cpp`
+  - 예: `components/Winpercent.cpp`, `components/value_score.cpp`
 - **컴파일 스크립트**: `scripts/compile-wasm.sh`
   - C++ 파일을 컴파일하여 JS 파일을 생성합니다.
+  - `--bind` 옵션을 지원하여 Embind를 사용하는 코드도 컴파일 가능합니다.
+  - `-s ENVIRONMENT='web,worker'` 옵션을 사용하여 웹 환경에 최적화되어 있습니다.
 - **Wasm JS 코드**: `lib/wasm/*.js`
-  - 컴파일된 Wasm 바이너리가 Base64 형태로 내장된(Self-contained) 모듈입니다.
+  - 컴파일된 Wasm 바이너리가 내장된(Self-contained) 모듈입니다. (`SINGLE_FILE=1`)
 - **Wasm 서비스**: `lib/wasm-service.ts`
   - Wasm 모듈을 동적으로 로드하고 React에서 사용할 수 있게 인터페이스를 제공합니다.
 

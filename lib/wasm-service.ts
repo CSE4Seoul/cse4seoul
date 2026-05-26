@@ -27,7 +27,9 @@ class WasmService {
       
       const { default: initModule } = await import(`@/lib/wasm/${name}.js`);
       
-      const module = await initModule();
+      const module = await initModule({
+        locateFile: (path: string) => `/wasm/${path}`
+      });
       
       // Wait for the module to be ready if it has a .then or is a promise
       if (module.ready) {
@@ -84,6 +86,29 @@ class WasmService {
       // 4. Free memory
       module._free(pricePtr);
       module._free(volPtr);
+    }
+  }
+
+  /**
+   * Helper for value investment scoring using ValueAnalyzer (Embind)
+   */
+  async scoreValueInvestment(data: any): Promise<any> {
+    const module = await this.getModule('value_score');
+    if (!module) return null;
+
+    try {
+      // Embind classes are available on the module
+      const result = module.ValueAnalyzer.analyze(data);
+      return {
+        grahamPrice: result.grahamPrice,
+        fScore: result.fScore,
+        buffettScore: result.buffettScore,
+        roe: result.roe,
+        debtToEquity: result.debtToEquity
+      };
+    } catch (error) {
+      console.error('[WasmService] Error in scoreValueInvestment:', error);
+      return null;
     }
   }
 }

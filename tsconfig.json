@@ -33,6 +33,7 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"  // Deno 파일을 제외하여 TypeScript 오류 방지
+    "supabase/functions",
+    "emsdk"
   ]
 }

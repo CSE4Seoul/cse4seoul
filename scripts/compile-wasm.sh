@@ -21,9 +21,10 @@ compile_wasm() {
     
     echo "Compiling $src_file to $out_js..."
     
-    $EMCC "$src_file" -o "$out_js" \
+    $EMCC "$src_file" --bind -o "$out_js" \
         -s MODULARIZE=1 \
-        -s EXPORT_ES6=1 \
+        -s EXPORT_ES6=0 \
+        -s ENVIRONMENT='web,worker' \
         -s EXPORTED_RUNTIME_METHODS='["cwrap", "ccall", "HEAPF64", "HEAP32"]' \
         -s EXPORTED_FUNCTIONS='["_malloc", "_free"]' \
         -s ALLOW_MEMORY_GROWTH=1 \
