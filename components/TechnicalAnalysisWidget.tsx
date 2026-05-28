@@ -56,6 +56,7 @@ export default function TechnicalAnalysisWidget() {
   const [symbol, setSymbol] = useState('');
   const [strategyMode, setStrategyMode] = useState(0);
   const [result, setResult] = useState<TechnicalResult | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
@@ -65,6 +66,7 @@ export default function TechnicalAnalysisWidget() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setHistory([]);
     
     try {
       const res = await fetch(`/api/market?symbol=${ticker.toUpperCase()}&range=1y&interval=1d`);
@@ -79,6 +81,7 @@ export default function TechnicalAnalysisWidget() {
       }
 
       setCurrentPrice(marketData.currentValue);
+      setHistory(marketData.data);
       
       const analysisResult = await wasmService.analyzeTechnical(marketData.data, mode);
       if (analysisResult) {
@@ -240,6 +243,98 @@ export default function TechnicalAnalysisWidget() {
             </div>
           </div>
 
+          {/* Price Chart (SVG) */}
+          <div className="p-6 bg-black/40 rounded-3xl border border-white/5 h-64 relative overflow-hidden group">
+            <div className="flex justify-between items-center mb-4 relative z-10">
+              <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Price History (1 Year)</div>
+              <div className="flex gap-4 text-[9px] font-bold">
+                <div className="flex items-center gap-1.5 text-purple-400">
+                  <div className="w-2 h-2 rounded-full bg-purple-500" /> PRICE
+                </div>
+                <div className="flex items-center gap-1.5 text-gray-600">
+                  <div className="w-2 h-2 rounded-full bg-gray-700" /> VOLUME
+                </div>
+              </div>
+            </div>
+            
+            <div className="absolute inset-0 pt-16 pb-6 px-6">
+              <svg className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                {(() => {
+                  const prices = history.map(d => d.close);
+                  const min = Math.min(...prices);
+                  const max = Math.max(...prices);
+                  const range = max - min;
+                  
+                  const points = prices.map((p, i) => {
+                    const x = (i / (prices.length - 1)) * 100;
+                    const y = 100 - ((p - min) / (range > 0 ? range : 1)) * 100;
+                    return `${x},${y}`;
+                  }).join(' ');
+
+                  const areaPoints = `0,100 ${points} 100,100`;
+
+                  return (
+                    <>
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#A855F7" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#A855F7" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <polyline
+                        fill="none"
+                        stroke="#A855F7"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={points}
+                        vectorEffect="non-scaling-stroke"
+                        className="drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                      />
+                      <polygon
+                        fill="url(#chartGradient)"
+                        points={areaPoints}
+                        vectorEffect="non-scaling-stroke"
+                      />
+
+                      {/* Support & Resistance Lines on Graph */}
+                      {result.resistanceLevels.map((lvl, i) => {
+                        const y = 100 - ((lvl - min) / (range > 0 ? range : 1)) * 100;
+                        if (y < 0 || y > 100) return null;
+                        return (
+                          <g key={`res-${i}`}>
+                            <line 
+                              x1="0" y1={y} x2="100" y2={y} 
+                              stroke="#F87171" strokeWidth="1" strokeDasharray="4 4" 
+                              vectorEffect="non-scaling-stroke"
+                              className="opacity-40"
+                            />
+                            <text x="1" y={y - 1} fill="#F87171" fontSize="3" className="font-black opacity-60">R{i+1}</text>
+                          </g>
+                        );
+                      })}
+                      {result.supportLevels.map((lvl, i) => {
+                        const y = 100 - ((lvl - min) / (range > 0 ? range : 1)) * 100;
+                        if (y < 0 || y > 100) return null;
+                        return (
+                          <g key={`sup-${i}`}>
+                            <line 
+                              x1="0" y1={y} x2="100" y2={y} 
+                              stroke="#4ADE80" strokeWidth="1" strokeDasharray="4 4" 
+                              vectorEffect="non-scaling-stroke"
+                              className="opacity-40"
+                            />
+                            <text x="1" y={y - 1} fill="#4ADE80" fontSize="3" className="font-black opacity-60">S{i+1}</text>
+                          </g>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </svg>
+            </div>
+          </div>
+
           {/* Main Indicators Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Trend Card */}
@@ -302,23 +397,51 @@ export default function TechnicalAnalysisWidget() {
                 <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Key Levels</div>
                 <Target className="w-4 h-4 text-yellow-400/50" />
               </div>
-              <div className="space-y-3">
-                {result.resistanceLevels.slice(0, 1).map((lvl, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-[10px] text-red-400 font-black">RESISTANCE</span>
-                    <span className="text-sm font-black text-white">${lvl.toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="py-1 border-y border-white/5 flex justify-between items-center">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">CURRENT</span>
-                  <span className="text-sm font-black text-purple-400">${currentPrice.toLocaleString()}</span>
+              <div className="space-y-4">
+                {/* Visual Level Bar */}
+                <div className="relative h-12 w-full bg-white/5 rounded-xl overflow-hidden border border-white/5">
+                  {(() => {
+                    const s1 = result.supportLevels[0];
+                    const r1 = result.resistanceLevels[0];
+                    const range = r1 - s1;
+                    const pos = ((currentPrice - s1) / (range > 0 ? range : 1)) * 100;
+                    const clampedPos = Math.max(0, Math.min(100, pos));
+                    
+                    return (
+                      <>
+                        <div className="absolute top-0 bottom-0 left-0 w-1 bg-green-500/50 z-10" title="S1" />
+                        <div className="absolute top-0 bottom-0 right-0 w-1 bg-red-500/50 z-10" title="R1" />
+                        <div 
+                          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-purple-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(168,85,247,0.8)] z-20 transition-all duration-700"
+                          style={{ left: `calc(${clampedPos}% - 6px)` }}
+                        />
+                        <div className="absolute inset-0 flex justify-between items-center px-2 text-[8px] font-black text-gray-600 uppercase pointer-events-none">
+                          <span>Support</span>
+                          <span>Resistance</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
-                {result.supportLevels.slice(0, 1).map((lvl, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-[10px] text-green-400 font-black">SUPPORT</span>
-                    <span className="text-sm font-black text-white">${lvl.toLocaleString()}</span>
+
+                <div className="space-y-3">
+                  {result.resistanceLevels.slice(0, 1).map((lvl, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-[10px] text-red-400 font-black">RESISTANCE</span>
+                      <span className="text-sm font-black text-white">${lvl.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="py-1 border-y border-white/5 flex justify-between items-center">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">CURRENT</span>
+                    <span className="text-sm font-black text-purple-400">${currentPrice.toLocaleString()}</span>
                   </div>
-                ))}
+                  {result.supportLevels.slice(0, 1).map((lvl, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-[10px] text-green-400 font-black">SUPPORT</span>
+                      <span className="text-sm font-black text-white">${lvl.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -346,42 +469,47 @@ export default function TechnicalAnalysisWidget() {
           </div>
 
           {/* Strategy Summary */}
-          <div className="p-8 bg-black/40 rounded-3xl border border-white/5 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <STRATEGIES[strategyMode].icon className="w-24 h-24" />
-            </div>
-            <h4 className="text-[10px] font-black text-gray-500 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
-              <ArrowUpRight className="w-3 h-3" /> Strategy Recommendation: {STRATEGIES[strategyMode].name}
-            </h4>
-            
-            <div className="relative z-10">
-              {result.technicalScore >= 70 ? (
-                <div className="space-y-2">
-                  <p className="text-xl font-black text-green-400">Strong Buy / Bullish Continuation</p>
-                  <p className="text-sm text-gray-400 leading-relaxed">
-                    이평선 정배열과 강한 거래량이 확인됩니다. MACD가 양의 영역에 있으며 RSI가 아직 과열권이 아닙니다. 
-                    지지선 ${result.supportLevels[0].toFixed(2)} 근처에서 매수 유효하며, 목표가는 저항선 ${result.resistanceLevels[0].toFixed(2)}입니다.
-                  </p>
+          {(() => {
+            const StrategyIcon = STRATEGIES[strategyMode].icon;
+            return (
+              <div className="p-8 bg-black/40 rounded-3xl border border-white/5 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <StrategyIcon className="w-24 h-24" />
                 </div>
-              ) : result.technicalScore >= 50 ? (
-                <div className="space-y-2">
-                  <p className="text-xl font-black text-yellow-400">Neutral / Accumulation Zone</p>
-                  <p className="text-sm text-gray-400 leading-relaxed">
-                    추세가 아직 명확하지 않거나 박스권 횡보 중입니다. 주요 지지선에서의 반등을 확인하거나 
-                    저항선 돌파 시 진입하는 것이 유리합니다. 변동성(ATR)이 낮아지는 구간입니다.
-                  </p>
+                <h4 className="text-[10px] font-black text-gray-500 mb-6 uppercase tracking-[0.3em] flex items-center gap-2">
+                  <ArrowUpRight className="w-3 h-3" /> Strategy Recommendation: {STRATEGIES[strategyMode].name}
+                </h4>
+                
+                <div className="relative z-10">
+                  {result.technicalScore >= 70 ? (
+                    <div className="space-y-2">
+                      <p className="text-xl font-black text-green-400">Strong Buy / Bullish Continuation</p>
+                      <p className="text-sm text-gray-400 leading-relaxed">
+                        이평선 정배열과 강한 거래량이 확인됩니다. MACD가 양의 영역에 있으며 RSI가 아직 과열권이 아닙니다. 
+                        지지선 ${result.supportLevels[0].toFixed(2)} 근처에서 매수 유효하며, 목표가는 저항선 ${result.resistanceLevels[0].toFixed(2)}입니다.
+                      </p>
+                    </div>
+                  ) : result.technicalScore >= 50 ? (
+                    <div className="space-y-2">
+                      <p className="text-xl font-black text-yellow-400">Neutral / Accumulation Zone</p>
+                      <p className="text-sm text-gray-400 leading-relaxed">
+                        추세가 아직 명확하지 않거나 박스권 횡보 중입니다. 주요 지지선에서의 반등을 확인하거나 
+                        저항선 돌파 시 진입하는 것이 유리합니다. 변동성(ATR)이 낮아지는 구간입니다.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xl font-black text-red-400">Caution / Bearish Signal</p>
+                      <p className="text-sm text-gray-400 leading-relaxed">
+                        주요 이평선을 이탈했거나 데드크로스가 발생했습니다. RSI 과열 이후 조정이 진행 중일 수 있습니다. 
+                        추가 하락 리스크가 있으므로 관망하거나 하단 지지선 ${result.supportLevels[1].toFixed(2)}까지 대기하세요.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xl font-black text-red-400">Caution / Bearish Signal</p>
-                  <p className="text-sm text-gray-400 leading-relaxed">
-                    주요 이평선을 이탈했거나 데드크로스가 발생했습니다. RSI 과열 이후 조정이 진행 중일 수 있습니다. 
-                    추가 하락 리스크가 있으므로 관망하거나 하단 지지선 ${result.supportLevels[1].toFixed(2)}까지 대기하세요.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
           
           <div className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-2xl">
             <p className="text-[10px] text-purple-500/70 leading-relaxed text-center">
