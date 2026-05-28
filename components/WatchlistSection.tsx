@@ -56,8 +56,8 @@ export default function WatchlistSection({ userId }: { userId: string }) {
           const res = await fetch(`/api/market?symbol=${encodeURIComponent(item.symbol)}&interval=1d&range=5d`);
           const json = await res.json();
           if (json.data && json.data.length > 0) {
-            const last = json.data[json.data.length - 1].value;
-            const prev = json.data[json.data.length - 2]?.value || last;
+            const last = json.data[json.data.length - 1].close;
+            const prev = json.data[json.data.length - 2]?.close || last;
             const change = ((last - prev) / prev) * 100;
             return { ...item, current_price: last, change_percent: change };
           }
