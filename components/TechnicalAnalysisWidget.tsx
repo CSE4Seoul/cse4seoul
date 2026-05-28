@@ -43,6 +43,8 @@ interface TechnicalResult {
   resistanceLevels: number[];
 }
 
+type Period = '1D' | '1W' | '1M' | '3M' | 'CUSTOM' | 'STANDARD';
+
 const STRATEGIES = [
   { id: 0, name: 'Conservative Value', icon: ShieldCheck, color: 'text-blue-400' },
   { id: 1, name: 'Growth Momentum', icon: TrendingUp, color: 'text-green-400' },
@@ -55,13 +57,15 @@ const FEATURED_TICKERS = ['AAPL', 'TSLA', 'NVDA', 'BTC-USD', 'ETH-USD', 'QQQ', '
 export default function TechnicalAnalysisWidget() {
   const [symbol, setSymbol] = useState('');
   const [strategyMode, setStrategyMode] = useState(0);
+  const [period, setPeriod] = useState<Period>('1Y' as any); // Default was 1y, mapping it to something sensible or extending Period
+  const [customDays, setCustomDays] = useState<number>(365);
   const [result, setResult] = useState<TechnicalResult | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
 
-  const fetchAndAnalyze = async (ticker: string, mode: number = strategyMode) => {
+  const fetchAndAnalyze = async (ticker: string, mode: number = strategyMode, selectedPeriod: Period = period) => {
     if (!ticker) return;
     setLoading(true);
     setError(null);
@@ -69,7 +73,33 @@ export default function TechnicalAnalysisWidget() {
     setHistory([]);
     
     try {
-      const res = await fetch(`/api/market?symbol=${ticker.toUpperCase()}&range=1y&interval=1d`);
+      let interval = '1d';
+      let range = '1y';
+
+      if (selectedPeriod === '1D') {
+        interval = '1h';
+        range = '5d'; // Need enough data for indicators
+      } else if (selectedPeriod === '1W') {
+        interval = '1h';
+        range = '1mo';
+      } else if (selectedPeriod === '1M') {
+        interval = '1d';
+        range = '6mo';
+      } else if (selectedPeriod === '3M') {
+        interval = '1d';
+        range = '1y';
+      } else if (selectedPeriod === 'STANDARD') {
+        interval = '1d';
+        range = '2y';
+      } else if ((selectedPeriod as any) === '1Y') {
+        interval = '1d';
+        range = '1y';
+      } else {
+        interval = customDays > 100 ? '1d' : '1h';
+        range = `${Math.max(customDays + 150, 200)}d`;
+      }
+
+      const res = await fetch(`/api/market?symbol=${ticker.toUpperCase()}&range=${range}&interval=${interval}`);
       if (!res.ok) {
         const errJson = await res.json();
         throw new Error(errJson.error || '데이터를 가져오는데 실패했습니다.');
@@ -109,6 +139,13 @@ export default function TechnicalAnalysisWidget() {
     }
   };
 
+  const handlePeriodChange = (p: Period) => {
+    setPeriod(p);
+    if (symbol) {
+      fetchAndAnalyze(symbol, strategyMode, p);
+    }
+  };
+
   return (
     <div className="p-8 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-3xl hover:border-blue-500/30 transition-all duration-500 shadow-2xl my-8 relative overflow-hidden">
       <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-600/5 blur-[100px] rounded-full pointer-events-none" />
@@ -141,6 +178,39 @@ export default function TechnicalAnalysisWidget() {
             ANALYZE
           </button>
         </form>
+      </div>
+
+      <div className="relative z-10 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h3 className="text-[10px] font-black text-gray-600 mb-2 uppercase tracking-[0.2em]">Analysis Period</h3>
+          <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 items-center">
+            {(['1D', '1W', '1M', '3M', 'CUSTOM', 'STANDARD'] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => handlePeriodChange(p)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${
+                  period === p ? 'text-purple-400 bg-purple-400/10' : 'text-gray-600 hover:text-gray-400'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            {period === 'CUSTOM' && (
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10 animate-in fade-in slide-in-from-left-2 duration-300">
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={customDays}
+                  onChange={(e) => setCustomDays(Number(e.target.value))}
+                  onBlur={() => symbol && fetchAndAnalyze(symbol)}
+                  className="w-12 bg-black/40 border border-white/10 rounded-lg px-2 py-0.5 text-[10px] font-black text-purple-400 focus:outline-none"
+                />
+                <span className="text-[10px] text-gray-500 font-black">DAYS</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="relative z-10 mb-8">

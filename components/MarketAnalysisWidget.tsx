@@ -340,7 +340,7 @@ export default function MarketAnalysisWidget({ symbol, title, isFX = false, onCl
 
       if (json.error) throw new Error(json.error);
 
-      const formattedData: DataPoint[] = json.data.map((item: { timestamp: string; value: number; volume: number }) => {
+      const formattedData: DataPoint[] = json.data.map((item: { timestamp: string; close: number; volume: number }) => {
         const d = new Date(item.timestamp);
         let dateLabel = '';
         if (period === '1D' || (period === 'CUSTOM' && customDays <= 1)) {
@@ -354,7 +354,7 @@ export default function MarketAnalysisWidget({ symbol, title, isFX = false, onCl
         }
         return {
           date: dateLabel,
-          value: item.value,
+          value: item.close,
           volume: item.volume,
         };
       });
