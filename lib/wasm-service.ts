@@ -111,6 +111,78 @@ class WasmService {
       return null;
     }
   }
+
+  /**
+   * Helper for technical analysis using TechnicalAnalyzer (Embind)
+   */
+  async analyzeTechnical(ohlcvData: any[], strategyMode: number = 0): Promise<any> {
+    const module = await this.getModule('technicalanalysis');
+    if (!module) return null;
+
+    try {
+      // Create a vector for OHLCV
+      const ohlcvVector = new module.OHLCVVector();
+      ohlcvData.forEach(d => {
+        ohlcvVector.push_back({
+          open: d.open || d.value || 0,
+          high: d.high || d.value || 0,
+          low: d.low || d.value || 0,
+          close: d.close || d.value || 0,
+          volume: d.volume || 0,
+          timestamp: BigInt(d.timestamp)
+        });
+      });
+
+      const result = module.TechnicalAnalyzer.analyze(ohlcvVector, strategyMode);
+      
+      // Convert vector results back to JS arrays
+      const supportLevels = [];
+      const resistanceLevels = [];
+      for (let i = 0; i < result.supportLevels.size(); i++) {
+        supportLevels.push(result.supportLevels.get(i));
+      }
+      for (let i = 0; i < result.resistanceLevels.size(); i++) {
+        resistanceLevels.push(result.resistanceLevels.get(i));
+      }
+
+      const formattedResult = {
+        ma5: result.ma5,
+        ma20: result.ma20,
+        ma60: result.ma60,
+        ma120: result.ma120,
+        ema12: result.ema12,
+        ema26: result.ema26,
+        rsi: result.rsi,
+        macd: result.macd,
+        macdSignal: result.macdSignal,
+        macdHist: result.macdHist,
+        bbUpper: result.bbUpper,
+        bbLower: result.bbLower,
+        bbMiddle: result.bbMiddle,
+        atr: result.atr,
+        technicalScore: result.technicalScore,
+        trendScore: result.trendScore,
+        volatilityScore: result.volatilityScore,
+        volumeScore: result.volumeScore,
+        fearGreedScore: result.fearGreedScore,
+        trendState: result.trendState,
+        marketSentiment: result.marketSentiment,
+        supportLevels,
+        resistanceLevels
+      };
+
+      // Cleanup
+      ohlcvVector.delete();
+      // result is a value object in this case if it's a struct, but if it was a class it would need delete.
+      // Embind structs returned as value objects don't need delete usually, 
+      // but if we used class_ with a constructor we would.
+      
+      return formattedResult;
+    } catch (error) {
+      console.error('[WasmService] Error in analyzeTechnical:', error);
+      return null;
+    }
+  }
 }
 
 export const wasmService = new WasmService();

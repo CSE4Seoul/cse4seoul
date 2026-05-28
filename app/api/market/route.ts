@@ -32,7 +32,10 @@ export async function GET(req: Request) {
     const result = data.chart.result[0];
     const timestamps = result.timestamp || [];
     const indicators = result.indicators?.quote?.[0] || {};
-    const quotes = indicators.close || [];
+    const opens = indicators.open || [];
+    const highs = indicators.high || [];
+    const lows = indicators.low || [];
+    const closes = indicators.close || [];
     const volumes = indicators.volume || [];
 
     if (timestamps.length === 0) {
@@ -46,9 +49,12 @@ export async function GET(req: Request) {
 
     const formattedData = timestamps.map((timestamp: number, index: number) => ({
       timestamp: timestamp * 1000, // Convert to ms
-      value: quotes[index],
+      open: opens[index],
+      high: highs[index],
+      low: lows[index],
+      close: closes[index],
       volume: volumes[index] || 0,
-    })).filter((item: any) => item.value !== null && item.value !== undefined);
+    })).filter((item: any) => item.close !== null && item.close !== undefined);
 
     return NextResponse.json({
       symbol,

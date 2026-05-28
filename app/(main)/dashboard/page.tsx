@@ -7,6 +7,7 @@ import { Settings } from 'lucide-react';
 import LobbyChatWidget from '@/components/LobbyChatWidget';
 import WatchlistSection from '@/components/WatchlistSection';
 import ValueScoreWidget from '@/components/ValueScoreWidget';
+import TechnicalAnalysisWidget from '@/components/TechnicalAnalysisWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -283,6 +284,9 @@ export default async function DashboardPage() {
 
         {/* 가치 투자 분석 위젯 추가 */}
         <ValueScoreWidget />
+
+        {/* 기술적 트레이딩 분석 위젯 추가 */}
+        <TechnicalAnalysisWidget />
 
         {/* 멤버 목록 테이블 */}
         <div className="mt-8 bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
