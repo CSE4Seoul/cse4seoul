@@ -10,6 +10,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from 'recharts';
 import { 
   RiExchangeLine, 
@@ -19,7 +23,8 @@ import {
   RiStockLine,
   RiLineChartLine,
   RiPulseLine,
-  RiInformationLine
+  RiInformationLine,
+  RiPieChart2Line
 } from 'react-icons/ri';
 import { wasmService } from '@/lib/wasm-service';
 
@@ -35,7 +40,18 @@ interface DataPoint {
   ma120?: number;
 }
 
-type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500';
+interface Constituent {
+  name: string;
+  weight: number;
+}
+
+const PIE_COLORS = [
+  '#06b6d4', '#0891b2', '#0e7490', '#155e75', 
+  '#22d3ee', '#67e8f9', '#a5f3fc', '#cffafe',
+  '#06b6d4CC', '#06b6d499', '#1e293b'
+];
+
+type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500' | 'KOSPI';
 type Period = '1D' | '1W' | '1M' | '3M' | 'CUSTOM' | 'STANDARD';
 
 interface AnalysisResult {
@@ -47,7 +63,7 @@ interface AnalysisResult {
 }
 
 export default function ExchangeRateWidget() {
-  const [marketType, setMarketType] = useState<MarketType>('USD/KRW');
+  const [marketType, setMarketType] = useState<MarketType>('KOSPI');
   const [data, setData] = useState<DataPoint[]>([]);
   const [currentValue, setCurrentValue] = useState<number | null>(null);
   const [change, setChange] = useState<{ value: number; percent: number } | null>(null);
@@ -59,11 +75,39 @@ export default function ExchangeRateWidget() {
   const [error, setError] = useState<string | null>(null);
   const [showRegression, setShowRegression] = useState(false);
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showComponents, setShowComponents] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  
+  // Dynamic Constituents State
+  const [constituents, setConstituents] = useState<Constituent[]>([]);
+  const [constituentsDate, setConstituentsDate] = useState<string | null>(null);
+  const [isConstituentsLoading, setIsConstituentsLoading] = useState(false);
 
   useEffect(() => {
     fetchMarketData();
   }, [marketType, period, customDays, showAnalysis]);
+
+  useEffect(() => {
+    if (showComponents && (marketType === 'KOSPI' || marketType === 'NASDAQ' || marketType === 'S&P 500')) {
+      fetchConstituents();
+    }
+  }, [showComponents, marketType]);
+
+  const fetchConstituents = async () => {
+    setIsConstituentsLoading(true);
+    try {
+      const res = await fetch(`/api/market/constituents?type=${encodeURIComponent(marketType)}`);
+      const json = await res.json();
+      if (json.data) {
+        setConstituents(json.data);
+        setConstituentsDate(json.updatedAt);
+      }
+    } catch (err) {
+      console.error('Failed to fetch constituents:', err);
+    } finally {
+      setIsConstituentsLoading(false);
+    }
+  };
 
   const calculateRegression = (pts: DataPoint[]) => {
     const n = pts.length;
@@ -112,6 +156,8 @@ export default function ExchangeRateWidget() {
         symbol = 'EURKRW=X';
       } else if (marketType === 'NASDAQ') {
         symbol = '^IXIC';
+      } else if (marketType === 'KOSPI') {
+        symbol = '^KS11';
       } else {
         symbol = '^GSPC';
       }
@@ -142,7 +188,7 @@ export default function ExchangeRateWidget() {
 
       if (json.error) throw new Error(json.error);
 
-      const formattedData: DataPoint[] = json.data.map((item: { timestamp: string; value: number; volume: number }) => {
+      const formattedData: DataPoint[] = json.data.map((item: { timestamp: number; close: number; volume: number }) => {
         const d = new Date(item.timestamp);
         let dateLabel = '';
         if (period === '1D' || (period === 'CUSTOM' && customDays <= 1)) {
@@ -156,7 +202,7 @@ export default function ExchangeRateWidget() {
         }
         return {
           date: dateLabel,
-          value: item.value,
+          value: item.close,
           volume: item.volume,
         };
       });
@@ -302,7 +348,7 @@ export default function ExchangeRateWidget() {
     const currentVol = volumes[n - 1];
     const volChange = volMA20 > 0 ? (currentVol / volMA20) * 100 : 0;
 
-    if (marketType === 'NASDAQ' || marketType === 'S&P 500') {
+    if (marketType === 'NASDAQ' || marketType === 'S&P 500' || marketType === 'KOSPI') {
       if (volChange >= 150) {
         if (current > values[n - 2]) {
           score += 1;
@@ -348,7 +394,7 @@ export default function ExchangeRateWidget() {
       // 1. Wasm 기반 분석 (속도 최적화)
       const prices = formattedData.map(d => d.value || 0);
       const volumes = formattedData.map(d => d.volume || 0);
-      const marketTypeInt = (marketType === 'NASDAQ' || marketType === 'S&P 500') ? 0 : 1;
+      const marketTypeInt = (marketType === 'NASDAQ' || marketType === 'S&P 500' || marketType === 'KOSPI') ? 0 : 1;
       
       const wasmScore = await wasmService.analyzeMarketWasm(prices, volumes, marketTypeInt);
       
@@ -410,12 +456,12 @@ export default function ExchangeRateWidget() {
           <p className="text-[10px] text-cyan-500 font-bold mb-1">{payload[0].payload.date}</p>
           <div className="flex flex-col gap-1">
             <p className="text-sm font-black text-white">
-              {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+              {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : (marketType === 'KOSPI' ? '' : '$')}{payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 1 })}
             </p>
             {showRegression && (
               <div className="flex flex-col gap-0.5 mt-1 border-t border-purple-500/20 pt-1">
                 <p className="text-[10px] text-purple-400 font-bold">
-                  TREND: {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : '$'}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                  TREND: {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : (marketType === 'KOSPI' ? '' : '$')}{payload[0].payload.regression?.toLocaleString(undefined, { minimumFractionDigits: 1 })}
                 </p>
                 <p className={`text-[9px] font-black ${(payload[0].payload.regressionGap ?? 0) >= 0 ? 'text-purple-300' : 'text-pink-400'}`}>
                   GAP: {(payload[0].payload.regressionGap ?? 0) >= 0 ? '+' : ''}{payload[0].payload.regressionGap?.toFixed(2)}%
@@ -461,11 +507,26 @@ export default function ExchangeRateWidget() {
               <RiLineChartLine className={showAnalysis ? 'animate-bounce' : ''} />
               ANALYSIS {showAnalysis ? 'ON' : 'OFF'}
             </button>
+            {(marketType === 'KOSPI' || marketType === 'NASDAQ' || marketType === 'S&P 500') && (
+              <button
+                onClick={() => setShowComponents(!showComponents)}
+                className={`px-3 py-1 rounded-full text-[9px] font-black transition-all flex items-center gap-1.5 ${
+                  showComponents 
+                    ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' 
+                    : 'bg-white/5 text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <RiPieChart2Line className={showComponents ? 'animate-spin-slow' : ''} />
+                COMPONENTS {showComponents ? 'ON' : 'OFF'}
+              </button>
+            )}
           </div>
         </div>
         <h2 className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
           <span className="opacity-40 select-none">/</span>
-          {(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? (
+          {marketType === 'KOSPI' ? (
+            <><span>코스피</span><span className="text-cyan-500">지수</span></>
+          ) : (marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? (
             <><span>시장</span><span className="text-cyan-500">환율</span></>
           ) : (
             <span>{marketType}</span>
@@ -476,7 +537,7 @@ export default function ExchangeRateWidget() {
       {/* 2. Control Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
         <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar w-full sm:w-auto">
-          {(['USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
+          {(['KOSPI', 'USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
             <button
               key={type}
               onClick={() => setMarketType(type)}
@@ -487,8 +548,7 @@ export default function ExchangeRateWidget() {
               }`}
             >
               {(type === 'USD/KRW' || type === 'EUR/KRW') && <RiExchangeLine />}
-              {type === 'NASDAQ' && <RiStockLine />}
-              {type === 'S&P 500' && <RiLineChartLine />}
+              {(type === 'NASDAQ' || type === 'S&P 500' || type === 'KOSPI') && <RiLineChartLine />}
               {type}
             </button>
           ))}
@@ -615,7 +675,82 @@ export default function ExchangeRateWidget() {
         )}
       </div>
 
-      {/* 5. Analysis Report Section */}
+      {/* 5. Index Components Section */}
+      {showComponents && (marketType === 'KOSPI' || marketType === 'NASDAQ' || marketType === 'S&P 500') && (
+        <div className="relative z-10 bg-black/40 rounded-2xl border border-white/5 p-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <RiPieChart2Line className="text-cyan-400" />
+              <span className="text-[10px] text-cyan-400 font-black uppercase tracking-widest">Index Constituents Weighting</span>
+            </div>
+            {constituentsDate && (
+              <span className="text-[9px] text-gray-500 font-bold uppercase">As of: {constituentsDate}</span>
+            )}
+          </div>
+
+          {isConstituentsLoading ? (
+            <div className="h-[300px] w-full flex items-center justify-center">
+              <div className="animate-spin w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="flex flex-col lg:flex-row gap-8 items-center">
+              {/* Pie Chart */}
+              <div className="w-full lg:w-1/2 h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={constituents}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="weight"
+                      animationBegin={0}
+                      animationDuration={1500}
+                    >
+                      {constituents.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="rgba(0,0,0,0.2)" />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(34,211,238,0.3)', borderRadius: '12px' }}
+                      itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* List */}
+              <div className="w-full lg:w-1/2 grid grid-cols-2 gap-y-3 gap-x-6">
+                {constituents.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between border-b border-white/5 pb-1 group/item">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                      <span className="text-[11px] text-gray-400 font-bold truncate group-hover/item:text-white transition-colors">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-cyan-500 font-black tabular-nums">
+                      {item.weight.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="mt-6 pt-4 border-t border-white/5">
+            <p className="text-[9px] text-gray-600 font-medium leading-relaxed italic">
+              {marketType === 'KOSPI' 
+                ? `※ 코스피 데이터는 ${constituentsDate} 기준 직접 제공된 수치입니다.`
+                : '※ 미국 지수 비중은 주요 ETF(QQQ, SPY) 홀딩스 데이터를 기반으로 실시간 자동 업데이트됩니다.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Analysis Report Section */}
       {showAnalysis && (
         <div className="relative z-10 bg-black/40 rounded-2xl border border-white/5 p-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex items-center gap-2 mb-4">
