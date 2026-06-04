@@ -406,6 +406,8 @@ export default function LobbyChatWidget() {
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiModel, setAiModel] = useState('qwen2.5:1.5b');
   const [isAiMode, setIsAiMode] = useState(false); 
+  const [canChat, setCanChat] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
@@ -486,20 +488,34 @@ export default function LobbyChatWidget() {
       }
     };
     const fetchCseKeywords = async () => {
-      try {
-        const response = await fetch('/drawing_keyword_set_cse.json');
-        if (response.ok) {
-          const data = await response.json();
-          setCseKeywords(data.cse_keywords || []);
+        try {
+          const response = await fetch('/drawing_keyword_set_cse.json');
+          if (response.ok) {
+            const data = await response.json();
+            setCseKeywords(data.cse_keywords || []);
+          }
+        } catch (e) {
+          console.log('CSE keywords not found');
         }
-      } catch (e) {
-        console.log('CSE keywords not found');
-      }
-    };
+      };
 
-    fetchEnglishWords();
-    fetchCseKeywords();
-  }, []);
+      const checkRateLimit = async () => {
+        try {
+          const response = await fetch('/api/chat/rate-limit');
+          if (response.ok) {
+            const data = await response.json();
+            setCanChat(data.canChat);
+            setIsGuest(data.isGuest);
+          }
+        } catch (e) {
+          console.error('Rate limit check failed', e);
+        }
+      };
+
+      fetchEnglishWords();
+      fetchCseKeywords();
+      checkRateLimit();
+    }, [reconnectTrigger]);
 
   useEffect(() => {
     localStorage.setItem('lobby_auto_scroll', autoScrollEnabled ? 'true' : 'false');
@@ -1125,6 +1141,10 @@ export default function LobbyChatWidget() {
 
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
+    if (isGuest && !canChat) {
+      alert('게스트는 하루에 한 번만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!');
+      return;
+    }
 
     try {
       isSendingRef.current = true;
@@ -1134,7 +1154,7 @@ export default function LobbyChatWidget() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
 
-      // 낙관적 업데이트: 서버 응답 전 화면에 먼저 표시
+      // 낙관적 업데이트
       const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
       const optimisticMsg: LobbyMessage = {
         id: tempId,
@@ -1148,22 +1168,34 @@ export default function LobbyChatWidget() {
       setMessages(prev => [...prev, optimisticMsg].slice(-MAX_MESSAGES));
 
       try {
-        const { data, error } = await supabase.from('lobby_messages').insert({
-          id: tempId,
-          content,
-          author_name: displayName,
-          expires_at: expiresAt.toISOString()
-        }).select().single();
+        const response = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content,
+            author_name: displayName,
+            expires_at: expiresAt.toISOString()
+          })
+        });
 
-        if (error) throw error;
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.error === 'GUEST_LIMIT_EXCEEDED') {
+            setCanChat(false);
+            throw new Error('게스트 메시지 한도 초과');
+          }
+          throw new Error(data.error || '전송 실패');
+        }
         
         if (data) {
           setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
+          if (isGuest) setCanChat(false); // 전송 성공 후 차단
         }
       } catch (err: any) {
         console.error(`이모티콘 전송 실패:`, err);
         setMessages(prev => prev.filter(m => m.id !== tempId));
-        setFilterWarning(`⚠️ 이모티콘 전송 실패: ${err.message || '다시 시도해주세요.'}`);
+        setFilterWarning(`⚠️ ${err.message || '다시 시도해주세요.'}`);
       }
     } catch (globalErr: any) {
       console.error(`이모티콘 함수 실행 오류:`, globalErr);
@@ -1178,6 +1210,11 @@ export default function LobbyChatWidget() {
     e.preventDefault();
     const trimmed = newMessage.trim();
     if (!trimmed) return;
+
+    if (isGuest && !canChat) {
+      alert('게스트는 하루에 한 번만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!');
+      return;
+    }
 
     if (isSendingRef.current) {
       alert('현재 메시지를 전송 중입니다. 잠시만 기다려주세요.');
@@ -1232,6 +1269,7 @@ export default function LobbyChatWidget() {
       const emoticonKeyword = matchEmoticonCommand(trimmed);
       if (emoticonKeyword) {
         await handleEmoticonSend(emoticonKeyword);
+        setNewMessage('');
         return;
       }
 
@@ -1263,17 +1301,30 @@ export default function LobbyChatWidget() {
 
       while (attempt < maxAttempts && !success) {
         try {
-          const { data, error } = await supabase.from('lobby_messages').insert({ 
-            content: trimmed, 
-            author_name: displayName, 
-            expires_at: expiresAt.toISOString()
-          }).select().single();
-          
-          if (error) throw error;
+          const response = await fetch('/api/chat/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: trimmed,
+              author_name: displayName,
+              expires_at: expiresAt.toISOString()
+            })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            if (data.error === 'GUEST_LIMIT_EXCEEDED') {
+              setCanChat(false);
+              throw new Error('게스트 메시지 한도 초과');
+            }
+            throw new Error(data.error || '전송 실패');
+          }
           
           if (data) {
             setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
             success = true;
+            if (isGuest) setCanChat(false);
 
             if (gameState.status !== 'PLAYING') {
               if (trimmed.startsWith('/ai ')) {
@@ -1291,15 +1342,14 @@ export default function LobbyChatWidget() {
           if (attempt === maxAttempts) {
             setMessages(prev => prev.filter(m => m.id !== tempId));
             const errorMsg = err.message || JSON.stringify(err);
-            setFilterWarning(`⚠️ 전송 실패: ${errorMsg}`);
-            alert(`DB 저장 에러: ${errorMsg}`);
+            setFilterWarning(`⚠️ ${errorMsg}`);
           } else {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
       }
     } catch (globalErr: any) {
-      alert(`함수 실행 오류: ${globalErr.message}`);
+      console.error(`함수 실행 오류:`, globalErr);
     } finally {
       isSendingRef.current = false;
       setIsSending(false);

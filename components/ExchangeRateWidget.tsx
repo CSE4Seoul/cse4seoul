@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { createClient } from '@/utils/supabase/client';
 import {
   AreaChart,
   Area,
@@ -24,7 +26,8 @@ import {
   RiLineChartLine,
   RiPulseLine,
   RiInformationLine,
-  RiPieChart2Line
+  RiPieChart2Line,
+  RiLock2Line
 } from 'react-icons/ri';
 import { wasmService } from '@/lib/wasm-service';
 
@@ -51,7 +54,7 @@ const PIE_COLORS = [
   '#06b6d4CC', '#06b6d499', '#1e293b'
 ];
 
-type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500' | 'KOSPI';
+type MarketType = 'USD/KRW' | 'EUR/KRW' | 'NASDAQ' | 'S&P 500' | 'KOSPI' | 'DXY';
 type Period = '1D' | '1W' | '1M' | '3M' | 'CUSTOM' | 'STANDARD';
 
 interface AnalysisResult {
@@ -77,21 +80,71 @@ export default function ExchangeRateWidget() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showComponents, setShowComponents] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   
   // Dynamic Constituents State
   const [constituents, setConstituents] = useState<Constituent[]>([]);
   const [constituentsDate, setConstituentsDate] = useState<string | null>(null);
   const [isConstituentsLoading, setIsConstituentsLoading] = useState(false);
 
-  useEffect(() => {
-    fetchMarketData();
-  }, [marketType, period, customDays, showAnalysis]);
+  // Market Comparison Data for Interpretation
+  const [comparisonData, setComparisonData] = useState<{
+    usdkrw?: { value: number; change: number };
+    dxy?: { value: number; change: number };
+  }>({});
 
   useEffect(() => {
-    if (showComponents && (marketType === 'KOSPI' || marketType === 'NASDAQ' || marketType === 'S&P 500')) {
+    const checkUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setIsAuthChecking(false);
+    };
+    checkUser();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthChecking && user) {
+      fetchMarketData();
+    }
+  }, [marketType, period, customDays, showAnalysis, user, isAuthChecking]);
+
+  useEffect(() => {
+    if (!isAuthChecking && user && showComponents && (marketType === 'KOSPI' || marketType === 'NASDAQ' || marketType === 'S&P 500')) {
       fetchConstituents();
     }
-  }, [showComponents, marketType]);
+  }, [showComponents, marketType, user, isAuthChecking]);
+
+  // Fetch both USD/KRW and DXY for interpretation
+  useEffect(() => {
+    if (!isAuthChecking && user) {
+      fetchComparisonData();
+    }
+  }, [user, isAuthChecking]);
+
+  const fetchComparisonData = async () => {
+    try {
+      const symbols = { usdkrw: 'USDKRW=X', dxy: 'DX-Y.NYB' };
+      const results: any = {};
+      
+      for (const [key, symbol] of Object.entries(symbols)) {
+        const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}&interval=1d&range=5d`);
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+          const last = json.data[json.data.length - 1].close;
+          const prev = json.data[json.data.length - 2]?.close || json.previousClose;
+          results[key] = {
+            value: last,
+            change: last - prev
+          };
+        }
+      }
+      setComparisonData(results);
+    } catch (err) {
+      console.error('Failed to fetch comparison data:', err);
+    }
+  };
 
   const fetchConstituents = async () => {
     setIsConstituentsLoading(true);
@@ -158,6 +211,8 @@ export default function ExchangeRateWidget() {
         symbol = '^IXIC';
       } else if (marketType === 'KOSPI') {
         symbol = '^KS11';
+      } else if (marketType === 'DXY') {
+        symbol = 'DX-Y.NYB';
       } else {
         symbol = '^GSPC';
       }
@@ -449,6 +504,25 @@ export default function ExchangeRateWidget() {
     }>;
   }
 
+  const getMarketInterpretation = () => {
+    const { usdkrw, dxy } = comparisonData;
+    if (!usdkrw || !dxy) return null;
+
+    const dxyUp = dxy.change > 0;
+    const krwUp = usdkrw.change > 0; // USDKRW 상승 = 원화 약세
+
+    if (dxyUp && krwUp) {
+      return "글로벌 달러 강세가 원화 약세로 이어지고 있습니다.";
+    } else if (!dxyUp && !krwUp) {
+      return "달러 약세와 함께 원화가 강세를 보이고 있습니다.";
+    } else if (dxyUp && !krwUp) {
+      return "달러는 강세지만 원화가 상대적으로 더 강한 모습을 보이고 있습니다.";
+    } else if (!dxyUp && krwUp) {
+      return "글로벌 달러는 약세이나 원화는 상대적으로 약한 흐름을 보이고 있습니다.";
+    }
+    return null;
+  };
+
   const CustomTooltip = ({ active, payload }: TooltipProps) => {
     if (active && payload && payload.length) {
       return (
@@ -475,8 +549,42 @@ export default function ExchangeRateWidget() {
     return null;
   };
 
+  if (!isAuthChecking && !user) {
+    return (
+      <div className="group relative rounded-3xl border border-white/10 bg-gray-900/40 p-12 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col items-center justify-center text-center gap-6">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
+          <RiLock2Line className="text-3xl text-gray-500" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xl font-bold text-white">로그인 후 이용 가능합니다</h3>
+          <p className="text-sm text-gray-400 max-w-xs">
+            실시간 시세 및 AI 분석 기능을 이용하시려면 로그인이 필요합니다.
+          </p>
+        </div>
+        <Link
+          href="/login"
+          className="px-8 py-3 rounded-xl bg-cyan-600 text-white text-sm font-bold hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-500/20"
+        >
+          로그인하러 가기
+        </Link>
+      </div>
+    );
+  }
+
+  const interpretation = getMarketInterpretation();
+
   return (
     <div className="group relative rounded-3xl border border-white/10 bg-gray-900/40 p-6 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col gap-6">
+      {/* Interpretation Section */}
+      {interpretation && (
+        <div className="relative z-10 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
+          <p className="text-xs font-medium text-cyan-200">
+            {interpretation}
+          </p>
+        </div>
+      )}
+
       {/* 1. Header Section */}
       <div className="relative z-10 flex flex-col gap-1">
         <div className="flex items-center justify-between">
@@ -537,7 +645,7 @@ export default function ExchangeRateWidget() {
       {/* 2. Control Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
         <div className="flex bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar w-full sm:w-auto">
-          {(['KOSPI', 'USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500'] as MarketType[]).map((type) => (
+          {(['KOSPI', 'USD/KRW', 'EUR/KRW', 'NASDAQ', 'S&P 500', 'DXY'] as MarketType[]).map((type) => (
             <button
               key={type}
               onClick={() => setMarketType(type)}
@@ -547,7 +655,7 @@ export default function ExchangeRateWidget() {
                   : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
               }`}
             >
-              {(type === 'USD/KRW' || type === 'EUR/KRW') && <RiExchangeLine />}
+              {(type === 'USD/KRW' || type === 'EUR/KRW' || type === 'DXY') && <RiExchangeLine />}
               {(type === 'NASDAQ' || type === 'S&P 500' || type === 'KOSPI') && <RiLineChartLine />}
               {type}
             </button>
@@ -586,10 +694,10 @@ export default function ExchangeRateWidget() {
       <div className="relative z-10">
         <div className="flex items-baseline gap-3">
           <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
-            {currentValue ? `${(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : ''}${currentValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : '---'}
+            {currentValue ? `${(marketType === 'USD/KRW' || marketType === 'EUR/KRW') ? '₩' : (marketType === 'KOSPI' || marketType === 'DXY' ? '' : '$')}${currentValue.toLocaleString(undefined, { maximumFractionDigits: marketType.includes('/') ? 1 : 1 })}` : '---'}
           </span>
           <span className="text-sm text-gray-500 font-bold uppercase tracking-widest">
-            {marketType === 'USD/KRW' ? 'KRW / USD' : marketType === 'EUR/KRW' ? 'KRW / EUR' : 'Index Points'}
+            {marketType === 'USD/KRW' ? 'KRW / USD' : marketType === 'EUR/KRW' ? 'KRW / EUR' : marketType === 'DXY' ? 'Dollar Index' : 'Index Points'}
           </span>
         </div>
         
