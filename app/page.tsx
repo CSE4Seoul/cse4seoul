@@ -25,21 +25,246 @@ interface Post {
   created_at: string;
 }
 
+// 다국어 번역 딕셔너리
+const contentData = {
+  ko: {
+    heroTag: "CSE4Seoul 커뮤니티",
+    heroTitleLine1: "함께 만들고, 함께 성장하는",
+    heroTitleLine2: "우리들의 공간",
+    heroDesc: "Computer Science && Engineering for Seoul (CSE4Seoul) 커뮤니티는 클래시로얄 클랜을 기반으로 한 개발자 & 게이머 그룹입니다.",
+    systemBtn: "시스템 접속하기",
+    infoBtn: "자세한 기능 소개",
+    featuresTitle: "✨ CSE4Seoul 주요 기능",
+    featureChatTitle: "실시간 암호화 채팅",
+    featureChatDesc: "AES-256으로 메시지를 암호화합니다. 비밀번호를 입력한 사람만 해당 채팅을 볼 수 있어요.",
+    featureBoardTitle: "자유로운 게시판",
+    featureBoardDesc: "프로젝트 모집, 정보 공유, 일상 대화까지. 클랜원들과 다양한 주제로 소통하세요.",
+    featureNetworkTitle: "클랜원 네트워크",
+    featureNetworkDesc: "현재 활동 중인 수많은 클랜원들. 함께 성장할 최고의 동료들을 만나보세요.",
+    recentPostsTitle: "📢 최근 게시글",
+    recentPostsMore: "더 보기 →",
+    recentPostsLoading: "통신망 스캔 중...",
+    recentPostsEmpty: "아직 등록된 게시글이 없습니다.",
+    securityTitle: "보안을 최우선으로",
+    securityDesc: "모든 채팅은 암호화되어 저장되며, 24시간 후 자동 삭제되어 익명성이 완벽하게 보장됩니다.",
+    modalTitle: "✨ CSE4Seoul 주요 기능",
+    modalChatTitle: "암호화 채팅",
+    modalChatBullet1: "AES-256 암호화로 모든 메시지를 보호합니다.",
+    modalChatBullet2: "24시간 후 자동 삭제되어 보안성을 높입니다.",
+    modalLobbyTitle: "익명 로비 채팅",
+    modalLobbyBullet1: "로그인 없이 참여 가능한 공개 채팅 공간입니다.",
+    modalCloseBtn: "닫기",
+    noticeBadgePinned: "📌 고정",
+    noticeBadgeTemp: "📢 공지",
+    adminPanelTitle: "🛠️ 최고관리자 공지 제어판",
+    adminPanelDesc: "메인 화면 상단의 공지사항을 등록/수정/삭제합니다.",
+    adminInputPlaceholder: "메인 페이지 상단에 노출할 공지 내용을 입력하세요.",
+    adminPinCheck: "📌 상단에 영구 고정",
+    adminPeriodLabel: "노출 기간:",
+    adminPeriod1h: "1시간",
+    adminPeriod6h: "6시간",
+    adminPeriod12h: "12시간",
+    adminPeriod24h: "24시간 (1일)",
+    adminPeriod72h: "72시간 (3일)",
+    adminSubmitBtn: "공지사항 게시하기",
+    adminSubmitting: "게시 중...",
+    adminListTitle: "현재 게시 중인 공지 목록",
+    deleteBtn: "삭제",
+    deleteConfirm: "이 공지사항을 삭제하시겠습니까?",
+    deleteSuccess: "공지사항이 삭제되었습니다.",
+    createSuccess: "공지사항이 등록되었습니다! 🎉",
+    expiredLabel: "만료됨",
+    expiresInH: "시간 후 만료",
+    expiresInM: "분 후 만료",
+    expiresInH_en: "h left",
+    expiresInM_en: "m left",
+    hourUnit: "시간",
+    minUnit: "분"
+  },
+  en: {
+    heroTag: "CSE4Seoul Community",
+    heroTitleLine1: "Co-creating and Growing Together",
+    heroTitleLine2: "Our Space",
+    heroDesc: "The Computer Science && Engineering for Seoul (CSE4Seoul) community is a developer & gamer group based on a Clash Royale clan.",
+    systemBtn: "Access System",
+    infoBtn: "Detailed Features",
+    featuresTitle: "✨ Key Features of CSE4Seoul",
+    featureChatTitle: "Real-time Encrypted Chat",
+    featureChatDesc: "Encrypt messages with AES-256. Only those who enter the password can view the chat.",
+    featureBoardTitle: "Free Bulletin Board",
+    featureBoardDesc: "From project recruiting, information sharing, to daily conversations. Communicate with clan members.",
+    featureNetworkTitle: "Clan Member Network",
+    featureNetworkDesc: "Many active clan members. Meet the best peers to grow together.",
+    recentPostsTitle: "📢 Recent Posts",
+    recentPostsMore: "More →",
+    recentPostsLoading: "Scanning communication network...",
+    recentPostsEmpty: "No posts have been registered yet.",
+    securityTitle: "Security First",
+    securityDesc: "All chats are encrypted and stored, then automatically deleted after 24 hours to ensure complete anonymity.",
+    modalTitle: "✨ CSE4Seoul Main Features",
+    modalChatTitle: "Encrypted Chat",
+    modalChatBullet1: "Protects all messages with AES-256 encryption.",
+    modalChatBullet2: "Automatically deleted after 24 hours to enhance security.",
+    modalLobbyTitle: "Anonymous Lobby Chat",
+    modalLobbyBullet1: "A public chat space accessible without logging in.",
+    modalCloseBtn: "Close",
+    noticeBadgePinned: "📌 Pinned",
+    noticeBadgeTemp: "📢 Notice",
+    adminPanelTitle: "🛠️ Super Admin Notice Panel",
+    adminPanelDesc: "Register, modify, or delete notices on the main screen.",
+    adminInputPlaceholder: "Enter the notice content to display on the main page.",
+    adminPinCheck: "📌 Permanently pin on top",
+    adminPeriodLabel: "Duration:",
+    adminPeriod1h: "1 hour",
+    adminPeriod6h: "6 hours",
+    adminPeriod12h: "12 hours",
+    adminPeriod24h: "24 hours (1 day)",
+    adminPeriod72h: "72 hours (3 days)",
+    adminSubmitBtn: "Publish Notice",
+    adminSubmitting: "Publishing...",
+    adminListTitle: "Currently Active Notices",
+    deleteBtn: "Delete",
+    deleteConfirm: "Are you sure you want to delete this notice?",
+    deleteSuccess: "Notice deleted successfully.",
+    createSuccess: "Notice published successfully! 🎉",
+    expiredLabel: "Expired",
+    expiresInH: "hours left",
+    expiresInM: "minutes left",
+    expiresInH_en: "h left",
+    expiresInM_en: "m left",
+    hourUnit: "h",
+    minUnit: "m"
+  }
+};
+
 export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const supabase = createClient();
+  
+  // 권한 및 다국어, 공지사항을 위한 추가 상태
+  const [profile, setProfile] = useState<any | null>(null);
+  const [lang, setLang] = useState<'ko' | 'en'>('ko');
+  const [notices, setNotices] = useState<any[]>([]);
+  const [isNoticeLoading, setIsNoticeLoading] = useState(true);
+  const [newNoticeContent, setNewNoticeContent] = useState('');
+  const [isPinned, setIsPinned] = useState(false);
+  const [expiresInHours, setExpiresInHours] = useState(24);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 사용자 정보 불러오기
+  const supabase = createClient();
+  const t = contentData[lang];
+
+  // 사용자 및 추가 프로필 정보 불러오기
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchUserAndProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (user) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (prof) {
+          setProfile(prof);
+        }
+      }
     };
-    fetchUser();
+    fetchUserAndProfile();
   }, [supabase]);
+
+  // 공지사항 불러오기
+  const fetchNotices = async () => {
+    setIsNoticeLoading(true);
+    try {
+      const res = await fetch('/api/notice');
+      const data = await res.json();
+      if (data.notices) {
+        setNotices(data.notices);
+      }
+    } catch (error) {
+      console.error('공지사항 조회 실패:', error);
+    } finally {
+      setIsNoticeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
+
+  // 공지 작성
+  const handleCreateNotice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNoticeContent.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/notice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: newNoticeContent,
+          is_pinned: isPinned,
+          expires_in_hours: isPinned ? undefined : expiresInHours,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(t.createSuccess);
+        setNewNoticeContent('');
+        setIsPinned(false);
+        setExpiresInHours(24);
+        fetchNotices();
+      } else {
+        alert(data.error || 'Failed');
+      }
+    } catch (error) {
+      console.error('공지사항 생성 실패:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 공지 삭제
+  const handleDeleteNotice = async (id: string) => {
+    if (!confirm(t.deleteConfirm)) return;
+    try {
+      const res = await fetch(`/api/notice?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(t.deleteSuccess);
+        fetchNotices();
+      } else {
+        alert(data.error || 'Failed');
+      }
+    } catch (error) {
+      console.error('공지사항 삭제 실패:', error);
+    }
+  };
+
+  // 공지사항 남은 만료 시간 계산 라벨
+  const getNoticeExpiryLabel = (expiresAtStr: string) => {
+    const expiresAt = new Date(expiresAtStr);
+    const now = new Date();
+    const diffMs = expiresAt.getTime() - now.getTime();
+    if (diffMs <= 0) return t.expiredLabel;
+    
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours >= 1) {
+      return lang === 'ko' 
+        ? `${diffHours}${t.expiresInH}` 
+        : `${diffHours}${t.hourUnit} left`;
+    }
+    return lang === 'ko' 
+      ? `${diffMins}${t.expiresInM}` 
+      : `${diffMins}${t.minUnit} left`;
+  };
 
   // 시간 표시 함수
   const timeAgo = (dateString: string) => {
@@ -50,10 +275,17 @@ export default function Home() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 60) return `${diffMins}분 전`;
-    if (diffHours < 24) return `${diffHours}시간 전`;
-    if (diffDays === 1) return '어제';
-    return `${diffDays}일 전`;
+    if (lang === 'ko') {
+      if (diffMins < 60) return `${diffMins}분 전`;
+      if (diffHours < 24) return `${diffHours}시간 전`;
+      if (diffDays === 1) return '어제';
+      return `${diffDays}일 전`;
+    } else {
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return 'Yesterday';
+      return `${diffDays}d ago`;
+    }
   };
 
   // 최신 게시글 불러오기
@@ -91,29 +323,43 @@ export default function Home() {
       <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.18),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_50%_100%,rgba(236,72,153,0.14),transparent_45%)]" />
       <div className="pointer-events-none absolute inset-0 z-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:42px_42px]" />
 
-      <div className="z-10 w-full max-w-7xl py-12 md:py-20 flex flex-col gap-12">
-        {/* 1. 로그인 정보 위젯 */}
+      <div className="z-10 w-full max-w-7xl py-12 md:py-20 flex flex-col gap-8">
+        
+        {/* 1. 로그인 정보 & 다국어 토글 위젯 */}
         <div className="w-full max-w-5xl mx-auto">
           <div className="rounded-3xl border border-white/10 bg-gray-900/40 p-6 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                   <RiGroupLine className="text-2xl text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">접속 정보</h3>
+                  <h3 className="text-lg font-bold text-white">
+                    {lang === 'ko' ? '접속 정보' : 'Access Info'}
+                  </h3>
                   <p className="text-sm text-gray-400">
-                    {user ? `${user.email} 님 환영합니다` : '현재 비로그인 상태입니다'}
+                    {user 
+                      ? (lang === 'ko' ? `${user.email} 님 환영합니다` : `Welcome, ${user.email}`) 
+                      : (lang === 'ko' ? '현재 비로그인 상태입니다' : 'Not logged in')}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-3">
+              
+              <div className="flex items-center gap-3">
+                {/* 다국어 변환 토글 */}
+                <button
+                  onClick={() => setLang(l => l === 'ko' ? 'en' : 'ko')}
+                  className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 hover:border-cyan-500/30 transition-all text-cyan-300 flex items-center gap-1.5 shadow-sm"
+                >
+                  🌐 {lang === 'ko' ? 'EN' : 'KO'}
+                </button>
+
                 {user ? (
                   <button
                     onClick={handleSignOut}
                     className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 transition-all"
                   >
-                    로그아웃
+                    {lang === 'ko' ? '로그아웃' : 'Logout'}
                   </button>
                 ) : (
                   <>
@@ -121,13 +367,13 @@ export default function Home() {
                       href="/login"
                       className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-bold hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-500/20"
                     >
-                      로그인
+                      {lang === 'ko' ? '로그인' : 'Login'}
                     </Link>
                     <Link
                       href="/auth/sign-up"
                       className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:bg-white/10 transition-all"
                     >
-                      회원가입
+                      {lang === 'ko' ? '회원가입' : 'Sign Up'}
                     </Link>
                   </>
                 )}
@@ -136,74 +382,203 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 2. 공지사항 노출 배너 */}
+        <AnimatePresence>
+          {notices.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full max-w-5xl mx-auto z-10"
+            >
+              <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 backdrop-blur-md flex items-center justify-between gap-4 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                    {notices[0].is_pinned ? '📌' : '📢'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-200">
+                      {notices[0].content}
+                    </p>
+                    {!notices[0].is_pinned && (
+                      <p className="text-[10px] text-amber-400/60 mt-0.5 font-medium">
+                        {getNoticeExpiryLabel(notices[0].expires_at)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                {profile?.role === 'admin' && (
+                  <button
+                    onClick={() => handleDeleteNotice(notices[0].id)}
+                    className="px-2.5 py-1 rounded-lg bg-red-950/40 border border-red-900/30 text-red-400 hover:bg-red-900/40 transition-all text-xs font-bold"
+                  >
+                    {t.deleteBtn}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-
-        {/* 3. 그 아래 원래 있었던 것들 */}
-        <div className="flex flex-col gap-24 mt-12">
+        {/* 3. 그 아래 콘텐츠 */}
+        <div className="flex flex-col gap-16 mt-6">
           {/* 히어로 섹션 */}
           <div className="text-center">
-            <span className="inline-block rounded-full border border-cyan-700/70 bg-cyan-900/40 px-4 py-1.5 text-sm font-medium text-cyan-300">
-              CSE4Seoul 커뮤니티
+            <span className="inline-block rounded-full border border-cyan-700/70 bg-cyan-900/40 px-4 py-1.5 text-sm font-medium text-cyan-300 shadow-inner">
+              {t.heroTag}
             </span>
-            <h1 className="mt-6 text-4xl font-black tracking-tight md:text-7xl bg-gradient-to-r from-blue-300 via-violet-300 to-pink-300 bg-clip-text text-transparent">
-              함께 만들고, 함께 성장하는
+            <h1 className="mt-6 text-4xl font-black tracking-tight md:text-7xl bg-gradient-to-r from-blue-300 via-violet-300 to-pink-300 bg-clip-text text-transparent leading-none">
+              {t.heroTitleLine1}
               <br />
-              우리들의 공간
+              <span className="inline-block mt-2">{t.heroTitleLine2}</span>
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 md:text-xl">
-              Computer Science && Engineering for Seoul (CSE4Seoul) 커뮤니티는{' '}
-              <span className="font-semibold text-cyan-300"><br />클래시로얄 클랜</span>을
-              기반으로 한 개발자 & 게이머 그룹입니다.
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-300 md:text-xl leading-relaxed">
+              {t.heroDesc}
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 href={user ? "/dashboard" : "/login"}
-                className="rounded-xl bg-white px-8 py-4 font-bold text-black transition-colors hover:bg-gray-200 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)]"
+                className="rounded-xl bg-white px-8 py-4 font-bold text-black transition-all hover:bg-gray-200 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:scale-[1.02]"
               >
-                시스템 접속하기
+                {t.systemBtn}
               </Link>
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-4 font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-4 font-medium text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:scale-[1.02]"
               >
                 <RiInformationLine className="text-xl" />
-                자세한 기능 소개
+                {t.infoBtn}
               </button>
             </div>
           </div>
 
-                    {/* 🔥 로비 채팅 위젯 */}
+          {/* 최고관리자 공지사항 관리 위젯 (어드민 전용) */}
+          {profile?.role === 'admin' && (
+            <div className="w-full max-w-5xl mx-auto z-20">
+              <div className="rounded-3xl border border-red-500/20 bg-red-950/5 p-6 backdrop-blur-xl hover:border-red-500/40 transition-all duration-500 shadow-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-amber-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+                    <span className="text-white text-lg">🛠️</span>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">{t.adminPanelTitle}</h3>
+                    <p className="text-xs text-gray-400">{t.adminPanelDesc}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCreateNotice} className="flex flex-col gap-4">
+                  <textarea
+                    className="w-full h-20 bg-black/40 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-red-500/50 resize-none placeholder-gray-500"
+                    placeholder={t.adminInputPlaceholder}
+                    value={newNoticeContent}
+                    onChange={(e) => setNewNoticeContent(e.target.value)}
+                  />
+                  
+                  <div className="flex flex-wrap items-center justify-between gap-4 bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={isPinned}
+                          onChange={(e) => setIsPinned(e.target.checked)}
+                          className="rounded border-white/20 bg-black text-red-600 focus:ring-0 focus:ring-offset-0"
+                        />
+                        {t.adminPinCheck}
+                      </label>
+
+                      {!isPinned && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">{t.adminPeriodLabel}</span>
+                          <select
+                            value={expiresInHours}
+                            onChange={(e) => setExpiresInHours(Number(e.target.value))}
+                            className="bg-black border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-red-500/50 cursor-pointer"
+                          >
+                            <option value={1}>{t.adminPeriod1h}</option>
+                            <option value={6}>{t.adminPeriod6h}</option>
+                            <option value={12}>{t.adminPeriod12h}</option>
+                            <option value={24}>{t.adminPeriod24h}</option>
+                            <option value={72}>{t.adminPeriod72h}</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !newNoticeContent.trim()}
+                      className="px-5 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 rounded-xl text-white text-xs font-bold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+                    >
+                      {isSubmitting ? t.adminSubmitting : t.adminSubmitBtn}
+                    </button>
+                  </div>
+                </form>
+
+                {/* 게재 목록 */}
+                {notices.length > 0 && (
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <h4 className="text-xs font-bold text-gray-400 mb-2">{t.adminListTitle}</h4>
+                    <div className="space-y-2">
+                      {notices.map((n) => (
+                        <div key={n.id} className="flex items-center justify-between bg-black/30 p-3 rounded-lg border border-white/5 text-xs">
+                          <div className="flex items-center gap-2 text-gray-300 max-w-[80%]">
+                            <span>{n.is_pinned ? '📌' : '⏰'}</span>
+                            <span className="truncate">{n.content}</span>
+                            {!n.is_pinned && (
+                              <span className="text-[10px] text-amber-500 font-medium whitespace-nowrap">
+                                ({getNoticeExpiryLabel(n.expires_at)})
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteNotice(n.id)}
+                            className="px-2 py-0.5 bg-red-950/60 border border-red-900/40 text-red-400 hover:bg-red-900/40 rounded text-[11px] font-bold transition-all"
+                          >
+                            {t.deleteBtn}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 🔥 로비 채팅 위젯 */}
           <div className="w-full max-w-5xl mx-auto relative z-20">
             <div className="w-full">
               <LobbyChatWidget />
             </div>
           </div>
-      {/* 2. 환율 / 나스닥 / S&P 500 위젯 */}
-        <div className="w-full max-w-5xl mx-auto">
-          <ExchangeRateWidget />
-        </div>
+
+          {/* 2. 환율 / 나스닥 / S&P 500 위젯 */}
+          <div className="w-full max-w-5xl mx-auto">
+            <ExchangeRateWidget />
+          </div>
 
           {/* 기능 카드 섹션 */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
               <RiChat3Line className="text-4xl text-cyan-400" />
-              <h3 className="mt-4 text-xl font-bold">실시간 암호화 채팅</h3>
+              <h3 className="mt-4 text-xl font-bold">{t.featureChatTitle}</h3>
               <p className="mt-2 text-sm text-gray-400">
-                AES-256으로 메시지를 암호화합니다. 비밀번호를 입력한 사람만 해당 채팅을 볼 수 있어요.
+                {t.featureChatDesc}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
               <RiFileList3Line className="text-4xl text-violet-400" />
-              <h3 className="mt-4 text-xl font-bold">자유로운 게시판</h3>
+              <h3 className="mt-4 text-xl font-bold">{t.featureBoardTitle}</h3>
               <p className="mt-2 text-sm text-gray-400">
-                프로젝트 모집, 정보 공유, 일상 대화까지. 클랜원들과 다양한 주제로 소통하세요.
+                {t.featureBoardDesc}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
               <RiGroupLine className="text-4xl text-pink-400" />
-              <h3 className="mt-4 text-xl font-bold">클랜원 네트워크</h3>
+              <h3 className="mt-4 text-xl font-bold">{t.featureNetworkTitle}</h3>
               <p className="mt-2 text-sm text-gray-400">
-                현재 활동 중인 수많은 클랜원들. 함께 성장할 최고의 동료들을 만나보세요.
+                {t.featureNetworkDesc}
               </p>
             </div>
           </div>
@@ -211,16 +586,16 @@ export default function Home() {
           {/* 최근 활동 미리보기 */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">📢 최근 게시글</h2>
+              <h2 className="text-2xl font-bold">{t.recentPostsTitle}</h2>
               <Link href={user ? "/board" : "/login"} className="text-sm text-cyan-400 hover:underline">
-                더 보기 →
+                {t.recentPostsMore}
               </Link>
             </div>
             <div className="divide-y divide-white/10 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
               {isLoading ? (
-                <div className="p-8 text-center text-gray-500">통신망 스캔 중...</div>
+                <div className="p-8 text-center text-gray-500">{t.recentPostsLoading}</div>
               ) : recentPosts.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">아직 등록된 게시글이 없습니다.</div>
+                <div className="p-8 text-center text-gray-500">{t.recentPostsEmpty}</div>
               ) : (
                 recentPosts.map((post) => (
                   <Link 
@@ -230,7 +605,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-medium">{post.title}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 font-mono mt-0.5">
                         {post.author_name} · {timeAgo(post.created_at)}
                       </p>
                     </div>
@@ -244,17 +619,16 @@ export default function Home() {
           {/* 보안 강조 */}
           <div className="flex flex-col items-center rounded-3xl border border-violet-400/30 bg-violet-900/20 p-8 text-center shadow-[0_0_40px_rgba(139,92,246,0.1)]">
             <RiFlashlightLine className="text-5xl text-violet-300 mb-4" />
-            <h3 className="text-2xl font-bold mb-2">보안을 최우선으로</h3>
-            <p className="max-w-xl text-violet-200/90 mb-6">
-              모든 채팅은 암호화되어 저장되며, 24시간 후 자동 삭제되어 익명성이 완벽하게 보장됩니다.
+            <h3 className="text-2xl font-bold mb-2">{t.securityTitle}</h3>
+            <p className="max-w-xl text-violet-200/90 mb-6 text-sm md:text-base">
+              {t.securityDesc}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <span className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-cyan-300 border border-cyan-500/30">AES-256</span>
               <span className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-cyan-300 border border-cyan-500/30">End-to-End Encryption</span>
-              <span className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-cyan-300 border border-cyan-500/30">자동 삭제 (24h)</span>
+              <span className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-cyan-300 border border-cyan-500/30">{lang === 'ko' ? '자동 삭제 (24h)' : 'Auto Delete (24h)'}</span>
             </div>
           </div>
-
 
           {/* 설립자 정보 */}
           <div className="text-center text-sm text-gray-500 pb-10">
@@ -283,24 +657,28 @@ export default function Home() {
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="relative max-w-2xl w-full bg-gradient-to-b from-gray-900 to-black border border-gray-700 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
               <button onClick={closeModal} className="absolute right-4 top-4 z-10 p-1 rounded-full hover:bg-white/10 text-gray-400 hover:text-white"><RiCloseLine className="text-2xl" /></button>
               <div className="overflow-y-auto p-6 md:p-8">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-6">✨ CSE4Seoul 주요 기능</h2>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent mb-6">
+                  {t.modalTitle}
+                </h2>
                 <div className="space-y-6">
                   <div className="border-l-4 border-cyan-500 pl-4">
-                    <h3 className="text-xl font-semibold flex items-center gap-2"><RiChat3Line className="text-cyan-400" /> 암호화 채팅</h3>
+                    <h3 className="text-xl font-semibold flex items-center gap-2"><RiChat3Line className="text-cyan-400" /> {t.modalChatTitle}</h3>
                     <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                      <li>• <strong>AES-256 암호화</strong>로 모든 메시지를 보호합니다.</li>
-                      <li>• <strong>24시간 후 자동 삭제</strong>되어 보안성을 높입니다.</li>
+                      <li>• <strong>AES-256 암호화</strong>로 {t.modalChatBullet1}</li>
+                      <li>• <strong>24시간 후 자동 삭제</strong>되어 {t.modalChatBullet2}</li>
                     </ul>
                   </div>
                   <div className="border-l-4 border-green-500 pl-4">
-                    <h3 className="text-xl font-semibold flex items-center gap-2"><RiChat3Line className="text-green-400" /> 익명 로비 채팅</h3>
+                    <h3 className="text-xl font-semibold flex items-center gap-2"><RiChat3Line className="text-green-400" /> {t.modalLobbyTitle}</h3>
                     <ul className="mt-2 space-y-2 text-gray-300 text-sm">
-                      <li>• 로그인 없이 참여 가능한 <strong>공개 채팅 공간</strong>입니다.</li>
+                      <li>• {t.modalLobbyBullet1}</li>
                     </ul>
                   </div>
                 </div>
                 <div className="mt-8 flex justify-end">
-                  <button onClick={closeModal} className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl text-white">닫기</button>
+                  <button onClick={closeModal} className="px-6 py-2 bg-gradient-to-r from-gray-700 to-gray-800 rounded-xl text-white">
+                    {t.modalCloseBtn}
+                  </button>
                 </div>
               </div>
             </motion.div>

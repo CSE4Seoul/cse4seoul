@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Fingerprint, ShieldCheck, ArrowLeft, GraduationCap, Briefcase, Gamepad2, Mail, ChevronDown } from 'lucide-react';
+import { updateProfile } from './actions';
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -70,38 +71,24 @@ export default function ProfileSetupPage() {
 
     setIsUpdating(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('보안 인가가 필요합니다.');
+      // 보안 서버 액션을 호출하여 프로필 수정 수행
+      const result = await updateProfile({
+        full_name: formData.full_name,
+        university: formData.university,
+        clash_royale_tag: formData.clash_royale_tag,
+        role: currentUserRole === 'admin' ? formData.role : undefined
+      });
 
-      // 업데이트할 데이터 구성
-      const updateData: any = {
-        id: user.id,
-        email: user.email,
-        full_name: formData.full_name.trim(),
-        university: formData.university.trim(),
-        clash_royale_tag: formData.clash_royale_tag.trim(),
-        updated_at: new Date().toISOString(),
-      };
-
-      // 관리자만 role 업데이트 가능
-      if (currentUserRole === 'admin') {
-        updateData.role = formData.role.trim();
-      } else {
-        // 일반 사용자는 role 변경 불가 → 기존 role 유지
-        // 이미 currentUserRole에 저장되어 있으므로, DB에서 가져온 값을 그대로 사용
-        // 만약 현재 formData.role이 바뀌었더라도 무시됨
+      if (!result.success) {
+        throw new Error(result.error);
       }
-
-      const { error } = await supabase.from('profiles').upsert(updateData);
-
-      if (error) throw error;
 
       alert('신원 정보가 성공적으로 갱신되었습니다! 🎯');
       router.push('/dashboard');
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error('프로필 등록 실패:', error);
-      alert('데이터 동기화 중 오류가 발생했습니다.');
+      alert(error.message || '데이터 동기화 중 오류가 발생했습니다.');
     } finally {
       setIsUpdating(false);
     }
