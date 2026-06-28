@@ -9,6 +9,7 @@ import WatchlistSection from '@/components/WatchlistSection';
 import ValueScoreWidget from '@/components/ValueScoreWidget';
 import TechnicalAnalysisWidget from '@/components/TechnicalAnalysisWidget';
 import ChangelogWidget from '@/components/ChangelogWidget';
+import DeleteAccountWidget from '@/components/DeleteAccountWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -349,6 +350,9 @@ export default async function DashboardPage() {
 
         {/* 시스템 체인지로그 위젯 */}
         <ChangelogWidget />
+
+        {/* 회원 탈퇴 및 계정 영구 파기 */}
+        <DeleteAccountWidget />
 
         {/* 하단 로그아웃 */}
         <form action="/auth/signout" method="post" className="mt-12 flex justify-center">

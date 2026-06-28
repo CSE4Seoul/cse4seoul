@@ -17,6 +17,8 @@ import {
 import LobbyChatWidget from '@/components/LobbyChatWidget';
 import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 import QAWidget from '@/components/QAWidget';
+import ChangelogWidget from '@/components/ChangelogWidget';
+import NoticeModal from '@/components/NoticeModal';
 
 // DB에서 가져올 게시글 타입 정의
 interface Post {
@@ -702,108 +704,18 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* 📢 공지사항 팝업 모달 (컴포넌트 분리 및 보완) */}
+      <NoticeModal
+        notices={notices}
+        lang={lang}
+        isAdmin={profile?.role === 'admin'}
+        onDeleteNotice={handleDeleteNotice}
+      />
 
-      {/* 4. 공지사항 팝업 모달 (페이지 로드시 팝업) */}
-      {/* 4. 공지사항 팝업 모달 (페이지 로드시 팝업) */}
-<AnimatePresence mode="wait">
-  {isNoticeModalOpen && notices.length > 0 && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 30, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.9, y: 30, opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-        className="relative max-w-lg w-full bg-gradient-to-br from-[#1a1410] via-[#0f0c0a] to-black rounded-3xl p-[2px] shadow-2xl shadow-amber-500/10"
-      >
-        {/* 내부 카드 (실제 컨텐츠) */}
-        <div className="relative rounded-3xl bg-gradient-to-b from-[#1f1a16] to-black p-6 md:p-8 flex flex-col gap-5 overflow-hidden">
-          
-          {/* 상단 장식 라이트 (데코레이션) */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-[2px] bg-gradient-to-r from-transparent via-amber-400/80 to-transparent" />
-          
-          {/* 상단 타이틀 영역 */}
-          <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-xl border border-amber-500/20 shadow-lg shadow-amber-500/5">
-                {notices[0].is_pinned ? '📌' : '📢'}
-              </div>
-              <div>
-                <h2 className="text-xl font-bold leading-tight tracking-tight">
-                  <span className="bg-gradient-to-r from-amber-200 via-amber-400 to-orange-400 bg-clip-text text-transparent">
-                    {notices[0].is_pinned
-                      ? lang === 'ko' ? '중요 공지사항' : 'Important Notice'
-                      : lang === 'ko' ? '새로운 알림' : 'New Notice'}
-                  </span>
-                </h2>
-                <p className="text-[11px] text-amber-500/60 font-medium tracking-wider">
-                  {new Date(notices[0].created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setIsNoticeModalOpen(false)}
-              className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-all duration-200 hover:scale-110"
-            >
-              <RiCloseLine className="text-2xl" />
-            </button>
-          </div>
-
-          {/* 본문 */}
-          <div className="py-1 relative">
-            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-500/50 to-transparent rounded-full" />
-            <p className="pl-4 text-[15px] text-gray-200 leading-relaxed font-light tracking-wide whitespace-pre-wrap">
-              {notices[0].content}
-            </p>
-            {!notices[0].is_pinned && (
-              <div className="mt-4 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 backdrop-blur-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  {getNoticeExpiryLabel(notices[0].expires_at)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* 하단 액션 영역 */}
-          <div className="flex items-center justify-between mt-2 pt-4 border-t border-white/5">
-            <span className="text-[10px] text-gray-500 font-medium tracking-wider">
-              {lang === 'ko' ? '⏳ 페이지 진입 시 노출' : '⏳ Appears on access'}
-            </span>
-            <div className="flex items-center gap-2">
-              {profile?.role === 'admin' && (
-                <button
-                  onClick={() => {
-                    handleDeleteNotice(notices[0].id);
-                    setIsNoticeModalOpen(false);
-                  }}
-                  className="group px-3.5 py-2 rounded-xl bg-red-950/30 border border-red-900/30 text-red-400 hover:bg-red-900/40 hover:border-red-700/50 text-xs font-semibold transition-all duration-200 flex items-center gap-1.5"
-                >
-                  <span className="group-hover:scale-110 transition-transform">🗑️</span>
-                  {t.deleteBtn}
-                </button>
-              )}
-              <button
-                onClick={() => setIsNoticeModalOpen(false)}
-                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl text-black font-bold text-xs shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] tracking-wide"
-              >
-                {t.modalCloseBtn}
-              </button>
-            </div>
-          </div>
-
-          {/* 하단 글로우 장식 */}
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+      {/* 📋 시스템 체인지로그 */}
+      <div className="max-w-6xl mx-auto px-6 pb-20 relative z-10">
+        <ChangelogWidget />
+      </div>
     </main>
   );
 }

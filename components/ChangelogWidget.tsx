@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GitCommit, Terminal, Calendar, Code, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface ChangelogEntry {
   version: string;
@@ -145,7 +146,13 @@ CREATE INDEX messages_expires_at_idx ON messages(expires_at);`
   };
 
   return (
-    <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl mt-8">
+    <motion.div
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={0.1}
+      whileDrag={{ scale: 1.01, zIndex: 50 }}
+      className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl mt-8 touch-none select-none"
+    >
       {/* 위젯 헤더 */}
       <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-950/20">
         <h3 className="text-gray-400 text-sm font-bold tracking-wider flex items-center gap-2">
@@ -246,6 +253,6 @@ CREATE INDEX messages_expires_at_idx ON messages(expires_at);`
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }
