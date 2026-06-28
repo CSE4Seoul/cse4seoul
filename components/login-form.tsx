@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FcGoogle } from "react-icons/fc";
+import { RiKakaoTalkFill } from "react-icons/ri";
 
 export function LoginForm({
   className,
@@ -43,6 +45,25 @@ export function LoginForm({
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: "google" | "kakao") => {
+    const supabase = createClient();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/protected`,
+        },
+      });
+      if (error) throw error;
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "An error occurred");
       setIsLoading(false);
     }
   };
@@ -92,6 +113,34 @@ export function LoginForm({
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Logging in..." : "Login"}
               </Button>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-gray-200"></div>
+                <span className="flex-shrink mx-4 text-gray-400 text-xs uppercase">Or continue with</span>
+                <div className="flex-grow border-t border-gray-200"></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={() => handleSocialLogin("google")}
+                  disabled={isLoading}
+                >
+                  <FcGoogle className="h-5 w-5" />
+                  Google
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full flex items-center justify-center gap-2 bg-[#FEE500] text-[#191919] hover:bg-[#FEE500]/90 border-none"
+                  onClick={() => handleSocialLogin("kakao")}
+                  disabled={isLoading}
+                >
+                  <RiKakaoTalkFill className="h-5 w-5 fill-[#191919]" />
+                  Kakao
+                </Button>
+              </div>
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{" "}

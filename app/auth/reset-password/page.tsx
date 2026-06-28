@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function ResetPasswordPage() {
@@ -13,9 +13,26 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isKakao, setIsKakao] = useState(false);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email?.endsWith('@cse4seoul.kakao')) {
+        setIsKakao(true);
+        setError('소셜 연동 계정(카카오)은 비밀번호를 설정/변경할 수 없습니다.');
+      }
+    };
+    checkUser();
+  }, [supabase]);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isKakao) {
+      setError('소셜 연동 계정(카카오)은 비밀번호를 설정/변경할 수 없습니다.');
+      return;
+    }
     
     // 1. 비밀번호 확인 교차 검증
     if (password !== confirmPassword) {
@@ -84,10 +101,10 @@ export default function ResetPasswordPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isKakao}
             className={`w-full py-3.5 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
-              loading 
-                ? 'bg-gray-800 text-gray-400 cursor-not-allowed' 
+              loading || isKakao
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
                 : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-emerald-900/50'
             }`}
           >

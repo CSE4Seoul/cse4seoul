@@ -8,6 +8,7 @@ import LobbyChatWidget from '@/components/LobbyChatWidget';
 import WatchlistSection from '@/components/WatchlistSection';
 import ValueScoreWidget from '@/components/ValueScoreWidget';
 import TechnicalAnalysisWidget from '@/components/TechnicalAnalysisWidget';
+import ChangelogWidget from '@/components/ChangelogWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -345,6 +346,9 @@ export default async function DashboardPage() {
             <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors">View All Agents →</button>
           </div>
         </div>
+
+        {/* 시스템 체인지로그 위젯 */}
+        <ChangelogWidget />
 
         {/* 하단 로그아웃 */}
         <form action="/auth/signout" method="post" className="mt-12 flex justify-center">

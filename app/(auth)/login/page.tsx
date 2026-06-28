@@ -41,6 +41,27 @@ export default function LoginPage() {
   }
 };
 
+  const handleSocialLogin = async (provider: 'google' | 'kakao') => {
+    setLoading(true);
+    setError(null);
+    if (!isAgreed) {
+      setError(lang === 'ko' ? '개인정보 수집 및 이용에 동의해 주세요.' : 'Please agree to the collection and use of personal information.');
+      setLoading(false);
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard&consent=true`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     setLoading(true);
     setError(null);
@@ -87,6 +108,14 @@ export default function LoginPage() {
     setError(null);
     setResetMessage(null);
     
+    if (resetEmail.endsWith('@cse4seoul.kakao')) {
+      setError(lang === 'ko' 
+        ? '소셜 연동 계정(카카오)은 비밀번호를 설정/변경할 수 없습니다.' 
+        : 'Socially linked accounts (Kakao) cannot set/change passwords.');
+      setLoading(false);
+      return;
+    }
+    
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       // 🚨 이 부분을 톨게이트를 거치도록 수정하세요!
       redirectTo: `${location.origin}/auth/callback?next=/auth/reset-password`,
@@ -95,7 +124,9 @@ export default function LoginPage() {
     if (error) {
       setError(error.message);
     } else {
-      setResetMessage('비밀번호 재설정 링크가 이메일로 전송되었습니다. 확인해주세요.');
+      setResetMessage(lang === 'ko' 
+        ? '비밀번호 재설정 링크가 이메일로 전송되었습니다. 확인해주세요.' 
+        : 'A password reset link has been sent to your email. Please check it.');
       setShowResetForm(false); // Optionally hide form after success
     }
     setLoading(false);
@@ -158,6 +189,57 @@ export default function LoginPage() {
             >
               {t('createNewIdentity')}
             </button>
+
+            {/* 소셜 로그인 구분선 */}
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-gray-800"></div>
+              <span className="flex-shrink mx-4 text-gray-500 text-xs uppercase">
+                {lang === 'ko' ? '또는' : 'Or'}
+              </span>
+              <div className="flex-grow border-t border-gray-800"></div>
+            </div>
+
+            {/* 소셜 로그인 버튼들 */}
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('google')}
+                disabled={loading}
+                className="w-full py-2.5 bg-white hover:bg-gray-100 text-black font-semibold rounded-lg transition-all flex items-center justify-center gap-2 border border-gray-200"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.927h6.6c-.29 1.5-.14 3.01-1.02 4.02l3.117 2.42c1.813-1.68 2.857-4.16 2.857-7.027z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.12-2.42c-.87.59-1.98.94-3.13.94-2.41 0-4.45-1.63-5.18-3.81l-3.23 2.51C4.8 21.84 8.16 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M6.82 15.8c-.19-.58-.3-1.2-.3-1.8s.11-1.22.3-1.8l-3.23-2.51C2.33 11.23 1.95 12.61 1.95 14s.38 2.77 1.05 4.31l3.82-2.51z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.43-3.43C17.96 1.19 15.24 0 12 0 8.16 0 4.8 2.16 3.01 5.37l3.81 2.96c.73-2.18 2.77-3.58 5.18-3.58z"
+                  />
+                </svg>
+                Google
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSocialLogin('kakao')}
+                disabled={loading}
+                className="w-full py-2.5 bg-[#FEE500] hover:bg-[#FEE500]/90 text-[#191919] font-semibold rounded-lg transition-all flex items-center justify-center gap-2 border-none"
+              >
+                <svg className="w-5 h-5 fill-[#191919]" viewBox="0 0 24 24">
+                  <path d="M12 3c-4.97 0-9 3.185-9 7.11 0 2.507 1.656 4.707 4.156 5.862l-1.056 3.864c-.08.293.088.585.377.65.088.02.176.02.256-.008l4.545-2.996C11.517 17.65 11.758 17.67 12 17.67c4.97 0 9-3.185 9-7.11C21 6.185 17.03 3 12 3z" />
+                </svg>
+                Kakao
+              </button>
+            </div>
+
             <div className="flex items-center gap-2 mt-2">
               <input
                 id="consent-login"

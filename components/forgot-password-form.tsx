@@ -26,6 +26,10 @@ export function ForgotPasswordForm({
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (email.endsWith('@cse4seoul.kakao')) {
+      setError("Socially linked accounts (Kakao) cannot set/change passwords.");
+      return;
+    }
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -90,7 +94,7 @@ export function ForgotPasswordForm({
               <div className="mt-4 text-center text-sm">
                 Already have an account?{" "}
                 <Link
-                  href="/auth/login"
+                  href="/login"
                   className="underline underline-offset-4"
                 >
                   Login

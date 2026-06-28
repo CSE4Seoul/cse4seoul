@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function UpdatePasswordForm({
   className,
@@ -22,10 +22,27 @@ export function UpdatePasswordForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isKakao, setIsKakao] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email?.endsWith('@cse4seoul.kakao')) {
+        setIsKakao(true);
+        setError("Socially linked accounts (Kakao) cannot set/change passwords.");
+      }
+    };
+    checkUser();
+  }, []);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isKakao) {
+      setError("Socially linked accounts (Kakao) cannot set/change passwords.");
+      return;
+    }
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -66,7 +83,7 @@ export function UpdatePasswordForm({
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || isKakao}>
                 {isLoading ? "Saving..." : "Save new password"}
               </Button>
             </div>
