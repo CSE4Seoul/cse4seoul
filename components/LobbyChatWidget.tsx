@@ -1695,7 +1695,7 @@ export default function LobbyChatWidget() {
   };
 
   return (
-    <div className="bg-gray-900/40 backdrop-blur-sm border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+    <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.08] rounded-3xl overflow-hidden shadow-2xl hover:border-cyan-500/20 transition-all duration-500">
       <MouseBubble />
       <audio 
         ref={bgmRef} 
@@ -1704,7 +1704,7 @@ export default function LobbyChatWidget() {
       />
       {showRecruitmentPopup && gameState.status === 'WAITING' && <RecruitmentPopup />}
       
-      <div className="p-4 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2">
+      <div className="p-4 border-b border-white/[0.08] flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <RiChat3Line className="text-cyan-400 text-xl" />
           <h3 className="text-gray-400 text-sm font-bold tracking-wider">로비 채팅</h3>
@@ -1829,7 +1829,7 @@ export default function LobbyChatWidget() {
       {/* ── 게임 HUD (채팅창과 입력창 사이) ── */}
       {gameState.status !== 'IDLE' && <GameHUD />}
 
-      <form onSubmit={sendMessage} className="border-t border-white/10 p-4 bg-black/30">
+      <form onSubmit={sendMessage} className="border-t border-white/[0.08] p-4 bg-black/20">
         <div className="flex gap-2 items-end relative">
           {showEmoticonPicker && (
             <EmoticonPicker

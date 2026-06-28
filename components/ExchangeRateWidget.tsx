@@ -65,7 +65,7 @@ interface AnalysisResult {
   risks: string[];
 }
 
-export default function ExchangeRateWidget() {
+export default function ExchangeRateWidget({ lang = 'ko' }: { lang?: 'ko' | 'en' }) {
   const [marketType, setMarketType] = useState<MarketType>('KOSPI');
   const [data, setData] = useState<DataPoint[]>([]);
   const [currentValue, setCurrentValue] = useState<number | null>(null);
@@ -551,21 +551,25 @@ export default function ExchangeRateWidget() {
 
   if (!isAuthChecking && !user) {
     return (
-      <div className="group relative rounded-3xl border border-white/10 bg-gray-900/40 p-12 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col items-center justify-center text-center gap-6">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
+      <div className="group relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-12 backdrop-blur-xl hover:border-cyan-500/20 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col items-center justify-center text-center gap-6">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/[0.08] flex items-center justify-center mb-2">
           <RiLock2Line className="text-3xl text-gray-500" />
         </div>
         <div className="flex flex-col gap-2">
-          <h3 className="text-xl font-bold text-white">로그인 후 이용 가능합니다</h3>
+          <h3 className="text-xl font-bold text-white">
+            {lang === 'ko' ? '로그인 후 이용 가능합니다' : 'Please log in to continue'}
+          </h3>
           <p className="text-sm text-gray-400 max-w-xs">
-            실시간 시세 및 AI 분석 기능을 이용하시려면 로그인이 필요합니다.
+            {lang === 'ko' 
+              ? '실시간 시세 및 AI 분석 기능을 이용하시려면 로그인이 필요합니다.' 
+              : 'Login is required to use real-time market rates and AI analysis features.'}
           </p>
         </div>
         <Link
           href="/login"
-          className="px-8 py-3 rounded-xl bg-cyan-600 text-white text-sm font-bold hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-500/20"
+          className="px-8 py-3 rounded-full bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-500 transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/35 hover:scale-[1.02]"
         >
-          로그인하러 가기
+          {lang === 'ko' ? '로그인하러 가기' : 'Go to Login'}
         </Link>
       </div>
     );
@@ -574,7 +578,7 @@ export default function ExchangeRateWidget() {
   const interpretation = getMarketInterpretation();
 
   return (
-    <div className="group relative rounded-3xl border border-white/10 bg-gray-900/40 p-6 backdrop-blur-xl hover:border-cyan-500/30 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col gap-6">
+    <div className="group relative rounded-3xl border border-white/[0.08] bg-white/[0.02] p-6 backdrop-blur-xl hover:border-cyan-500/20 transition-all duration-500 shadow-2xl overflow-hidden flex flex-col gap-6">
       {/* Interpretation Section */}
       {interpretation && (
         <div className="relative z-10 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
