@@ -6,7 +6,7 @@ import {
   RiChat3Line, RiSendPlaneLine, RiAlertLine, RiUserLine, RiEyeOffLine,
   RiGamepadLine, RiCloseLine, RiUserAddLine, RiLogoutCircleLine, RiRefreshLine,
   RiEmotionLine, RiImageLine, RiArrowDownSLine, RiArrowUpSLine,
-  RiPercentLine,
+  RiPercentLine, RiTerminalBoxLine,
 } from 'react-icons/ri';
 import { wasmService } from '@/lib/wasm-service';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -191,6 +191,30 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
 
 function MessageBubble({ msg }: { msg: LobbyMessage }) {
   const emoticonSrcVal = parseEmoticonToken(msg.content);
+
+  if (msg.author_name === 'console') {
+    return (
+      <div className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
+        <div className="flex-shrink-0 mt-1">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500/30 to-emerald-600/30 border border-green-500/50 flex items-center justify-center">
+            <RiTerminalBoxLine className="w-4 h-4 text-green-400" />
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-green-400">Console Engine</span>
+            <span className="text-[10px] text-gray-500">
+              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          <div className="mt-1.5 p-3 rounded-lg bg-black border border-green-950 text-green-400 font-mono text-xs whitespace-pre-wrap break-all shadow-inner">
+            {msg.content}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
@@ -435,6 +459,15 @@ export default function LobbyChatWidget() {
   const handleCalculate = async () => {
     const result = await wasmService.calculateRequiredWins(calcWins, calcLosses, calcTarget);
     setCalcResult(result);
+  };
+
+  // Wasm Launcher States
+  const [showWasmLauncher, setShowWasmLauncher] = useState(false);
+  const executedCommands = useRef<Set<string>>(new Set());
+
+  const handleProgramClick = (name: string) => {
+    setNewMessage(`./${name}`);
+    textareaRef.current?.focus();
   };
 
   useEffect(() => {
@@ -1369,6 +1402,38 @@ export default function LobbyChatWidget() {
     }
   }, [filterWarning]);
 
+  // Wasm 가상 프로그램 실행 감지 및 local response 추가
+  useEffect(() => {
+    messages.forEach(async (msg) => {
+      if (msg.content && msg.content.startsWith('./') && !executedCommands.current.has(msg.id)) {
+        executedCommands.current.add(msg.id);
+        
+        const cmdText = msg.content;
+        const parts = cmdText.slice(2).trim().split(/\s+/);
+        const progName = parts[0];
+        const args = parts.slice(1);
+
+        if (!progName) return;
+
+        const output = await wasmService.runWasmExecutable(progName, args);
+
+        const botMsg: LobbyMessage = {
+          id: `bot-${msg.id}`,
+          content: output,
+          author_name: 'console',
+          created_at: new Date(new Date(msg.created_at).getTime() + 100).toISOString(),
+          expires_at: msg.expires_at,
+          message_type: 'text'
+        };
+
+        setMessages(prev => {
+          if (prev.some(m => m.id === botMsg.id)) return prev;
+          return [...prev, botMsg].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        });
+      }
+    });
+  }, [messages]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -1751,6 +1816,17 @@ export default function LobbyChatWidget() {
 
           <button
             type="button"
+            onClick={() => setShowWasmLauncher(prev => !prev)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
+              showWasmLauncher ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
+                             : 'bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <RiTerminalBoxLine className="w-3 h-3" /> Wasm 프로그램
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAutoScrollEnabled(prev => !prev)}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors ${
               autoScrollEnabled ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30'
@@ -1805,6 +1881,49 @@ export default function LobbyChatWidget() {
           onCalculate={handleCalculate}
           onClose={() => setShowCalculator(false)}
         />
+      )}
+
+      {/* ── Wasm 가상 프로그램 런처 패널 ── */}
+      {showWasmLauncher && (
+        <div className="bg-gray-800/80 border-b border-gray-700 p-4 animate-in slide-in-from-top duration-200">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-sm font-bold text-cyan-400 flex items-center gap-2">
+              <RiTerminalBoxLine /> Wasm 가상 프로그램 런처
+            </h4>
+            <button onClick={() => setShowWasmLauncher(false)} className="text-gray-500 hover:text-gray-300">
+              <RiCloseLine className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 mb-3 leading-relaxed">
+            C/C++ 소스코드로 컴파일되어 브라우저에서 실행 가능한 바이너리 목록입니다. 클릭 시 입력창에 명령어가 자동 구성됩니다.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div 
+              onClick={() => handleProgramClick('hello')}
+              className="p-2.5 rounded-lg bg-gray-950/60 border border-gray-800 hover:border-cyan-500/50 hover:bg-cyan-950/10 cursor-pointer transition-all group"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-mono font-bold text-cyan-400 group-hover:text-cyan-300">./hello</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-900/30 border border-cyan-800/30 text-cyan-300">C++ Executable</span>
+              </div>
+              <p className="text-[10px] text-gray-400">콘솔에 "hello"를 출력하는 Wasm 테스트 프로그램 (components/hello.cpp)</p>
+            </div>
+
+            <div 
+              onClick={() => handleProgramClick('winpercent')}
+              className="p-2.5 rounded-lg bg-gray-950/60 border border-gray-800 hover:border-cyan-500/50 hover:bg-cyan-950/10 cursor-pointer transition-all group"
+            >
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-mono font-bold text-cyan-400 group-hover:text-cyan-300">./winpercent</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-900/30 border border-cyan-800/30 text-cyan-300">C++ Executable</span>
+              </div>
+              <p className="text-[10px] text-gray-400">목표 승률 도달을 위한 연승 수를 계산하는 프로그램 (인자: 승 패 목표승률)</p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-800/50 text-[10px] text-gray-500 leading-normal">
+            ℹ️ 새로운 C/C++ 소스 수정 후 <code className="px-1 py-0.5 bg-gray-900 border border-gray-850 rounded font-mono text-[9px] text-gray-400">./scripts/compile-wasm.sh</code>로 컴파일하여 등록할 수 있습니다.
+          </div>
+        </div>
       )}
 
       {/* ── 메시지 목록 ── */}

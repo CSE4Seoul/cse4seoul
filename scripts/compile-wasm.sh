@@ -29,6 +29,7 @@ compile_wasm() {
         -s EXPORTED_FUNCTIONS='["_malloc", "_free"]' \
         -s ALLOW_MEMORY_GROWTH=1 \
         -s SINGLE_FILE=1 \
+        -s SINGLE_FILE_BINARY_ENCODE=0 \
         -O3
         
     if [ $? -eq 0 ]; then

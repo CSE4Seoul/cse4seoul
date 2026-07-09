@@ -183,6 +183,53 @@ class WasmService {
       return null;
     }
   }
+
+  /**
+   * Runs an arbitrary C/C++ compiled Wasm executable (with main function)
+   * and returns its captured stdout.
+   */
+  async runWasmExecutable(name: string, args: string[] = []): Promise<string> {
+    if (name.toLowerCase() === 'winpercent') {
+      try {
+        const wins = parseInt(args[0]) || 0;
+        const losses = parseInt(args[1]) || 0;
+        const target = parseFloat(args[2]) || 50;
+        const result = await this.calculateRequiredWins(wins, losses, target);
+        return `[🖥️ Wasm Engine - winpercent]\n${wins}승 ${losses}패 상태에서 목표 ${target}% 달성을 위해 필요한 연속 승수: ${result}승`;
+      } catch (e: any) {
+        return `[Err] winpercent 실행 실패: ${e.message}`;
+      }
+    }
+
+    const output: string[] = [];
+    try {
+      const { default: initModule } = await import(`@/lib/wasm/${name.toLowerCase()}.js`);
+      
+      const module = await initModule({
+        print: (text: string) => {
+          output.push(text);
+        },
+        printErr: (text: string) => {
+          output.push(`[Err] ${text}`);
+        },
+        arguments: args,
+        locateFile: (path: string) => `/wasm/${path}`
+      });
+
+      if (module.ready) {
+        await module.ready;
+      }
+
+      if (typeof module.callMain === 'function') {
+        module.callMain(args);
+      }
+
+      return output.join('\n') || '[출력 결과 없음]';
+    } catch (error: any) {
+      console.error(`[WasmService] Error running executable ${name}:`, error);
+      return `[System Error] 프로그램 '${name}' 실행에 실패했습니다: ${error.message}`;
+    }
+  }
 }
 
 export const wasmService = new WasmService();
