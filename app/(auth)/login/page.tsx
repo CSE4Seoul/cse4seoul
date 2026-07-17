@@ -45,15 +45,14 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: 'google' | 'kakao') => {
     setLoading(true);
     setError(null);
-    if (!isAgreed) {
-      setError(lang === 'ko' ? '개인정보 수집 및 이용에 동의해 주세요.' : 'Please agree to the collection and use of personal information.');
-      setLoading(false);
-      return;
-    }
+    
+    // 💡 로그인 시에는 미리 동의하지 않아도 로그인을 허용합니다.
+    // 기존에 동의한 적이 없는 경우, 미들웨어에 의해 동의 페이지(/privacy/consent)로 자동 리다이렉트됩니다.
+    // 따라서 consent=true 파라미터는 제거합니다.
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard&consent=true`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
 
@@ -66,8 +65,12 @@ export default function LoginPage() {
   const handleSignUp = async () => {
     setLoading(true);
     setError(null);
+    
+    // 💡 회원가입 시에는 명시적인 약관 동의를 필수로 요구합니다.
     if (!isAgreed) {
-      setError(lang === 'ko' ? '개인정보 수집 및 이용에 동의해 주세요.' : 'Please agree to the collection and use of personal information.');
+      setError(lang === 'ko' 
+        ? '회원가입을 진행하려면 개인정보 수집 및 이용에 동의해 주세요.' 
+        : 'Please agree to the collection and use of personal information to sign up.');
       setLoading(false);
       return;
     }
@@ -250,7 +253,11 @@ export default function LoginPage() {
                 className="mt-1"
               />
               <label htmlFor="consent-login" className="text-sm text-gray-300">
-                {t('privacyAgree')} (
+                {t('privacyAgree')}{' '}
+                <span className="text-xs text-blue-400 font-bold">
+                  {lang === 'ko' ? '(회원가입 시에만 필수)' : '(Required for Sign Up only)'}
+                </span>{' '}
+                (
                 <button 
                   type="button"
                   onClick={() => setShowPrivacyModal(true)}
