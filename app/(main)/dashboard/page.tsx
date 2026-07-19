@@ -176,7 +176,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* 전술 기록 및 작전 채널 (전체 너비) */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 동물농장 카드 */}
           <Link
             href="/animal-farm"
@@ -212,6 +212,25 @@ export default async function DashboardPage() {
             <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
               <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
               실시간 업데이트
+            </div>
+          </Link>
+
+          {/* 북 트래커 카드 */}
+          <Link
+            href="/book-tracker"
+            className="group flex flex-col p-6 rounded-2xl bg-gradient-to-br from-cyan-900/20 to-teal-900/20 border border-cyan-850 hover:border-cyan-500/60 transition-all hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-3xl group-hover:rotate-12 transition-transform">📖</span>
+              <span className="text-xs text-cyan-400 group-hover:translate-x-1 transition-transform">
+                보안 접속 →
+              </span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-1">북 트래커 & 학습 로그</h3>
+            <p className="text-sm text-gray-400">독서 진도를 기록하고, 핵심 구절과 나의 생각을 보안 공간에 정리하세요.</p>
+            <div className="mt-4 flex items-center gap-2 text-xs text-cyan-500">
+              <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></span>
+              공부용 템플릿 지원
             </div>
           </Link>
 
