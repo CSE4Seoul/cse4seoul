@@ -255,7 +255,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-8">
-          <LobbyChatWidget />
+          <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
         </div>
 
         {/* ETF 실시간 iNAV 추적 위젯 */}

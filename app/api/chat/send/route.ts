@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { headers } from 'next/headers';
+import { GUEST_DAILY_CHAT_LIMIT } from '@/lib/constants';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
       .eq('ip_address', ip)
       .gte('created_at', today.toISOString());
 
-    if (!countError && (count || 0) >= 1) {
+    if (!countError && (count || 0) >= GUEST_DAILY_CHAT_LIMIT) {
       return NextResponse.json({ error: 'GUEST_LIMIT_EXCEEDED' }, { status: 429 });
     }
   }

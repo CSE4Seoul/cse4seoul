@@ -876,7 +876,7 @@ export default function Home() {
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
                 <span>{t.lobbyChatStatus}</span>
               </div>
-              <LobbyChatWidget />
+              <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
             </div>
 
             {/* Q&A & Suggestions 위젯 */}

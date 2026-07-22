@@ -9,11 +9,14 @@ import {
   RiPercentLine, RiTerminalBoxLine,
 } from 'react-icons/ri';
 import { wasmService } from '@/lib/wasm-service';
+import { GUEST_DAILY_CHAT_LIMIT } from '@/lib/constants';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
+
+export type MessageStatus = 'NORMAL' | 'FLAGGED' | 'WARNING' | 'HIDDEN' | 'MUTED';
 
 interface LobbyMessage {
   id: string;
@@ -24,6 +27,7 @@ interface LobbyMessage {
   message_type?: 'text' | 'emoticon' | 'image';
   media_url?: string;
   author_avatar_url?: string;
+  message_status?: MessageStatus;
 }
 
 type GameStartPayload = { starter: string; startWord: string };
@@ -189,8 +193,33 @@ function EmoticonPicker({ onSelect, onClose }: EmoticonPickerProps) {
 // MessageBubble sub-component
 // ─────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: LobbyMessage }) {
+function MessageBubble({
+  msg,
+  isAdmin,
+  onUpdateStatus,
+}: {
+  msg: LobbyMessage;
+  isAdmin?: boolean;
+  onUpdateStatus?: (id: string, status: MessageStatus) => void;
+}) {
   const emoticonSrcVal = parseEmoticonToken(msg.content);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const status = msg.message_status || 'NORMAL';
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowAdminMenu(false);
+      }
+    };
+    if (showAdminMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAdminMenu]);
 
   if (msg.author_name === 'console') {
     return (
@@ -216,8 +245,70 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
     );
   }
 
+  let containerStyle = "group flex items-start gap-3 rounded-xl p-2 transition-all duration-200 relative ";
+  let statusBadge = null;
+  let isBlurred = false;
+
+  switch (status) {
+    case 'FLAGGED':
+      containerStyle += "bg-red-950/20 border border-red-500/40 hover:bg-red-950/30";
+      statusBadge = (
+        <div className="flex items-center gap-1 text-[11px] font-bold text-red-400 bg-red-950/60 px-2 py-0.5 rounded border border-red-500/30 mb-1">
+          <span>🚨</span>
+          <span>운영진이 부적절한 채팅으로 지정했습니다.</span>
+        </div>
+      );
+      isBlurred = !isRevealed;
+      break;
+
+    case 'WARNING':
+      containerStyle += "bg-yellow-950/20 border border-yellow-500/40 hover:bg-yellow-950/30 animate-[shake_0.5s_ease-in-out]";
+      statusBadge = (
+        <div className="flex items-center gap-1 text-[11px] font-bold text-yellow-400 bg-yellow-950/60 px-2 py-0.5 rounded border border-yellow-500/30 mb-1">
+          <span>⚠️</span>
+          <span>운영진 경고: 부적절한 표현 주의</span>
+        </div>
+      );
+      isBlurred = !isRevealed;
+      break;
+
+    case 'HIDDEN':
+      containerStyle += "bg-gray-900/60 border border-gray-700/60 opacity-80";
+      statusBadge = (
+        <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 bg-gray-800/80 px-2 py-0.5 rounded border border-gray-700 mb-1">
+          <span>🙈</span>
+          <span>운영진이 숨김 처리한 메시지입니다.</span>
+        </div>
+      );
+      isBlurred = !isRevealed;
+      break;
+
+    case 'MUTED':
+      containerStyle += "bg-gray-950/40 border border-gray-800/40 opacity-50";
+      statusBadge = (
+        <div className="flex items-center gap-1 text-[10px] text-gray-500 mb-0.5">
+          <span>🔇</span>
+          <span>음소거 처리됨</span>
+        </div>
+      );
+      break;
+
+    case 'NORMAL':
+    default:
+      containerStyle += "hover:bg-white/5";
+      break;
+  }
+
   return (
-    <div className="group flex items-start gap-3 hover:bg-white/5 rounded-xl p-2 transition-all duration-200">
+    <div className={containerStyle}>
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-3px); }
+          40%, 80% { transform: translateX(3px); }
+        }
+      `}</style>
+
       <div className="flex-shrink-0 mt-1">
         {msg.author_avatar_url ? (
           <img 
@@ -235,28 +326,111 @@ function MessageBubble({ msg }: { msg: LobbyMessage }) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-cyan-300">{msg.author_name}</span>
-          <span className="text-[10px] text-gray-500">
-            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-cyan-300">{msg.author_name}</span>
+            <span className="text-[10px] text-gray-500">
+              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          {isAdmin && (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAdminMenu(prev => !prev);
+                }}
+                className="opacity-80 hover:opacity-100 transition-opacity duration-150 px-2 py-0.5 rounded text-[11px] font-mono bg-red-950/80 text-red-300 border border-red-700/50 hover:bg-red-900 flex items-center gap-1 cursor-pointer"
+                title="관리자 조치 메뉴"
+              >
+                <span>🛡️</span>
+                <span>관리자</span>
+              </button>
+
+              {showAdminMenu && (
+                <div className="absolute right-0 top-6 z-50 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-1 text-xs space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2 py-1 text-[10px] text-gray-400 font-bold border-b border-gray-800 mb-1">
+                    관리자 메시지 상태 변경
+                  </div>
+                  {[
+                    { key: 'NORMAL', label: '🟢 정상 표시', desc: '기본 상태로 복원' },
+                    { key: 'FLAGGED', label: '🚨 부적절 플래그', desc: '경고 아이콘 & 블러' },
+                    { key: 'WARNING', label: '⚠️ 경고 표시', desc: '경고 배너 & 흔들림' },
+                    { key: 'HIDDEN', label: '🙈 숨김 처리', desc: '내용 블러 & 숨김' },
+                    { key: 'MUTED', label: '🔇 음소거 처리', desc: '희미하게 표시' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => {
+                        onUpdateStatus?.(msg.id, opt.key as MessageStatus);
+                        setShowAdminMenu(false);
+                      }}
+                      className={`w-full text-left px-2 py-1.5 rounded flex flex-col transition-colors ${
+                        status === opt.key 
+                          ? 'bg-cyan-950 text-cyan-300 font-bold border border-cyan-800' 
+                          : 'hover:bg-gray-800 text-gray-300'
+                      }`}
+                    >
+                      <span className="text-xs">{opt.label}</span>
+                      <span className="text-[9px] text-gray-400">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {emoticonSrcVal ? (
-          <div className="mt-1">
-            <img
-              src={emoticonSrcVal}
-              alt={msg.content}
-              className="w-20 h-20 object-cover rounded-xl border border-gray-700
-                         hover:scale-125 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-900/30
-                         transition-all duration-200 cursor-pointer"
-              title={msg.content.replace(/^\[emoticon:(.+?)\]$/, '/$1')}
-            />
-          </div>
-        ) : (
-          <p className="text-gray-200 text-sm break-words mt-0.5 leading-relaxed">
-            {msg.content}
-          </p>
+        {statusBadge}
+
+        <div 
+          className={`relative transition-all duration-200 ${isBlurred ? 'cursor-pointer select-none' : ''}`}
+          onClick={() => {
+            if (isBlurred) setIsRevealed(true);
+          }}
+        >
+          {emoticonSrcVal ? (
+            <div className={`mt-1 ${isBlurred ? 'filter blur-md opacity-40' : ''}`}>
+              <img
+                src={emoticonSrcVal}
+                alt={msg.content}
+                className="w-20 h-20 object-cover rounded-xl border border-gray-700
+                           hover:scale-125 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-900/30
+                           transition-all duration-200 cursor-pointer"
+                title={msg.content.replace(/^\[emoticon:(.+?)\]$/, '/$1')}
+              />
+            </div>
+          ) : (
+            <p className={`text-sm break-words mt-0.5 leading-relaxed ${
+              status === 'MUTED' ? 'text-gray-500 line-through' : 'text-gray-200'
+            } ${isBlurred ? 'filter blur-sm select-none opacity-50' : ''}`}>
+              {msg.content}
+            </p>
+          )}
+
+          {isBlurred && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded backdrop-blur-[2px] hover:bg-black/10 transition-all">
+              <span className="text-xs text-cyan-300 bg-black/80 px-2 py-1 rounded-md border border-cyan-500/30 shadow-md font-mono flex items-center gap-1">
+                <span>👁️</span> 클릭하여 내용 확인하기
+              </span>
+            </div>
+          )}
+        </div>
+
+        {isRevealed && isBlurred === false && status !== 'NORMAL' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsRevealed(false);
+            }}
+            className="text-[10px] text-gray-500 hover:text-gray-400 mt-1 underline cursor-pointer"
+          >
+            내용 다시 가리기
+          </button>
         )}
       </div>
     </div>
@@ -396,7 +570,11 @@ function CalculatorPanel({
 // Main component
 // ─────────────────────────────────────────────
 
-export default function LobbyChatWidget() {
+interface LobbyChatWidgetProps {
+  isAdminProp?: boolean;
+}
+
+export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = {}) {
   const [supabase] = useState(() => createClient());
   const [messages, setMessages]       = useState<LobbyMessage[]>([]);
   const [newMessage, setNewMessage]   = useState('');
@@ -432,6 +610,7 @@ export default function LobbyChatWidget() {
   const [isAiMode, setIsAiMode] = useState(false); 
   const [canChat, setCanChat] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(!!isAdminProp);
 
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
@@ -498,6 +677,19 @@ export default function LobbyChatWidget() {
   const currentUserIdRef = useRef(currentUserId);
   useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
 
+  const checkRateLimit = useCallback(async () => {
+    try {
+      const response = await fetch('/api/chat/rate-limit');
+      if (response.ok) {
+        const data = await response.json();
+        setCanChat(data.canChat);
+        setIsGuest(data.isGuest);
+      }
+    } catch (e) {
+      console.error('Rate limit check failed', e);
+    }
+  }, []);
+
   useEffect(() => {
     const sets: Record<string, Set<string>> = {};
     for (const char in WORD_MAP) {
@@ -532,23 +724,10 @@ export default function LobbyChatWidget() {
         }
       };
 
-      const checkRateLimit = async () => {
-        try {
-          const response = await fetch('/api/chat/rate-limit');
-          if (response.ok) {
-            const data = await response.json();
-            setCanChat(data.canChat);
-            setIsGuest(data.isGuest);
-          }
-        } catch (e) {
-          console.error('Rate limit check failed', e);
-        }
-      };
-
-      fetchEnglishWords();
-      fetchCseKeywords();
-      checkRateLimit();
-    }, [reconnectTrigger]);
+    fetchEnglishWords();
+    fetchCseKeywords();
+    checkRateLimit();
+  }, [reconnectTrigger, checkRateLimit]);
 
   useEffect(() => {
     localStorage.setItem('lobby_auto_scroll', autoScrollEnabled ? 'true' : 'false');
@@ -590,20 +769,36 @@ export default function LobbyChatWidget() {
   };
 
   useEffect(() => {
+    if (isAdminProp !== undefined) {
+      setIsAdmin(isAdminProp);
+    }
+  }, [isAdminProp]);
+
+  useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setIsLoggedIn(true);
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url, is_admin, role').eq('id', user.id).single();
         if (profile?.full_name) setRealName(profile.full_name);
         if (profile?.avatar_url) setAvatarUrl(profile.avatar_url);
+        if (profile?.is_admin || profile?.role === 'admin') setIsAdmin(true);
       } else {
-        setIsLoggedIn(false); setUserId(null); setRealName(null); setAvatarUrl(null);
+        setIsLoggedIn(false); setUserId(null); setRealName(null); setAvatarUrl(null); 
+        if (isAdminProp === undefined) setIsAdmin(false);
       }
     };
     fetchUser();
-  }, [supabase]);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchUser();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, isAdminProp]);
 
   useEffect(() => {
     if (isLoggedIn && realName) {
@@ -1089,7 +1284,13 @@ export default function LobbyChatWidget() {
         setLastMessageForBubble({ content: newMsg.content, author: newMsg.author_name });
         if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
         bubbleTimerRef.current = setTimeout(() => setLastMessageForBubble(null), 3000);
-      }).subscribe();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobby_messages' }, (payload) => {
+        if (isStale()) return;
+        const updatedMsg = payload.new as LobbyMessage;
+        setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+      })
+      .subscribe();
 
     const gameCh = supabase.channel('game:lobby', {
       config: {
@@ -1172,10 +1373,34 @@ export default function LobbyChatWidget() {
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
+  const handleUpdateMessageStatus = async (messageId: string, status: MessageStatus) => {
+    if (!isAdmin) {
+      alert('관리자만 이 기능을 사용할 수 있습니다.');
+      return;
+    }
+
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, message_status: status } : m));
+
+    try {
+      const res = await fetch('/api/chat/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, status })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || '상태 변경 실패');
+      }
+    } catch (err: any) {
+      console.error('Failed to update message status:', err);
+      alert(`상태 변경에 실패했습니다: ${err.message}`);
+    }
+  };
+
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
     if (isGuest && !canChat) {
-      alert('게스트는 하루에 한 번만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!');
+      alert(`게스트는 하루에 ${GUEST_DAILY_CHAT_LIMIT}회만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!`);
       return;
     }
 
@@ -1223,7 +1448,7 @@ export default function LobbyChatWidget() {
         
         if (data) {
           setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
-          if (isGuest) setCanChat(false); // 전송 성공 후 차단
+          if (isGuest) checkRateLimit();
         }
       } catch (err: any) {
         console.error(`이모티콘 전송 실패:`, err);
@@ -1245,7 +1470,7 @@ export default function LobbyChatWidget() {
     if (!trimmed) return;
 
     if (isGuest && !canChat) {
-      alert('게스트는 하루에 한 번만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!');
+      alert(`게스트는 하루에 ${GUEST_DAILY_CHAT_LIMIT}회만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!`);
       return;
     }
 
@@ -1357,7 +1582,7 @@ export default function LobbyChatWidget() {
           if (data) {
             setMessages(prev => prev.map(m => m.id === tempId ? (data as LobbyMessage) : m));
             success = true;
-            if (isGuest) setCanChat(false);
+            if (isGuest) checkRateLimit();
 
             if (gameState.status !== 'PLAYING') {
               if (trimmed.startsWith('/ai ')) {
@@ -1776,6 +2001,11 @@ export default function LobbyChatWidget() {
           <span className="text-xs bg-cyan-600/30 text-cyan-300 px-2 py-0.5 rounded-full">
             {isAnonymousMode ? '익명 모드' : (isLoggedIn ? '실명 모드' : '게스트')}
           </span>
+          {isAdmin && (
+            <span className="text-xs bg-red-600/30 text-red-300 border border-red-500/40 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-sm">
+              <span>🛡️</span> 관리자 권한
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -1941,7 +2171,14 @@ export default function LobbyChatWidget() {
             <p className="text-sm">첫 메시지를 남겨보세요!</p>
           </div>
         ) : (
-          messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)
+          messages.map(msg => (
+            <MessageBubble
+              key={msg.id}
+              msg={msg}
+              isAdmin={isAdmin}
+              onUpdateStatus={handleUpdateMessageStatus}
+            />
+          ))
         )}
       </div>
 
