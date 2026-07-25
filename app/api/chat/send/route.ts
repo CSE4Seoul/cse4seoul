@@ -27,13 +27,16 @@ export async function POST(req: Request) {
     }
   }
 
+  const defaultExpiresAt = new Date();
+  defaultExpiresAt.setDate(defaultExpiresAt.getDate() + 7);
+
   // 메시지 저장
   const { data, error } = await supabase
     .from('lobby_messages')
     .insert({
       content,
       author_name,
-      expires_at,
+      expires_at: expires_at || defaultExpiresAt.toISOString(),
       ip_address: ip
     })
     .select()

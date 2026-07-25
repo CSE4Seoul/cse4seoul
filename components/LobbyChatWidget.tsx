@@ -11,6 +11,8 @@ import {
 import { wasmService } from '@/lib/wasm-service';
 import { GUEST_DAILY_CHAT_LIMIT } from '@/lib/constants';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import UserProfileModal from '@/components/UserProfileModal';
+import DirectMessageModal from '@/components/DirectMessageModal';
 
 // ─────────────────────────────────────────────
 // Types
@@ -612,6 +614,27 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
   const [isGuest, setIsGuest] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(!!isAdminProp);
 
+  // Profile & DM modal states
+  const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [dmTargetUser, setDmTargetUser] = useState<{ id: string; name: string; avatar_url?: string } | null>(null);
+  const [isDMModalOpen, setIsDMModalOpen] = useState(false);
+
+  const openMyPage = () => {
+    setProfileModalUserId(userId);
+    setIsProfileModalOpen(true);
+  };
+
+  const openUserProfile = (targetId: string) => {
+    setProfileModalUserId(targetId);
+    setIsProfileModalOpen(true);
+  };
+
+  const openDM = (targetUser: { id: string; name: string; avatar_url?: string }) => {
+    setDmTargetUser(targetUser);
+    setIsDMModalOpen(true);
+  };
+
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
   const [wordSets, setWordSets] = useState<Record<string, Set<string>>>({});
   const [englishWordSets, setEnglishWordSets] = useState<Record<string, Set<string>>>({});
@@ -758,8 +781,8 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
   const sendAiMessage = async (content: string) => {
     if (!content) return;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
     try {
       await supabase.from('lobby_messages').insert({ 
         content, author_name: `🤖 AI Assistant (${aiModel})`, 
@@ -919,8 +942,8 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
   const sendSystemMessage = useCallback(async (content: string) => {
     if (gameState.hostId !== currentUserId) return;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 1);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
     try {
       await supabase.from('lobby_messages').insert({ 
         content: `📢 ${content}`, author_name: '시스템', 
@@ -1410,7 +1433,7 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
       const content = `[emoticon:${keyword}]`;
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1);
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
       // 낙관적 업데이트
       const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
@@ -1537,7 +1560,7 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
       }
 
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1);
+      expiresAt.setDate(expiresAt.getDate() + 7);
       
       // 낙관적 업데이트
       const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
@@ -2246,6 +2269,25 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
           </div>
         )}
       </form>
+
+      {/* 👤 MyPage & User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userId={profileModalUserId}
+        currentUserId={userId}
+        onOpenDM={openDM}
+      />
+
+      {/* 🔒 1:1 Direct Message Modal */}
+      {dmTargetUser && userId && (
+        <DirectMessageModal
+          isOpen={isDMModalOpen}
+          onClose={() => setIsDMModalOpen(false)}
+          currentUserId={userId}
+          targetUser={dmTargetUser}
+        />
+      )}
     </div>
   );
 }

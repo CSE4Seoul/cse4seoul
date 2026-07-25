@@ -7,6 +7,8 @@ import { ChevronLeft, Send, User, Shield, Zap, Clock, Bot, Trash2, Activity, Wif
 
 import { encryptMessage, decryptMessage } from '@/utils/encryption';
 import { wasmService } from '@/lib/wasm-service';
+import UserProfileModal from '@/components/UserProfileModal';
+import DirectMessageModal from '@/components/DirectMessageModal';
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -191,6 +193,23 @@ export default function ChatPage() {
 
   // 닉네임 모드 (true: 실제 이름, false: 익명 요원명)
   const [isNicknameMode, setIsNicknameMode] = useState<boolean>(false);
+
+  // 마이페이지 & 1:1 개인 메시지 모달 상태
+  const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [dmTargetUser, setDmTargetUser] = useState<{ id: string; name: string; avatar_url?: string } | null>(null);
+  const [isDMModalOpen, setIsDMModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const openMyPage = () => {
+    setProfileModalUserId(currentUserId);
+    setIsProfileModalOpen(true);
+  };
+
+  const openDM = (targetUser: { id: string; name: string; avatar_url?: string }) => {
+    setDmTargetUser(targetUser);
+    setIsDMModalOpen(true);
+  };
 
   const executedCommands = useRef<Set<string>>(new Set());
 
@@ -551,6 +570,15 @@ export default function ChatPage() {
             </div>
             
             <div className="flex flex-wrap gap-3">
+              {currentUserId && (
+                <button
+                  onClick={openMyPage}
+                  className="px-3.5 py-2 bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-700/50 rounded-xl text-xs text-cyan-300 font-bold transition-all flex items-center gap-1.5 shadow-md"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>마이페이지</span>
+                </button>
+              )}
               <div className="px-4 py-2 bg-gradient-to-r from-blue-900/50 to-cyan-900/50 border border-blue-800/50 rounded-xl backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-yellow-400" />
@@ -760,6 +788,25 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* 👤 MyPage & User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userId={profileModalUserId}
+        currentUserId={currentUserId}
+        onOpenDM={openDM}
+      />
+
+      {/* 🔒 1:1 Direct Message Modal */}
+      {dmTargetUser && currentUserId && (
+        <DirectMessageModal
+          isOpen={isDMModalOpen}
+          onClose={() => setIsDMModalOpen(false)}
+          currentUserId={currentUserId}
+          targetUser={dmTargetUser}
+        />
+      )}
     </div>
   );
 }

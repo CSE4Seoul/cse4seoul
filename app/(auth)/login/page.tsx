@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
 
 export default function LoginPage() {
@@ -141,6 +142,15 @@ export default function LoginPage() {
       {/* 배경 그라데이션 (기존 코드 유지) */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900/50 via-black to-black z-0" />
 
+      {/* 🏠 메인화면으로 돌아가기 버튼 (좌측 상단) */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-gray-800/80 text-gray-300 hover:text-white hover:bg-gray-700 border border-gray-700/50 transition duration-200 text-sm font-medium shadow-md backdrop-blur-sm"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>{t('backToHome')}</span>
+      </Link>
+
       {/* 🌍 언어 변경 토글 버튼 (우측 상단) */}
       <button
         onClick={toggleLanguage}
@@ -268,7 +278,7 @@ export default function LoginPage() {
                 )
               </label>
             </div>
-            <div className="text-center mt-4">
+            <div className="text-center mt-4 flex items-center justify-center gap-3 text-sm">
               <button
                 type="button"
                 onClick={() => {
@@ -276,10 +286,17 @@ export default function LoginPage() {
                   setResetEmail(email); // 로그인 이메일 미리 채우기
                   setError(null);
                 }}
-                className="text-sm text-blue-400 hover:underline focus:outline-none"
+                className="text-blue-400 hover:underline focus:outline-none"
               >
                 {t('forgotPassword')}
               </button>
+              <span className="text-gray-600">|</span>
+              <Link
+                href="/"
+                className="text-gray-400 hover:text-white hover:underline focus:outline-none"
+              >
+                {t('backToHome')}
+              </Link>
             </div>
           </form>
         ) : (

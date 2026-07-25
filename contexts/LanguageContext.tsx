@@ -19,6 +19,7 @@ const dictionaries = {
     backToLogin: 'Back to Login',
     privacyAgree: 'I agree to the collection and use of personal information.',
     privacyPolicy: 'Privacy Policy',
+    backToHome: 'Back to Main',
   },
   ko: {
     systemAccess: '시스템 접근',
@@ -36,6 +37,7 @@ const dictionaries = {
     backToLogin: '로그인으로 돌아가기',
     privacyAgree: '개인정보 수집 · 이용에 동의합니다.',
     privacyPolicy: '개인정보 처리방침',
+    backToHome: '메인화면으로 돌아가기',
   },
 };
 

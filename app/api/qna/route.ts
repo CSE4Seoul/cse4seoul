@@ -74,18 +74,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: newQna, error: dbError } = await supabase
+    const { error: dbError } = await supabase
       .from('qnas')
-      .insert(insertData)
-      .select()
-      .single();
+      .insert(insertData);
 
     if (dbError) {
       console.error('Q&A 저장 실패:', dbError);
       return NextResponse.json({ error: dbError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, qna: newQna }, { status: 201 });
+    return NextResponse.json({ success: true }, { status: 201 });
   } catch (err: any) {
     console.error('Q&A 등록 API 오류:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
