@@ -37,7 +37,6 @@ import {
 import LobbyChatWidget from '@/components/LobbyChatWidget';
 import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 import QAWidget from '@/components/QAWidget';
-import ChangelogWidget from '@/components/ChangelogWidget';
 import NoticeModal from '@/components/NoticeModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -1135,11 +1134,6 @@ export default function Home() {
         isAdmin={profile?.role === 'admin'}
         onDeleteNotice={handleDeleteNotice}
       />
-
-      {/* 📋 시스템 체인지로그 */}
-      <div className="max-w-6xl mx-auto px-6 pb-20 relative z-10 w-full">
-        <ChangelogWidget />
-      </div>
 
       {/* 7. CSS 스타일 시트 주입 (Marquee 및 Scanline 애니메이션) */}
       <style dangerouslySetInnerHTML={{ __html: `
