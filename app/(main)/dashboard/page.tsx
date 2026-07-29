@@ -9,6 +9,7 @@ import ValueScoreWidget from '@/components/ValueScoreWidget';
 import TechnicalAnalysisWidget from '@/components/TechnicalAnalysisWidget';
 import EtfTrackerWidget from '@/components/EtfTrackerWidget';
 import DeleteAccountWidget from '@/components/DeleteAccountWidget';
+import MomentGallery from '@/components/widgets/MomentGallery';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -106,6 +107,11 @@ export default async function DashboardPage() {
             </span>
           </div>
         </header>
+
+        {/* 클랜 영광의 순간 갤러리 위젯 */}
+        <div className="mb-10">
+          <MomentGallery />
+        </div>
 
         {/* 메인 대시보드 그리드 (2열로 축소 조정) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
