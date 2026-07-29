@@ -38,6 +38,7 @@ import LobbyChatWidget from '@/components/LobbyChatWidget';
 import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 import QAWidget from '@/components/QAWidget';
 import NoticeModal from '@/components/NoticeModal';
+import MomentGallery from '@/components/widgets/MomentGallery';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // DB에서 가져올 게시글 타입 정의
@@ -731,6 +732,11 @@ export default function Home() {
               <span>{t.infoBtn.toUpperCase()}</span>
             </button>
           </motion.div>
+        </div>
+
+        {/* 클랜 영광의 순간 갤러리 위젯 */}
+        <div className="w-full">
+          <MomentGallery />
         </div>
 
         {/* 5. Asymmetrical Interactive Bento Grid (3 Features) */}

@@ -108,11 +108,6 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        {/* 클랜 영광의 순간 갤러리 위젯 */}
-        <div className="mb-10">
-          <MomentGallery />
-        </div>
-
         {/* 메인 대시보드 그리드 (2열로 축소 조정) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* 1. 내 프로필 카드 */}
@@ -178,6 +173,11 @@ export default async function DashboardPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* 클랜 영광의 순간 갤러리 위젯 */}
+        <div className="mt-8">
+          <MomentGallery />
         </div>
 
         {/* 전술 기록 및 작전 채널 (전체 너비) */}
