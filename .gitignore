@@ -35,3 +35,7 @@ emsdk/
 .env
 .env*.local
 .env.local
+
+# Windows metadata
+*:Zone.Identifier
+
