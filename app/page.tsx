@@ -39,6 +39,7 @@ import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 import QAWidget from '@/components/QAWidget';
 import NoticeModal from '@/components/NoticeModal';
 import MomentGallery from '@/components/widgets/MomentGallery';
+import ReservationWidget from '@/components/ReservationWidget';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // DB에서 가져올 게시글 타입 정의
@@ -737,6 +738,11 @@ export default function Home() {
         {/* 클랜 영광의 순간 갤러리 위젯 */}
         <div className="w-full">
           <MomentGallery />
+        </div>
+
+        {/* 실시간 타임 스케줄 예약 위젯 (10:00 ~ 19:00 1시간 간격) */}
+        <div className="w-full">
+          <ReservationWidget user={user} profile={profile} lang={lang} />
         </div>
 
         {/* 5. Asymmetrical Interactive Bento Grid (3 Features) */}
