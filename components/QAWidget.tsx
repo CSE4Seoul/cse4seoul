@@ -12,6 +12,7 @@ interface QnaItem {
   author_name: string;
   created_at: string;
   created_by: string | null;
+  is_private?: boolean;
 }
 
 interface QAWidgetProps {
@@ -40,7 +41,9 @@ const widgetI18n = {
     noQuestions: "아직 등록된 질문이 없습니다. 첫 질문을 남겨보세요!",
     loading: "보안 통신망 연결 중...",
     submitSuccess: "질문이 전송되었습니다! 관리자 검토 및 답변 완료 후 게시됩니다.",
-    deleteConfirm: "이 질문을 영구 삭제하시겠습니까?"
+    deleteConfirm: "이 질문을 영구 삭제하시겠습니까?",
+    privateLabel: "🔒 1대1 개인 비밀 문의 (작성자와 관리자만 확인 가능)",
+    privateBadge: "🔒 비밀 문의"
   },
   en: {
     userTitle: "💬 Q&A & Suggestions",
@@ -61,7 +64,9 @@ const widgetI18n = {
     noQuestions: "No questions submitted yet. Be the first to ask!",
     loading: "Establishing secure link...",
     submitSuccess: "Submitted! It will be visible once reviewed and answered by admin.",
-    deleteConfirm: "Are you sure you want to delete this question permanently?"
+    deleteConfirm: "Are you sure you want to delete this question permanently?",
+    privateLabel: "🔒 1:1 Private Inquiry (Visible only to you and admin)",
+    privateBadge: "🔒 Private Inquiry"
   }
 };
 
@@ -70,6 +75,7 @@ export default function QAWidget({ user, profile, lang }: QAWidgetProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [newQuestion, setNewQuestion] = useState('');
   const [authorName, setAuthorName] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [replyInputs, setReplyInputs] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'user' | 'admin'>('user');
@@ -109,6 +115,7 @@ export default function QAWidget({ user, profile, lang }: QAWidgetProps) {
         body: JSON.stringify({
           content: newQuestion,
           author_name: authorName.trim() || undefined,
+          is_private: isPrivate,
         }),
       });
 
@@ -117,6 +124,7 @@ export default function QAWidget({ user, profile, lang }: QAWidgetProps) {
         alert(t.submitSuccess);
         setNewQuestion('');
         setAuthorName('');
+        setIsPrivate(false);
         fetchQnas();
       } else {
         alert(data.error || 'API Error');
@@ -397,7 +405,18 @@ export default function QAWidget({ user, profile, lang }: QAWidgetProps) {
                 className="flex-1 bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500/50 transition-all text-white placeholder-white/30"
               />
             </div>
-            <div className="flex justify-end">
+            
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+              <label className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) => setIsPrivate(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-black/40 text-cyan-500 focus:ring-cyan-500/40"
+                />
+                <span>{t.privateLabel}</span>
+              </label>
+
               <button
                 type="submit"
                 disabled={isSubmitting || !newQuestion.trim()}

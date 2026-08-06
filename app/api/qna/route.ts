@@ -3,10 +3,13 @@ import { createClient } from '@/utils/supabase/server';
 
 // 1. Q&A 조회 API (GET)
 // 관리자는 모든 질문을 보고, 일반 유저는 승인된(POSTED) 질문과 자신이 등록한 질문을 봅니다.
-export async function GET() {
+// my=true 쿼리 파라미터 전달 시 본인이 작성한 질문 목록만 조회합니다.
+export async function GET(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    const { searchParams } = new URL(request.url);
+    const myOnly = searchParams.get('my') === 'true';
 
     let isAdmin = false;
     if (user) {
@@ -20,17 +23,34 @@ export async function GET() {
       }
     }
 
+    // 마이페이지 1대1 문의 전용 조회
+    if (myOnly) {
+      if (!user) {
+        return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+      }
+      const { data: myQnas, error: myError } = await supabase
+        .from('qnas')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (myError) {
+        return NextResponse.json({ error: myError.message }, { status: 500 });
+      }
+      return NextResponse.json({ qnas: myQnas || [] });
+    }
+
     let query = supabase.from('qnas').select('*');
 
     if (isAdmin) {
-      // 최고관리자는 등록순으로 모든 질문을 조회
+      // 최고관리자는 모든 질문을 최신순 조회
       query = query.order('created_at', { ascending: false });
     } else if (user) {
       // 일반 로그인 유저는 게시된(POSTED) 질문 및 본인이 등록한 질문 조회
       query = query.or(`status.eq.POSTED,created_by.eq.${user.id}`).order('created_at', { ascending: false });
     } else {
-      // 비로그인 방문자는 답변 완료된(POSTED) 질문만 조회
-      query = query.eq('status', 'POSTED').order('created_at', { ascending: false });
+      // 비로그인 방문자는 답변 완료(POSTED)되며 비밀글이 아닌(is_private = false 또는 null) 질문만 조회
+      query = query.eq('status', 'POSTED').or('is_private.eq.false,is_private.is.null').order('created_at', { ascending: false });
     }
 
     const { data: qnas, error } = await query;
@@ -40,7 +60,19 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ qnas });
+    // 비밀글인 경우 본인 작성자가 아니고 관리자가 아니면 내용을 마스킹 처리
+    const processedQnas = (qnas || []).map((qna: any) => {
+      if (qna.is_private && (!user || (qna.created_by !== user.id && !isAdmin))) {
+        return {
+          ...qna,
+          content: '🔒 작성자와 관리자만 볼 수 있는 1대1 개인 비밀 문의입니다.',
+          author_name: '비밀 문의'
+        };
+      }
+      return qna;
+    });
+
+    return NextResponse.json({ qnas: processedQnas });
   } catch (err: any) {
     console.error('Q&A API 오류:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -48,14 +80,14 @@ export async function GET() {
 }
 
 // 2. Q&A 등록 API (POST)
-// 비로그인 방문자 또는 회원이 질문을 작성할 수 있습니다.
+// 비로그인 방문자 또는 회원이 질문을 작성할 수 있습니다. (is_private 선택 가능)
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     const body = await request.json();
-    const { content, author_name } = body;
+    const { content, author_name, is_private } = body;
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
       return NextResponse.json({ error: '질문 내용을 입력해주세요.' }, { status: 400 });
@@ -64,7 +96,8 @@ export async function POST(request: Request) {
     const insertData: any = {
       content: content.trim(),
       status: 'PENDING',
-      author_name: author_name && author_name.trim() !== '' ? author_name.trim() : 'Anonymous'
+      author_name: author_name && author_name.trim() !== '' ? author_name.trim() : 'Anonymous',
+      is_private: Boolean(is_private)
     };
 
     if (user) {
