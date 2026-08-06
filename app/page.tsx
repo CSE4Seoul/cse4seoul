@@ -632,12 +632,20 @@ export default function Home() {
               {/* 세련된 슬라이딩 다국어 토글 버튼 */}
               <button
                 onClick={toggleLanguage}
-                className="relative h-8 w-20 rounded-full bg-neutral-900 border border-white/10 p-0.5 transition-colors hover:border-white/20"
+                className="relative h-8 w-20 rounded-full bg-neutral-900 border border-white/10 p-0.5 transition-colors hover:border-white/20 flex items-center justify-between px-2.5 text-[10px] font-mono font-bold select-none cursor-pointer"
                 aria-label="Language Toggle"
               >
                 <motion.div
                   layout
-                </div>
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  className={`absolute top-0.5 bottom-0.5 w-9 rounded-full bg-cyan-500/20 border border-cyan-400/40 ${
+                    lang === 'ko' ? 'left-0.5' : 'left-[38px]'
+                  }`}
+                />
+                <span className={`z-10 transition-colors ${lang === 'ko' ? 'text-cyan-300 font-black' : 'text-neutral-500'}`}>KO</span>
+                <span className={`z-10 transition-colors ${lang === 'en' ? 'text-cyan-300 font-black' : 'text-neutral-500'}`}>EN</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
