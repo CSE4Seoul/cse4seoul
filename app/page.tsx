@@ -39,6 +39,7 @@ import ExchangeRateWidget from '@/components/ExchangeRateWidget';
 import QAWidget from '@/components/QAWidget';
 import NoticeModal from '@/components/NoticeModal';
 import MomentGallery from '@/components/widgets/MomentGallery';
+import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 import ReservationWidget from '@/components/ReservationWidget';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -663,6 +664,9 @@ export default function Home() {
             <a href="#moments" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
               🏆 모멘트 갤러리
             </a>
+            <a href="#hall-of-shame" className="px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 border border-rose-500/20 transition-all font-bold">
+              🚨 Hall of Shame
+            </a>
             <a href="#lobby-chat" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
               💬 로비채팅
             </a>
@@ -804,6 +808,11 @@ export default function Home() {
         {/* 3. 클랜 모멘트 갤러리 (#moments) */}
         <section id="moments" className="scroll-mt-32 w-full">
           <MomentGallery />
+        </section>
+
+        {/* 🚨 CSE4Seoul Hall of Shame (비매너 블랙리스트 박제소) (#hall-of-shame) */}
+        <section id="hall-of-shame" className="scroll-mt-32 w-full">
+          <HallOfShameWidget />
         </section>
 
         {/* 6. 로비채팅 (#lobby-chat) */}

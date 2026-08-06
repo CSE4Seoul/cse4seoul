@@ -10,6 +10,7 @@ import TechnicalAnalysisWidget from '@/components/TechnicalAnalysisWidget';
 import EtfTrackerWidget from '@/components/EtfTrackerWidget';
 import DeleteAccountWidget from '@/components/DeleteAccountWidget';
 import MomentGallery from '@/components/widgets/MomentGallery';
+import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -178,6 +179,11 @@ export default async function DashboardPage() {
         {/* 클랜 영광의 순간 갤러리 위젯 */}
         <div className="mt-8">
           <MomentGallery />
+        </div>
+
+        {/* 🚨 CSE4Seoul Hall of Shame (비매너 블랙리스트 박제소) */}
+        <div className="mt-8">
+          <HallOfShameWidget />
         </div>
 
         {/* 전술 기록 및 작전 채널 (전체 너비) */}
