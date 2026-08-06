@@ -637,37 +637,7 @@ export default function Home() {
               >
                 <motion.div
                   layout
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                  className="absolute top-[3px] bottom-[3px] rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500 shadow shadow-cyan-500/50"
-                  style={{
-                    left: lang === 'ko' ? '4px' : 'calc(50% + 2px)',
-                    right: lang === 'ko' ? 'calc(50% + 2px)' : '4px',
-                  }}
-                />
-                <div className="absolute inset-0 flex justify-between px-3 items-center text-[9px] font-black text-white/90 tracking-widest font-mono pointer-events-none select-none">
-                  <span className={lang === 'ko' ? 'text-black' : 'text-white/50'}>KO</span>
-                  <span className={lang === 'en' ? 'text-black' : 'text-white/50'}>EN</span>
                 </div>
-              </button>
-
-              {user ? (
-                <button
-                  onClick={handleSignOut}
-                  className="px-3.5 py-1.5 rounded-full bg-white/5 border border-white/[0.08] text-[10px] font-bold text-white/80 hover:bg-white/10 hover:border-white/20 hover:text-white transition-all flex items-center gap-1 uppercase tracking-wider font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                >
-                  <LogOut className="w-3 h-3" />
-                  {lang === 'ko' ? '로그아웃' : 'Logout'}
-                </button>
-              ) : (
-                <Link
-                  href="/login"
-                  className="px-4.5 py-1.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1 uppercase tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.3)]"
-                >
-                  <Lock className="w-3 h-3" />
-                  {lang === 'ko' ? '로그인' : 'Login'}
-                </Link>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -676,35 +646,35 @@ export default function Home() {
       <nav className="sticky top-[65px] z-40 w-full backdrop-blur-md bg-black/40 border-b border-white/[0.08] py-2.5 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto custom-scrollbar gap-2 text-xs font-mono">
           <div className="flex items-center gap-1.5 min-w-max">
-            <a
-              href="#intro"
-              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all flex items-center gap-1"
-            >
-              <span>✨ Intro</span>
+            <a href="#intro" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              ✨ 1.소개
             </a>
-            <a
-              href="#clan-moment"
-              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all flex items-center gap-1"
-            >
-              <span>🏆 Clan Moments</span>
+            <a href="#clan-features" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              ✨ 5.클랜소개
             </a>
-            <a
-              href="#reservation"
-              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all flex items-center gap-1"
-            >
-              <span>📅 Reservation & Tools</span>
+            <a href="#moments" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              🏆 3.모멘트 갤러리
             </a>
-            <a
-              href="#qna"
-              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all flex items-center gap-1"
-            >
-              <span>💬 Q&A & Community</span>
+            <a href="#lobby-chat" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              💬 6.로비채팅
             </a>
-            <a
-              href="#security"
-              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all flex items-center gap-1"
-            >
-              <span>🔒 Security</span>
+            <a href="#clash-royale" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              👑 8.클래시로얄
+            </a>
+            <a href="#recent-posts" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              📢 10.최근게시글
+            </a>
+            <a href="#qna" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              ❓ 7.QnA
+            </a>
+            <a href="#analytics" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              📈 9.실시간시세/AI
+            </a>
+            <a href="#reservation" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              📅 4.예약
+            </a>
+            <a href="#security" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+              🔒 11.보안
             </a>
           </div>
 
@@ -722,8 +692,9 @@ export default function Home() {
       {/* Main Content Layout */}
       <div className="z-10 w-full max-w-7xl px-6 py-12 md:py-16 flex flex-col gap-16 md:gap-24">
         
-        {/* SECTION 1: Cinematic Hero & Intro (#intro) */}
+        {/* 1. 소개문구 & 2. 접속하기 및 소개 (#intro) */}
         <section id="intro" className="scroll-mt-32 text-center relative py-6">
+          {/* 1. 소개문구 */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -758,6 +729,7 @@ export default function Home() {
             {t.heroDesc}
           </motion.p>
           
+          {/* 2. 접속하기 및 소개 버튼 */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -782,22 +754,12 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* SECTION 2: Clan Moments & Highlights (#clan-moment) */}
-        <section id="clan-moment" className="scroll-mt-32 flex flex-col gap-10">
-          <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-            <span className="text-xl">🏆</span>
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-wide">CLAN MOMENTS & NETWORK</h2>
-              <p className="text-xs text-gray-400">CSE4Seoul 클랜의 명예의 전당과 네트워크 정보입니다.</p>
-            </div>
+        {/* 5. 클랜 소개 위젯 (자유로운 채팅방, 금융데이터, 클랜원 네트워크 Bento 3 cards) (#clan-info) */}
+        <section id="clan-info" className="scroll-mt-32 flex flex-col gap-6">
+          <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+            <span className="text-lg">✨</span>
+            <h3 className="text-base font-bold text-white tracking-wide">CSE4Seoul 주요 기능 소개</h3>
           </div>
-
-          {/* 클랜 모멘트 갤러리 위젯 */}
-          <div className="w-full">
-            <MomentGallery />
-          </div>
-
-          {/* 주요 기능 Bento Grid (자유로운 채팅방, 금융 위젯, 클랜원 네트워크) */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             <HoverTiltCard className="p-8 group/card">
               <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 mb-6 group-hover/card:scale-110 group-hover/card:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300">
@@ -829,280 +791,213 @@ export default function Home() {
               </p>
             </HoverTiltCard>
           </div>
+        </section>
 
-          {/* Clash Royale Clan & External Links Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 👑 Clash Royale Clan Widget (RoyaleAPI 연결 위젯) */}
-            <HoverTiltCard className="border-amber-500/10">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-white text-lg shadow-lg shadow-amber-500/25 border border-amber-400/20 font-bold">
-                      👑
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-tight">{t.clanWidgetTitle}</h4>
-                      <p className="text-[10px] text-amber-500 font-mono font-bold tracking-wider">#RRG9U0C9</p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold tracking-wider">
-                    {t.clanStatus}
-                  </span>
-                </div>
+        {/* 3. 클랜 모멘트 갤러리 (#moments) */}
+        <section id="moments" className="scroll-mt-32 w-full">
+          <MomentGallery />
+        </section>
 
-                <p className="text-xs text-neutral-400 leading-relaxed font-light">
-                  {t.clanWidgetDesc}
-                </p>
+        {/* 6. 로비채팅 (#lobby-chat) */}
+        <section id="lobby-chat" className="scroll-mt-32 flex flex-col gap-4">
+          <div className="relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
+            <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent z-10" />
+            <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 select-none bg-cyan-950/20 px-2.5 py-0.5 rounded border border-cyan-800/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>{t.lobbyChatStatus}</span>
+            </div>
+            <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
+          </div>
+        </section>
 
-                <div className="grid grid-cols-2 gap-3 py-1 font-mono">
-                  <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col justify-between">
-                    <span className="text-[9px] text-neutral-400 uppercase tracking-wider">{lang === 'ko' ? '클랜 점수' : 'Clan Trophies'}</span>
-                    <span className="text-base font-black text-amber-400 mt-1">54,200+</span>
-                  </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col justify-between">
-                    <span className="text-[9px] text-neutral-400 uppercase tracking-wider">{lang === 'ko' ? '전쟁 승률' : 'War Rate'}</span>
-                    <span className="text-base font-black text-teal-400 mt-1">68.4%</span>
-                  </div>
-                </div>
-
-                <a
-                  href="https://royaleapi.com/clan/RRG9U0C9"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group/btn relative w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-600/10 hover:from-amber-500 hover:to-yellow-600 border border-amber-500/30 hover:border-amber-400 text-amber-400 hover:text-black font-bold text-xs transition-all duration-300 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/5"
-                >
-                  <span>{t.clanBtn}</span>
-                  <RiExternalLinkLine className="text-xs group-hover/btn:scale-110 transition-transform" />
-                </a>
-              </div>
-            </HoverTiltCard>
-
-            {/* Founder & Kakao Analysis Links */}
-            <div className="flex flex-col justify-between gap-4">
-              <div className="p-6 rounded-3xl border border-white/[0.08] bg-white/[0.02] flex flex-col gap-4">
-                <div className="text-xs text-white/50 font-mono space-y-2">
-                  <p><span>FOUNDER: </span><a href="https://hamin-portfolio.vercel.app/" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors font-bold">조하민 (DEVELOPER) ↗</a></p>
-                  <p><span>CLAN: </span><a href="https://royaleapi.com/clan/RRG9U0C9" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors font-bold">CSE4SEOUL ↗</a></p>
-                  <p><span>BASEBALL: </span><a href="https://www.statiz.co.kr/" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors font-bold">KBO STATIZ ↗</a></p>
-                </div>
-              </div>
-
-              <a 
-                href="https://chatanalyze.vercel.app/" 
-                target="_blank" 
-                rel="noreferrer" 
-                className="group flex items-center justify-between text-left p-5 rounded-3xl border border-cyan-500/20 bg-neutral-950/40 backdrop-blur-md hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-800/30 flex items-center justify-center text-cyan-400 text-lg shadow-inner">
-                    💬
+        {/* 8. 클래시로얄 클랜 정보 (royaleapi 연결 위젯) (#clash-royale) */}
+        <section id="clash-royale" className="scroll-mt-32">
+          <HoverTiltCard className="border-amber-500/10">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center text-white text-lg shadow-lg shadow-amber-500/25 border border-amber-400/20 font-bold">
+                    👑
                   </div>
                   <div>
-                    <p className="font-bold text-white text-sm">카카오톡 채팅 분석 서비스</p>
-                    <p className="text-[10px] text-white/50 mt-1">대화 데이터 업로드 및 통계/패턴 분석</p>
+                    <h4 className="text-xs font-black text-white uppercase tracking-tight">{t.clanWidgetTitle}</h4>
+                    <p className="text-[10px] text-amber-500 font-mono font-bold tracking-wider">#RRG9U0C9</p>
                   </div>
                 </div>
-                <ChevronRight className="text-cyan-400 group-hover:translate-x-1 transition-transform w-5 h-5 shrink-0" />
+                <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold tracking-wider">
+                  {t.clanStatus}
+                </span>
+              </div>
+
+              <p className="text-xs text-neutral-400 leading-relaxed font-light">
+                {t.clanWidgetDesc}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 py-1 font-mono">
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col justify-between">
+                  <span className="text-[9px] text-neutral-400 uppercase tracking-wider">{lang === 'ko' ? '클랜 점수' : 'Clan Trophies'}</span>
+                  <span className="text-base font-black text-amber-400 mt-1">54,200+</span>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex flex-col justify-between">
+                  <span className="text-[9px] text-neutral-400 uppercase tracking-wider">{lang === 'ko' ? '전쟁 승률' : 'War Rate'}</span>
+                  <span className="text-base font-black text-teal-400 mt-1">68.4%</span>
+                </div>
+              </div>
+
+              <a
+                href="https://royaleapi.com/clan/RRG9U0C9"
+                target="_blank"
+                rel="noreferrer"
+                className="group/btn relative w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-600/10 hover:from-amber-500 hover:to-yellow-600 border border-amber-500/30 hover:border-amber-400 text-amber-400 hover:text-black font-bold text-xs transition-all duration-300 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/5"
+              >
+                <span>{t.clanBtn}</span>
+                <RiExternalLinkLine className="text-xs group-hover/btn:scale-110 transition-transform" />
               </a>
             </div>
-          </div>
+          </HoverTiltCard>
         </section>
 
-        {/* SECTION 3: Reservation & Analytics (#reservation) */}
-        <section id="reservation" className="scroll-mt-32 flex flex-col gap-8">
-          <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-            <span className="text-xl">📅</span>
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-wide">RESERVATION & FINANCIAL ANALYTICS</h2>
-              <p className="text-xs text-gray-400">타임 스케줄 예약과 실시간 환율 & AI 분석 위젯입니다.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* 예약 위젯 */}
-            <div className="lg:col-span-7">
-              <ReservationWidget user={user} profile={profile} lang={lang} />
-            </div>
-
-            {/* 실시간 환율 및 AI 분석 위젯 */}
-            <div className="lg:col-span-5 relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
-              <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent z-10" />
-              <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 select-none bg-cyan-950/20 px-2.5 py-0.5 rounded border border-cyan-800/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                <span>{t.exchangeStatus}</span>
+        {/* 10. 최근 게시글 위젯 (#recent-posts) */}
+        <section id="recent-posts" className="scroll-mt-32">
+          <HoverTiltCard>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">{t.recentPostsTitle}</h4>
+                </div>
+                <Link href={user ? "/board" : "/login"} className="text-[9px] font-bold text-cyan-400 hover:text-cyan-300 transition-colors uppercase tracking-wider font-mono">
+                  {t.recentPostsMore}
+                </Link>
               </div>
-              <ExchangeRateWidget lang={lang} />
-            </div>
-          </div>
-        </section>
 
-        {/* SECTION 4: Q&A & Community (#qna) */}
-        <section id="qna" className="scroll-mt-32 flex flex-col gap-8">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4 flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">💬</span>
-              <div>
-                <h2 className="text-lg font-bold text-white tracking-wide">COMMUNITY & Q&A</h2>
-                <p className="text-xs text-gray-400">로비 실시간 채팅, 최근 게시글, 1대1 비밀 문의 및 Q&A 공간입니다.</p>
-              </div>
-            </div>
-
-            {user && (
-              <Link
-                href="/mypage"
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-300 hover:text-white text-xs font-semibold transition-all hover:scale-[1.02] flex items-center gap-1.5"
-              >
-                <span>내 1:1 문의 답변 확인하기 (마이페이지)</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* 좌측: 로비 채팅 & Q&A 위젯 (8 cols) */}
-            <div className="lg:col-span-8 flex flex-col gap-6">
-              {/* 최고관리자 공지사항 관리 */}
-              {profile?.role === 'admin' && (
-                <div className="relative rounded-3xl border border-red-500/15 bg-red-950/[0.01] p-6 backdrop-blur-xl shadow-2xl overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(45deg,#b91c1c,#b91c1c_10px,#000_10px,#000_20px)] opacity-60" />
-
-                  <div className="flex items-center gap-3 mb-5 mt-1">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center shadow-lg shadow-red-500/20 border border-red-500/20">
-                      <Terminal className="text-white text-lg" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight">{t.adminPanelTitle}</h3>
-                      <p className="text-[10px] text-red-400 font-mono">{t.adminPanelDesc}</p>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleCreateNotice} className="flex flex-col gap-4">
-                    <div className="relative">
-                      <span className="absolute top-3.5 left-4 text-[10px] text-red-500/80 font-mono font-black">CMD &gt;</span>
-                      <textarea
-                        className="w-full h-24 bg-black/60 border border-white/10 rounded-xl pl-16 pr-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-red-500/50 resize-none placeholder-red-900/40"
-                        placeholder={t.adminInputPlaceholder}
-                        value={newNoticeContent}
-                        onChange={(e) => setNewNoticeContent(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center justify-between gap-4 bg-white/[0.02] border border-white/5 p-3 rounded-xl">
-                      <div className="flex flex-wrap items-center gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-white/70 hover:text-white transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={isPinned}
-                            onChange={(e) => setIsPinned(e.target.checked)}
-                            className="rounded border-white/10 bg-black text-red-600 focus:ring-0 focus:ring-offset-0"
-                          />
-                          {t.adminPinCheck}
-                        </label>
-
-                        {!isPinned && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-white/40 font-mono uppercase tracking-wider">{t.adminPeriodLabel}</span>
-                            <select
-                              value={expiresInHours}
-                              onChange={(e) => setExpiresInHours(Number(e.target.value))}
-                              className="bg-black border border-white/10 rounded-lg px-2.5 py-1 text-[10px] font-mono text-white focus:outline-none focus:border-red-500/50 cursor-pointer"
-                            >
-                              <option value={1}>{t.adminPeriod1h}</option>
-                              <option value={6}>{t.adminPeriod6h}</option>
-                              <option value={12}>{t.adminPeriod12h}</option>
-                              <option value={24}>{t.adminPeriod24h}</option>
-                              <option value={72}>{t.adminPeriod72h}</option>
-                            </select>
-                          </div>
-                        )}
+              <div className="flex flex-col gap-2.5">
+                {isLoading ? (
+                  <div className="py-6 text-center text-xs text-white/40 font-mono">{t.recentPostsLoading}</div>
+                ) : recentPosts.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-white/40 font-mono">{t.recentPostsEmpty}</div>
+                ) : (
+                  recentPosts.map((post) => (
+                    <Link 
+                      href={user ? `/board/${post.id}` : "/login"}
+                      key={post.id} 
+                      className="group/item flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.04] hover:bg-white/[0.03] hover:border-cyan-500/25 transition-all duration-300 cursor-pointer font-mono"
+                    >
+                      <div className="min-w-0 max-w-[85%]">
+                        <p className="text-xs font-bold text-white group-hover/item:text-cyan-400 transition-colors truncate">{post.title}</p>
+                        <p className="text-[9px] text-white/45 mt-1">
+                          BY: {post.author_name} // {timeAgo(post.created_at)}
+                        </p>
                       </div>
-
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || !newNoticeContent.trim()}
-                        className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 rounded-xl text-white text-xs font-bold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 hover:scale-[1.01]"
-                      >
-                        {isSubmitting ? t.adminSubmitting : t.adminSubmitBtn}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {/* 로비 익명 채팅 위젯 */}
-              <div className="relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
-                <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent z-10" />
-                <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 select-none bg-cyan-950/20 px-2.5 py-0.5 rounded border border-cyan-800/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                  <span>{t.lobbyChatStatus}</span>
-                </div>
-                <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
-              </div>
-
-              {/* Q&A & Suggestions 위젯 (1:1 비밀 문의 포함) */}
-              <div className="relative group rounded-3xl border border-white/[0.08] hover:border-violet-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
-                <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-violet-500/25 to-transparent z-10" />
-                <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-violet-400 select-none bg-violet-950/20 px-2.5 py-0.5 rounded border border-violet-800/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
-                  <span>{t.qaStatus}</span>
-                </div>
-                <QAWidget user={user} profile={profile} lang={lang} />
+                      <RiLock2Line className="text-white/30 group-hover/item:text-cyan-400 transition-colors shrink-0 text-xs" />
+                    </Link>
+                  ))
+                )}
               </div>
             </div>
+          </HoverTiltCard>
+        </section>
 
-            {/* 우측: 최근 게시글 (4 cols) */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              <HoverTiltCard>
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                      <h4 className="text-xs font-black text-white uppercase tracking-wider">{t.recentPostsTitle}</h4>
-                    </div>
-                    <Link href={user ? "/board" : "/login"} className="text-[9px] font-bold text-cyan-400 hover:text-cyan-300 transition-colors uppercase tracking-wider font-mono">
-                      {t.recentPostsMore}
-                    </Link>
-                  </div>
+        {/* 7. QnA 문의 및 건의사항 (#qna) */}
+        <section id="qna" className="scroll-mt-32 flex flex-col gap-6">
+          {/* 최고관리자 공지사항 관리 */}
+          {profile?.role === 'admin' && (
+            <div className="relative rounded-3xl border border-red-500/15 bg-red-950/[0.01] p-6 backdrop-blur-xl shadow-2xl overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-[repeating-linear-gradient(45deg,#b91c1c,#b91c1c_10px,#000_10px,#000_20px)] opacity-60" />
 
-                  <div className="flex flex-col gap-2.5">
-                    {isLoading ? (
-                      <div className="py-6 text-center text-xs text-white/40 font-mono">{t.recentPostsLoading}</div>
-                    ) : recentPosts.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-white/40 font-mono">{t.recentPostsEmpty}</div>
-                    ) : (
-                      recentPosts.map((post) => (
-                        <Link 
-                          href={user ? `/board/${post.id}` : "/login"}
-                          key={post.id} 
-                          className="group/item flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.04] hover:bg-white/[0.03] hover:border-cyan-500/25 transition-all duration-300 cursor-pointer font-mono"
+              <div className="flex items-center gap-3 mb-5 mt-1">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center shadow-lg shadow-red-500/20 border border-red-500/20">
+                  <Terminal className="text-white text-lg" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-tight">{t.adminPanelTitle}</h3>
+                  <p className="text-[10px] text-red-400 font-mono">{t.adminPanelDesc}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateNotice} className="flex flex-col gap-4">
+                <div className="relative">
+                  <span className="absolute top-3.5 left-4 text-[10px] text-red-500/80 font-mono font-black">CMD &gt;</span>
+                  <textarea
+                    className="w-full h-24 bg-black/60 border border-white/10 rounded-xl pl-16 pr-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-red-500/50 resize-none placeholder-red-900/40"
+                    placeholder={t.adminInputPlaceholder}
+                    value={newNoticeContent}
+                    onChange={(e) => setNewNoticeContent(e.target.value)}
+                  />
+                </div>
+                
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-white/[0.02] border border-white/5 p-3 rounded-xl">
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-mono text-white/70 hover:text-white transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={isPinned}
+                        onChange={(e) => setIsPinned(e.target.checked)}
+                        className="rounded border-white/10 bg-black text-red-600 focus:ring-0 focus:ring-offset-0"
+                      />
+                      {t.adminPinCheck}
+                    </label>
+
+                    {!isPinned && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-white/40 font-mono uppercase tracking-wider">{t.adminPeriodLabel}</span>
+                        <select
+                          value={expiresInHours}
+                          onChange={(e) => setExpiresInHours(Number(e.target.value))}
+                          className="bg-black border border-white/10 rounded-lg px-2.5 py-1 text-[10px] font-mono text-white focus:outline-none focus:border-red-500/50 cursor-pointer"
                         >
-                          <div className="min-w-0 max-w-[85%]">
-                            <p className="text-xs font-bold text-white group-hover/item:text-cyan-400 transition-colors truncate">{post.title}</p>
-                            <p className="text-[9px] text-white/45 mt-1">
-                              BY: {post.author_name} // {timeAgo(post.created_at)}
-                            </p>
-                          </div>
-                          <RiLock2Line className="text-white/30 group-hover/item:text-cyan-400 transition-colors shrink-0 text-xs" />
-                        </Link>
-                      ))
+                          <option value={1}>{t.adminPeriod1h}</option>
+                          <option value={6}>{t.adminPeriod6h}</option>
+                          <option value={12}>{t.adminPeriod12h}</option>
+                          <option value={24}>{t.adminPeriod24h}</option>
+                          <option value={72}>{t.adminPeriod72h}</option>
+                        </select>
+                      </div>
                     )}
                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !newNoticeContent.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 rounded-xl text-white text-xs font-bold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 hover:scale-[1.01]"
+                  >
+                    {isSubmitting ? t.adminSubmitting : t.adminSubmitBtn}
+                  </button>
                 </div>
-              </HoverTiltCard>
+              </form>
             </div>
+          )}
+
+          {/* Q&A 위젯 */}
+          <div className="relative group rounded-3xl border border-white/[0.08] hover:border-violet-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
+            <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-violet-500/25 to-transparent z-10" />
+            <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-violet-400 select-none bg-violet-950/20 px-2.5 py-0.5 rounded border border-violet-800/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
+              <span>{t.qaStatus}</span>
+            </div>
+            <QAWidget user={user} profile={profile} lang={lang} />
           </div>
         </section>
 
-        {/* SECTION 5: Security & Footer (#security) */}
-        <section id="security" className="scroll-mt-32 flex flex-col gap-8 border-t border-white/5 pt-12">
-          <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-            <span className="text-xl">🔒</span>
-            <div>
-              <h2 className="text-lg font-bold text-white tracking-wide">SECURITY & PRIVACY</h2>
-              <p className="text-xs text-gray-400">보안 최우선 원칙과 암호화 시스템입니다.</p>
+        {/* 9. 실시간 시세 및 AI 분석 기능 (#analytics) */}
+        <section id="analytics" className="scroll-mt-32">
+          <div className="relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/30 backdrop-blur-xl shadow-2xl transition-all duration-500">
+            <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent z-10" />
+            <div className="absolute top-3 right-5 flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 select-none bg-cyan-950/20 px-2.5 py-0.5 rounded border border-cyan-800/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>{t.exchangeStatus}</span>
             </div>
+            <ExchangeRateWidget lang={lang} />
           </div>
+        </section>
 
+        {/* 4. 예약 (#reservation) */}
+        <section id="reservation" className="scroll-mt-32 w-full">
+          <ReservationWidget user={user} profile={profile} lang={lang} />
+        </section>
+
+        {/* 11. 보안을 최우선으로 (#security) */}
+        <section id="security" className="scroll-mt-32">
           <HoverTiltCard className="border-violet-500/10 relative overflow-hidden">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-violet-500/10 to-transparent h-[40%] w-full animate-scan -z-10" />
 
@@ -1141,8 +1036,39 @@ export default function Home() {
               {t.securityDesc}
             </p>
           </HoverTiltCard>
+        </section>
 
-          <p className="text-[10px] text-white/30 text-center font-mono uppercase tracking-widest mt-6">
+        {/* 12. founder, clan baseball 링크 */}
+        <section id="links" className="scroll-mt-32 border-t border-white/5 pt-10 text-center text-xs text-white/40 font-mono flex flex-col items-center gap-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-white/50">
+            <span>FOUNDER: <a href="https://hamin-portfolio.vercel.app/" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors">조하민 (DEVELOPER) ↗</a></span>
+            <span>•</span>
+            <span>CLAN: <a href="https://royaleapi.com/clan/RRG9U0C9" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors">CSE4SEOUL ↗</a></span>
+            <span>•</span>
+            <span>BASEBALL: <a href="https://www.statiz.co.kr/" target="_blank" rel="noreferrer" className="text-cyan-400 underline decoration-cyan-400/30 hover:text-cyan-300 transition-colors">KBO STATIZ ↗</a></span>
+          </div>
+          
+          <div className="w-full max-w-xl">
+            <a 
+              href="https://chatanalyze.vercel.app/" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="group flex items-center justify-between text-left p-5 rounded-2xl border border-cyan-500/20 bg-neutral-950/40 backdrop-blur-md hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:scale-[1.01] transition-all duration-300"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-800/30 flex items-center justify-center text-cyan-400 text-lg shadow-inner">
+                  💬
+                </div>
+                <div>
+                  <p className="font-bold text-white text-sm">카카오톡 채팅 분석 서비스</p>
+                  <p className="text-[10px] text-white/50 mt-1">대화 데이터를 업로드하고 통계 및 패턴을 상세히 분석해보세요</p>
+                </div>
+              </div>
+              <ChevronRight className="text-cyan-400 group-hover:translate-x-1 transition-transform w-5 h-5 shrink-0" />
+            </a>
+          </div>
+
+          <p className="text-[9px] text-white/20 mt-4 uppercase tracking-widest">
             © 2026 CSE4SEOUL HQ. ALL SYSTEMS OPERATIONAL.
           </p>
         </section>
