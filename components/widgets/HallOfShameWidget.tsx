@@ -57,8 +57,8 @@ const DEFAULT_SHAME_RECORDS: ShameRecord[] = [
       kickMessage: 'Your defeat will be posted on our site. I am glad that I can let you know this fact.',
     },
     evidenceImages: {
-      abuse: '/assets/moment-gallery/아이언크랩_1.PNG',
-      battlelog: '/assets/moment-gallery/아이언크랩_1.PNG',
+      abuse: '/assets/evidence/mr_smitty_abuse.png',
+      battlelog: '/assets/evidence/mr_smitty_battlelog.png',
     },
     tags: ['#BadManners', '#ClanRequestAbuse', '#1v1_Defeated', '#참교육완료'],
     initialClaps: 128,
@@ -266,6 +266,11 @@ export default function HallOfShameWidget() {
                           alt="Battle Result"
                           fill
                           className="object-cover"
+                          onError={(e) => {
+                            // 이미지가 아직 없는 경우 아이언크랩_1.PNG로 fallback
+                            const target = e.target as HTMLImageElement;
+                            target.src = '/assets/moment-gallery/아이언크랩_1.PNG';
+                          }}
                         />
                       </div>
                     </div>
