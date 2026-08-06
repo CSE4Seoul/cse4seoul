@@ -53,7 +53,19 @@ export async function GET(request: Request) {
       query = query.eq('status', 'POSTED').or('is_private.eq.false,is_private.is.null').order('created_at', { ascending: false });
     }
 
-    const { data: qnas, error } = await query;
+    let { data: qnas, error } = await query;
+
+    // Supabase DB 스키마에 is_private 컬럼이 미생성된 경우 fallback 처리
+    if (error && error.message.includes('is_private')) {
+      const fallbackQuery = isAdmin
+        ? supabase.from('qnas').select('*').order('created_at', { ascending: false })
+        : (user 
+            ? supabase.from('qnas').select('*').or(`status.eq.POSTED,created_by.eq.${user.id}`).order('created_at', { ascending: false })
+            : supabase.from('qnas').select('*').eq('status', 'POSTED').order('created_at', { ascending: false }));
+      const fallbackRes = await fallbackQuery;
+      qnas = fallbackRes.data;
+      error = fallbackRes.error;
+    }
 
     if (error) {
       console.error('Q&A 조회 실패:', error);
@@ -107,9 +119,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error: dbError } = await supabase
+    let { error: dbError } = await supabase
       .from('qnas')
       .insert(insertData);
+
+    // Supabase DB에 is_private 컬럼이 아직 없는 경우 is_private 키 제거 후 재시도
+    if (dbError && dbError.message.includes('is_private')) {
+      delete insertData.is_private;
+      const retryRes = await supabase.from('qnas').insert(insertData);
+      dbError = retryRes.error;
+    }
 
     if (dbError) {
       console.error('Q&A 저장 실패:', dbError);
