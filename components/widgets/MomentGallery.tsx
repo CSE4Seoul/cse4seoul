@@ -15,18 +15,9 @@ import {
   Pause, 
   Trophy, 
   Sparkles,
-  Flame
+  Flame,
+  UserCheck
 } from 'lucide-react';
-
-/**
- * 📢 CSE4Seoul 클랜 영광의 순간 갤러리 위젯
- * 
- * [주요 기능]
- * 1. HAMIN & 아이언크랩 등 클랜원의 3크라운 승리 인증샷 슬라이더 (메인 & 대시보드 공용)
- * 2. 5초 자동 슬라이드 전환 및 실시간 카운트다운 프로그레스 바 (시간에 따라 자동 이동)
- * 3. 풀스크린 확대보기(Lightbox) 모달 + Zoom In/Out/Reset 및 드래그 패닝 기능
- * 4. 하단/사이드 썸네일 카드 뷰 지원 (기존 hamin_3* 및 아이언크랩_3* 사진 나란히 배치)
- */
 
 export interface MomentImage {
   id: string;
@@ -40,32 +31,72 @@ export interface MomentImage {
   accentColor: string;
   badgeText: string;
   stats?: string;
+  num?: number;
 }
 
-// 1. 갤러리 이미지 데이터 (로컬 public 디렉터리 기준)
-const GALLERY_IMAGES: MomentImage[] = [
+// 로컬 assets/moment-gallery 기본 초기 데이터 (SSR 및 fallback용)
+const INITIAL_IMAGES: MomentImage[] = [
   {
-    id: 'hamin_3crown',
-    src: '/assets/moment-gallery/hamin_3crown_win_1.PNG',
-    title: 'HAMIN: 완벽한 3크라운 승리',
-    player: 'HAMIN',
+    id: 'Hamin_1',
+    src: '/assets/moment-gallery/Hamin_1.PNG',
+    title: 'Hamin: 영광의 순간 #1',
+    player: 'Hamin',
     tag: '3-CROWN VICTORY',
-    description: 'CSE4Seoul의 자존심, HAMIN 선수의 압도적인 3크라운 클리어 현장!',
-    date: '2026.07',
-    bgColor: 'rgba(56, 189, 248, 0.15)', // Cyber Blue Accent
+    description: 'CSE4Seoul 클랜 Hamin 선수의 화려한 승리 인증샷 #1!',
+    date: '2026.08',
+    bgColor: 'rgba(56, 189, 248, 0.15)',
     accentColor: '#38bdf8',
-    badgeText: 'LEGENDARY',
-    stats: 'PERFECT 3-CROWN',
+    badgeText: 'LEGENDARY MVP',
+    stats: 'PERFECT MATCH',
   },
   {
-    id: 'ironcrab_3crown',
-    src: '/assets/moment-gallery/아이언크랩_3crown_win_1.PNG',
-    title: '아이언크랩: 3크라운 대승리',
+    id: 'Hamin_2',
+    src: '/assets/moment-gallery/Hamin_2.PNG',
+    title: 'Hamin: 영광의 순간 #2',
+    player: 'Hamin',
+    tag: '3-CROWN VICTORY',
+    description: 'CSE4Seoul 클랜 Hamin 선수의 화려한 승리 인증샷 #2!',
+    date: '2026.08',
+    bgColor: 'rgba(56, 189, 248, 0.15)',
+    accentColor: '#38bdf8',
+    badgeText: 'LEGENDARY MVP',
+    stats: 'PERFECT MATCH',
+  },
+  {
+    id: 'Space_2',
+    src: '/assets/moment-gallery/Space_2.PNG',
+    title: 'Space: 영광의 순간 #2',
+    player: 'Space',
+    tag: '3-CROWN VICTORY',
+    description: 'CSE4Seoul 클랜 Space 선수의 화려한 승리 인증샷 #2!',
+    date: '2026.08',
+    bgColor: 'rgba(45, 212, 191, 0.15)',
+    accentColor: '#2dd4bf',
+    badgeText: 'STAR PLAYER',
+    stats: 'PERFECT MATCH',
+  },
+  {
+    id: 'Space_3',
+    src: '/assets/moment-gallery/Space_3.PNG',
+    title: 'Space: 영광의 순간 #3',
+    player: 'Space',
+    tag: '3-CROWN VICTORY',
+    description: 'CSE4Seoul 클랜 Space 선수의 화려한 승리 인증샷 #3!',
+    date: '2026.08',
+    bgColor: 'rgba(45, 212, 191, 0.15)',
+    accentColor: '#2dd4bf',
+    badgeText: 'STAR PLAYER',
+    stats: 'PERFECT MATCH',
+  },
+  {
+    id: '아이언크랩_1',
+    src: '/assets/moment-gallery/아이언크랩_1.PNG',
+    title: '아이언크랩: 영광의 순간 #1',
     player: '아이언크랩',
     tag: '3-CROWN VICTORY',
-    description: 'CSE4Seoul 클랜 전설의 아이언크랩 선수의 화려한 3크라운 클리어 순간!',
-    date: '2026.07',
-    bgColor: 'rgba(168, 85, 247, 0.15)', // Cyber Purple Accent
+    description: 'CSE4Seoul 클랜 아이언크랩 선수의 화려한 승리 인증샷 #1!',
+    date: '2026.08',
+    bgColor: 'rgba(168, 85, 247, 0.15)',
     accentColor: '#c084fc',
     badgeText: 'CLAN MVP',
     stats: 'EPIC MATCH',
@@ -89,24 +120,55 @@ const slideVariants = {
     x: direction < 0 ? 800 : -800,
     opacity: 0,
     scale: 0.95,
-    filter: 'blur(6px)', // 사이버펑크 스타일 블러
+    filter: 'blur(6px)',
   }),
 };
 
-const AUTO_SLIDE_INTERVAL = 5000; // 5초
+const AUTO_SLIDE_INTERVAL = 5000;
 
 export default function MomentGallery() {
+  const [galleryImages, setGalleryImages] = useState<MomentImage[]>(INITIAL_IMAGES);
+  const [playerList, setPlayerList] = useState<string[]>(['ALL']);
+  const [selectedPlayerFilter, setSelectedPlayerFilter] = useState<string>('ALL');
+
   const [[page, direction], setPage] = useState([0, 0]);
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   
-  // 확대 보기 (Lightbox Modal) 관련 상태
+  // 확대 보기 (Lightbox Modal)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalZoomScale, setModalZoomScale] = useState(1);
   const [modalImageIndex, setModalImageIndex] = useState(0);
 
-  const imageIndex = Math.abs(page % GALLERY_IMAGES.length);
-  const currentImage = GALLERY_IMAGES[imageIndex];
+  // API 호출로 public/assets/moment-gallery 내 최신 이미지 자동 스캔
+  useEffect(() => {
+    async function loadGalleryAssets() {
+      try {
+        const res = await fetch('/api/moment-gallery');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.images && data.images.length > 0) {
+            setGalleryImages(data.images);
+            if (data.players && data.players.length > 0) {
+              setPlayerList(data.players);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to auto-fetch moment gallery assets:', error);
+      }
+    }
+    loadGalleryAssets();
+  }, []);
+
+  // 유저 필터링 적용된 이미지 목록
+  const activeImages = selectedPlayerFilter === 'ALL'
+    ? galleryImages
+    : galleryImages.filter((img) => img.player.toLowerCase() === selectedPlayerFilter.toLowerCase());
+
+  const validImages = activeImages.length > 0 ? activeImages : galleryImages;
+  const imageIndex = Math.abs(page % validImages.length);
+  const currentImage = validImages[imageIndex] || validImages[0];
 
   const paginate = useCallback((newDirection: number) => {
     setPage(([prevPage]) => [prevPage + newDirection, newDirection]);
@@ -117,9 +179,14 @@ export default function MomentGallery() {
     setPage([index, newDir]);
   };
 
-  // 5초마다 자동 슬라이드 (호버 시 또는 일시정지 버튼 누를 시 일시 정지)
+  const handlePlayerFilterChange = (player: string) => {
+    setSelectedPlayerFilter(player);
+    setPage([0, 0]);
+  };
+
+  // 자동 슬라이드
   useEffect(() => {
-    if (!isPlaying || isHovered || isModalOpen || GALLERY_IMAGES.length <= 1) {
+    if (!isPlaying || isHovered || isModalOpen || validImages.length <= 1) {
       return;
     }
     const timer = setInterval(() => {
@@ -127,32 +194,31 @@ export default function MomentGallery() {
     }, AUTO_SLIDE_INTERVAL);
 
     return () => clearInterval(timer);
-  }, [isPlaying, isHovered, isModalOpen, paginate]);
+  }, [isPlaying, isHovered, isModalOpen, paginate, validImages.length]);
 
-  // 라이트박스 열기
+  // 라이트박스 열기/닫기
   const openLightbox = (indexToOpen = imageIndex) => {
     setModalImageIndex(indexToOpen);
     setModalZoomScale(1);
     setIsModalOpen(true);
   };
 
-  // 라이트박스 닫기
   const closeLightbox = () => {
     setIsModalOpen(false);
     setModalZoomScale(1);
   };
 
-  // 키보드 단축키 지원 (ESC, 좌우 화살표)
+  // 키보드 이벤트
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isModalOpen) {
         if (e.key === 'Escape') closeLightbox();
         if (e.key === 'ArrowLeft') {
-          setModalImageIndex((prev) => (prev > 0 ? prev - 1 : GALLERY_IMAGES.length - 1));
+          setModalImageIndex((prev) => (prev > 0 ? prev - 1 : validImages.length - 1));
           setModalZoomScale(1);
         }
         if (e.key === 'ArrowRight') {
-          setModalImageIndex((prev) => (prev < GALLERY_IMAGES.length - 1 ? prev + 1 : 0));
+          setModalImageIndex((prev) => (prev < validImages.length - 1 ? prev + 1 : 0));
           setModalZoomScale(1);
         }
       } else {
@@ -163,9 +229,15 @@ export default function MomentGallery() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, paginate]);
+  }, [isModalOpen, paginate, validImages.length]);
 
-  const modalCurrentImage = GALLERY_IMAGES[modalImageIndex];
+  const modalCurrentImage = validImages[modalImageIndex] || currentImage;
+
+  // 유저별 등록된 사진 개수 맵 생성
+  const playerCounts = galleryImages.reduce((acc, img) => {
+    acc[img.player] = (acc[img.player] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <>
@@ -175,7 +247,7 @@ export default function MomentGallery() {
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* 상단 헤더 & 컨트롤 바 */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gray-900/60 border-b border-gray-800/60 backdrop-blur-md z-20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between px-6 py-4 bg-gray-900/60 border-b border-gray-800/60 backdrop-blur-md z-20 gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-cyan-950/80 border border-cyan-700/50 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.2)]">
               <Trophy size={18} />
@@ -191,13 +263,13 @@ export default function MomentGallery() {
                 </span>
               </div>
               <p className="text-xs text-gray-400 font-sans font-light">
-                CSE4Seoul 영광의 순간 (HAMIN & 아이언크랩 3크라운)
+                CSE4Seoul 클랜원들의 승리 인증샷 ({galleryImages.length}개 연동됨)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* 자동 재생/일시정지 토글 버튼 */}
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            {/* 자동 재생/일시정지 토글 */}
             <button
               onClick={() => setIsPlaying(!isPlaying)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-800/80 hover:bg-gray-700 text-gray-300 border border-gray-700/60 transition-all"
@@ -220,7 +292,39 @@ export default function MomentGallery() {
           </div>
         </div>
 
-        {/* 상단 프로그레스 바 (자동 슬라이드 카운트다운) */}
+        {/* 🌟 확장형 플레이어 선택 필터 탭 바 (유저이름_사진번호 자동 연동) */}
+        {playerList.length > 1 && (
+          <div className="flex items-center gap-2 px-6 py-2.5 bg-gray-900/40 border-b border-gray-800/40 overflow-x-auto custom-scrollbar">
+            <span className="text-[11px] font-bold text-gray-500 font-cyber flex items-center gap-1 shrink-0">
+              <UserCheck size={12} className="text-cyan-400" />
+              유저별 갤러리:
+            </span>
+            <div className="flex items-center gap-1.5">
+              {playerList.map((p) => {
+                const isSelected = selectedPlayerFilter === p;
+                const count = p === 'ALL' ? galleryImages.length : playerCounts[p] || 0;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => handlePlayerFilterChange(p)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold font-cyber transition-all flex items-center gap-1.5 shrink-0 border ${
+                      isSelected
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/60 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
+                        : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    <span>{p === 'ALL' ? 'ALL MOMENTS' : `${p} Player`}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-cyan-400/30 text-cyan-200' : 'bg-gray-800 text-gray-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 상단 프로그레스 바 (자동 슬라이드) */}
         {isPlaying && !isHovered && !isModalOpen && (
           <div className="w-full bg-gray-900 h-1 overflow-hidden">
             <motion.div
@@ -233,8 +337,8 @@ export default function MomentGallery() {
           </div>
         )}
 
-        {/* 본문 레이아웃: 이미지 영역 (상단/좌측) + 상세설명 & 썸네일 스트립 (하단/우측) */}
-        <div className="flex flex-col lg:flex-row h-auto lg:h-[420px]">
+        {/* 본문 레이아웃: 이미지 메인 뷰어 + 썸네일 컨트롤 스트립 */}
+        <div className="flex flex-col lg:flex-row h-auto lg:h-[430px]">
           {/* 1. 이미지 메인 뷰어 */}
           <div className="relative flex-1 aspect-[16/10] lg:aspect-auto overflow-hidden bg-black/60 min-h-[280px] sm:min-h-[350px]">
             <AnimatePresence initial={false} custom={direction}>
@@ -262,7 +366,6 @@ export default function MomentGallery() {
                   priority={imageIndex === 0}
                 />
                 
-                {/* Cyberpunk Dynamic Gradient Overlay */}
                 <div 
                   className="absolute inset-0 pointer-events-none"
                   style={{ 
@@ -270,7 +373,7 @@ export default function MomentGallery() {
                   }}
                 />
 
-                {/* 이미지 위 호버 시 나타나는 확대 아이콘 오버레이 */}
+                {/* 이미지 호버 시 나타나는 오버레이 */}
                 <div className="absolute inset-0 bg-cyan-950/30 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
                   <div className="px-4 py-2 rounded-2xl bg-black/80 border border-cyan-400/60 text-cyan-300 flex items-center gap-2 shadow-glow-blue font-cyber text-sm tracking-wider">
                     <Maximize2 size={18} />
@@ -278,7 +381,7 @@ export default function MomentGallery() {
                   </div>
                 </div>
 
-                {/* 이미지 내 태그 뱃지 */}
+                {/* 이미지 배지 */}
                 <div className="absolute top-4 left-4 z-10 flex gap-2">
                   <span className="px-3 py-1 rounded-lg text-xs font-black tracking-widest text-cyan-300 bg-cyan-950/90 border border-cyan-600/80 shadow-glow-blue font-cyber">
                     {currentImage.tag}
@@ -291,8 +394,8 @@ export default function MomentGallery() {
               </motion.div>
             </AnimatePresence>
 
-            {/* 슬라이드 이전/다음 내비게이션 화살표 */}
-            {GALLERY_IMAGES.length > 1 && (
+            {/* 슬라이드 이전/다음 내비게이션 */}
+            {validImages.length > 1 && (
               <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none z-20">
                 <button 
                   onClick={(e) => { e.stopPropagation(); paginate(-1); }} 
@@ -312,8 +415,8 @@ export default function MomentGallery() {
             )}
           </div>
 
-          {/* 2. 우측/하단: 사진 타이틀 정보 & 나란히 정렬된 썸네일 카드 영역 */}
-          <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col justify-between p-6 bg-gray-950/90 border-t lg:border-t-0 lg:border-l border-gray-800/70 font-cyber">
+          {/* 2. 우측/하단: 플레이어 정보 & 나란히 정렬된 썸네일 스트립 */}
+          <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col justify-between p-6 bg-gray-950/90 border-t lg:border-t-0 lg:border-l border-gray-800/70 font-cyber overflow-hidden">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -323,13 +426,13 @@ export default function MomentGallery() {
                   </span>
                 </div>
                 <span className="text-xs font-mono text-gray-500 bg-gray-900 px-2.5 py-1 rounded-md border border-gray-800">
-                  {imageIndex + 1} / {GALLERY_IMAGES.length}
+                  {imageIndex + 1} / {validImages.length}
                 </span>
               </div>
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={page}
+                  key={`${page}-${currentImage.id}`}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
@@ -346,33 +449,33 @@ export default function MomentGallery() {
               </AnimatePresence>
             </div>
 
-            {/* 3. 사진 나란히 배치 (나란히 정렬된 썸네일 내비게이션 스트립) */}
-            <div className="mt-6 pt-5 border-t border-gray-800/80">
-              <div className="flex items-center justify-between mb-3">
+            {/* 3. 사진 목록 썸네일 카드 뷰 */}
+            <div className="mt-4 pt-4 border-t border-gray-800/80">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-gray-400 tracking-wider flex items-center gap-1.5">
                   <Sparkles size={14} className="text-cyan-400" />
-                  갤러리 사진 목록 (선택 이동)
+                  {selectedPlayerFilter === 'ALL' ? '전체 갤러리 목록' : `${selectedPlayerFilter} Player 갤러리`}
                 </span>
                 <span className="text-[11px] text-cyan-400 font-sans">
-                  클릭시 바로 이동
+                  클릭시 해당 위치로 이동
                 </span>
               </div>
 
-              {/* HAMIN & 아이언크랩 썸네일 그리드 */}
-              <div className="grid grid-cols-2 gap-3">
-                {GALLERY_IMAGES.map((img, idx) => {
+              {/* 썸네일 그리드 목록 (스크롤 지원) */}
+              <div className="grid grid-cols-2 gap-2.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                {validImages.map((img, idx) => {
                   const isActive = idx === imageIndex;
                   return (
                     <button
                       key={img.id}
                       onClick={() => selectSlide(idx)}
-                      className={`relative flex flex-col p-2 rounded-2xl border transition-all duration-300 text-left overflow-hidden group/thumb ${
+                      className={`relative flex flex-col p-1.5 rounded-2xl border transition-all duration-300 text-left overflow-hidden group/thumb ${
                         isActive
                           ? 'bg-cyan-950/60 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.35)] scale-[1.02]'
                           : 'bg-gray-900/60 border-gray-800 hover:border-gray-700 hover:bg-gray-900'
                       }`}
                     >
-                      <div className="relative w-full h-16 rounded-xl overflow-hidden mb-2 bg-black">
+                      <div className="relative w-full h-14 rounded-xl overflow-hidden mb-1.5 bg-black">
                         <Image
                           src={img.src}
                           alt={img.title}
@@ -385,12 +488,12 @@ export default function MomentGallery() {
                           <div className="absolute inset-0 border-2 border-cyan-400 rounded-xl pointer-events-none" />
                         )}
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between px-1">
                         <span className={`text-xs font-bold truncate ${isActive ? 'text-cyan-300' : 'text-gray-400'}`}>
                           {img.player}
                         </span>
-                        <span className="text-[10px] text-gray-500 font-mono">
-                          3Crown
+                        <span className="text-[10px] text-cyan-400/80 font-mono font-bold">
+                          #{img.num || (idx + 1)}
                         </span>
                       </div>
                     </button>
@@ -412,7 +515,7 @@ export default function MomentGallery() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
             onClick={closeLightbox}
           >
-            {/* 상단 툴바 (제목 + 줌 컨트롤 + 닫기) */}
+            {/* 상단 툴바 */}
             <div 
               className="absolute top-0 left-0 right-0 p-4 md:px-8 flex items-center justify-between bg-gradient-to-b from-black/90 to-transparent z-50 font-cyber"
               onClick={(e) => e.stopPropagation()}
@@ -426,7 +529,7 @@ export default function MomentGallery() {
                 </h4>
               </div>
 
-              {/* 확대/축소 및 닫기 컨트롤 버튼 */}
+              {/* 확대/축소 및 닫기 */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-gray-900/90 border border-gray-700 rounded-full px-2 py-1 gap-1">
                   <button
@@ -467,7 +570,7 @@ export default function MomentGallery() {
               </div>
             </div>
 
-            {/* 메인 라이트박스 이미지 박스 (드래그 가능) */}
+            {/* 메인 이미지 뷰어 */}
             <div 
               className="relative w-full h-full max-w-6xl max-h-[80vh] flex items-center justify-center overflow-hidden my-auto"
               onClick={(e) => e.stopPropagation()}
@@ -492,13 +595,13 @@ export default function MomentGallery() {
               </motion.div>
             </div>
 
-            {/* 좌우 탐색 버튼 (모달 전용) */}
-            {GALLERY_IMAGES.length > 1 && (
+            {/* 좌우 탐색 버튼 */}
+            {validImages.length > 1 && (
               <>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setModalImageIndex((prev) => (prev > 0 ? prev - 1 : GALLERY_IMAGES.length - 1));
+                    setModalImageIndex((prev) => (prev > 0 ? prev - 1 : validImages.length - 1));
                     setModalZoomScale(1);
                   }}
                   className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-50"
@@ -509,7 +612,7 @@ export default function MomentGallery() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setModalImageIndex((prev) => (prev < GALLERY_IMAGES.length - 1 ? prev + 1 : 0));
+                    setModalImageIndex((prev) => (prev < validImages.length - 1 ? prev + 1 : 0));
                     setModalZoomScale(1);
                   }}
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-50"
@@ -520,12 +623,12 @@ export default function MomentGallery() {
               </>
             )}
 
-            {/* 하단 라이트박스 썸네일 내비게이터 */}
+            {/* 하단 썸네일 스트립 */}
             <div 
               className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 rounded-2xl bg-gray-900/90 border border-gray-800 backdrop-blur-md z-50 font-cyber"
               onClick={(e) => e.stopPropagation()}
             >
-              {GALLERY_IMAGES.map((img, idx) => (
+              {validImages.map((img, idx) => (
                 <button
                   key={img.id}
                   onClick={() => {

@@ -655,34 +655,34 @@ export default function Home() {
         <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto custom-scrollbar gap-2 text-xs font-mono">
           <div className="flex items-center gap-1.5 min-w-max">
             <a href="#intro" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              ✨ 1.소개
+              ✨ 소개
             </a>
             <a href="#clan-features" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              ✨ 5.클랜소개
+              ✨ 클랜소개
             </a>
             <a href="#moments" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              🏆 3.모멘트 갤러리
+              🏆 모멘트 갤러리
             </a>
             <a href="#lobby-chat" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              💬 6.로비채팅
+              💬 로비채팅
             </a>
             <a href="#clash-royale" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              👑 8.클래시로얄
+              👑 클래시로얄
             </a>
             <a href="#recent-posts" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              📢 10.최근게시글
+              📢 최근게시글
             </a>
             <a href="#qna" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              ❓ 7.QnA
+              ❓ QnA
             </a>
             <a href="#analytics" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              📈 9.실시간시세/AI
+              📈 실시간시세/AI
             </a>
             <a href="#reservation" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              📅 4.예약
+              📅 예약
             </a>
             <a href="#security" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              🔒 11.보안
+              🔒 보안
             </a>
           </div>
 
