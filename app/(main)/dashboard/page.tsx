@@ -11,6 +11,8 @@ import EtfTrackerWidget from '@/components/EtfTrackerWidget';
 import DeleteAccountWidget from '@/components/DeleteAccountWidget';
 import MomentGallery from '@/components/widgets/MomentGallery';
 import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
+import DailyStudyWidget from '@/components/widgets/DailyStudyWidget';
+import TaxBenefitWidget from '@/components/widgets/TaxBenefitWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
