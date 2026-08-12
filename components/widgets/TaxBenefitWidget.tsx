@@ -67,6 +67,11 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
 
   const getTodayString = () => new Date().toISOString().split('T')[0];
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [records, setRecords] = useState<TaxBenefitRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -101,16 +106,45 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
 
       if (error) {
         console.warn('Supabase fetch error, checking localStorage fallback:', error.message);
-        const localData = localStorage.getItem(`tax_benefit_${userId}`);
-        if (localData) setRecords(JSON.parse(localData));
+        if (typeof window !== 'undefined') {
+          const localData = localStorage.getItem(`tax_benefit_${userId}`);
+          if (localData) {
+            try {
+              const parsed = JSON.parse(localData);
+              setRecords(Array.isArray(parsed) ? parsed : []);
+            } catch {
+              setRecords([]);
+            }
+          } else {
+            setRecords([]);
+          }
+        } else {
+          setRecords([]);
+        }
       } else if (data) {
-        setRecords(data);
-        localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(data));
+        const recordsArray = Array.isArray(data) ? data : [];
+        setRecords(recordsArray);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(recordsArray));
+        }
       }
     } catch (err) {
       console.error('Fetch failed:', err);
-      const localData = localStorage.getItem(`tax_benefit_${userId}`);
-      if (localData) setRecords(JSON.parse(localData));
+      if (typeof window !== 'undefined') {
+        const localData = localStorage.getItem(`tax_benefit_${userId}`);
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            setRecords(Array.isArray(parsed) ? parsed : []);
+          } catch {
+            setRecords([]);
+          }
+        } else {
+          setRecords([]);
+        }
+      } else {
+        setRecords([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -164,11 +198,14 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
 
         if (error) {
           console.warn('Supabase update failed, saving locally:', error.message);
-          const updated = records.map((r) =>
+          const currentRecords = Array.isArray(records) ? records : [];
+          const updated = currentRecords.map((r) =>
             r.id === editingId ? { ...r, ...payload, updated_at: new Date().toISOString() } : r
           );
           setRecords(updated);
-          localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+          }
         } else {
           await fetchRecords();
         }
@@ -187,9 +224,12 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
             ...payload,
             created_at: new Date().toISOString(),
           };
-          const updated = [newRecord, ...records];
+          const currentRecords = Array.isArray(records) ? records : [];
+          const updated = [newRecord, ...currentRecords];
           setRecords(updated);
-          localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+          }
         } else if (data) {
           await fetchRecords();
         }
@@ -216,15 +256,18 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
   };
 
   const startEdit = (item: TaxBenefitRecord) => {
+    if (!item) return;
     setEditingId(item.id);
-    setRecordType(item.record_type);
-    setCategory(item.category);
-    setTitle(item.title);
-    setAmount(item.amount.toString());
+    setRecordType(item.record_type || 'tax');
+    setCategory(item.category || '배당소득세 (15.4%)');
+    setTitle(item.title || '');
+    setAmount(item.amount ? item.amount.toString() : '');
     setTaxRate(item.tax_rate ? item.tax_rate.toString() : '15.4');
-    setRecordDate(item.record_date);
+    setRecordDate(item.record_date || getTodayString());
     setNotes(item.notes || '');
-    window.scrollTo({ top: 700, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 700, behavior: 'smooth' });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -238,9 +281,12 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
 
       if (error) {
         console.warn('Supabase delete failed, deleting locally:', error.message);
-        const updated = records.filter((r) => r.id !== id);
+        const currentRecords = Array.isArray(records) ? records : [];
+        const updated = currentRecords.filter((r) => r.id !== id);
         setRecords(updated);
-        localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`tax_benefit_${userId}`, JSON.stringify(updated));
+        }
       } else {
         await fetchRecords();
       }
@@ -278,10 +324,14 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
     let totalTax = 0;
     let totalBenefit = 0;
 
-    records.forEach((r) => {
-      if (r.record_type === 'tax') totalTax += Number(r.amount);
-      else if (r.record_type === 'benefit') totalBenefit += Number(r.amount);
-    });
+    if (Array.isArray(records)) {
+      records.forEach((r) => {
+        if (!r) return;
+        const amt = Number(r.amount) || 0;
+        if (r.record_type === 'tax') totalTax += amt;
+        else if (r.record_type === 'benefit') totalBenefit += amt;
+      });
+    }
 
     const netBalance = totalBenefit - totalTax; // 순 혜택/환급
     const totalSum = totalTax + totalBenefit;
@@ -294,8 +344,9 @@ export default function TaxBenefitWidget({ userId }: TaxBenefitWidgetProps) {
 
   // 필터링된 기록 리스트
   const filteredRecords = useMemo(() => {
+    if (!Array.isArray(records)) return [];
     if (filterType === 'ALL') return records;
-    return records.filter((r) => r.record_type === filterType);
+    return records.filter((r) => r && r.record_type === filterType);
   }, [records, filterType]);
 
   // txt 요약 보고서 내보내기

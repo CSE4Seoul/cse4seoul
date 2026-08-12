@@ -45,6 +45,11 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
     return today.toISOString().split('T')[0];
   };
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [logs, setLogs] = useState<StudyLogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'record' | 'review'>('record');
@@ -79,18 +84,45 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
       if (error) {
         console.warn('Supabase fetch failed, checking localStorage fallback:', error.message);
-        const localData = localStorage.getItem(`study_logs_${userId}`);
-        if (localData) {
-          setLogs(JSON.parse(localData));
+        if (typeof window !== 'undefined') {
+          const localData = localStorage.getItem(`study_logs_${userId}`);
+          if (localData) {
+            try {
+              const parsed = JSON.parse(localData);
+              setLogs(Array.isArray(parsed) ? parsed : []);
+            } catch {
+              setLogs([]);
+            }
+          } else {
+            setLogs([]);
+          }
+        } else {
+          setLogs([]);
         }
       } else if (data) {
-        setLogs(data);
-        localStorage.setItem(`study_logs_${userId}`, JSON.stringify(data));
+        const logsArray = Array.isArray(data) ? data : [];
+        setLogs(logsArray);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`study_logs_${userId}`, JSON.stringify(logsArray));
+        }
       }
     } catch (err) {
       console.error('Error loading study logs:', err);
-      const localData = localStorage.getItem(`study_logs_${userId}`);
-      if (localData) setLogs(JSON.parse(localData));
+      if (typeof window !== 'undefined') {
+        const localData = localStorage.getItem(`study_logs_${userId}`);
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            setLogs(Array.isArray(parsed) ? parsed : []);
+          } catch {
+            setLogs([]);
+          }
+        } else {
+          setLogs([]);
+        }
+      } else {
+        setLogs([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -133,11 +165,14 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
         if (error) {
           console.warn('Supabase update failed, updating locally:', error.message);
-          const updated = logs.map((item) =>
+          const currentLogs = Array.isArray(logs) ? logs : [];
+          const updated = currentLogs.map((item) =>
             item.id === editingId ? { ...item, ...payload, updated_at: new Date().toISOString() } : item
           );
           setLogs(updated);
-          localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+          }
         } else {
           await fetchStudyLogs();
         }
@@ -156,9 +191,12 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
             ...payload,
             created_at: new Date().toISOString(),
           };
-          const updated = [newItem, ...logs];
+          const currentLogs = Array.isArray(logs) ? logs : [];
+          const updated = [newItem, ...currentLogs];
           setLogs(updated);
-          localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+          }
         } else if (data) {
           await fetchStudyLogs();
         }
@@ -184,12 +222,15 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
   // 항목 수정 클릭
   const startEdit = (item: StudyLogItem) => {
+    if (!item) return;
     setEditingId(item.id);
-    setLogDate(item.log_date);
-    setSubject(item.subject);
-    setContent(item.content);
+    setLogDate(item.log_date || getTodayString());
+    setSubject(item.subject || '');
+    setContent(item.content || '');
     setActiveTab('record');
-    window.scrollTo({ top: 300, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+    }
   };
 
   // 항목 삭제
@@ -205,9 +246,12 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
       if (error) {
         console.warn('Supabase delete failed, deleting locally:', error.message);
-        const updated = logs.filter((l) => l.id !== id);
+        const currentLogs = Array.isArray(logs) ? logs : [];
+        const updated = currentLogs.filter((l) => l.id !== id);
         setLogs(updated);
-        localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`study_logs_${userId}`, JSON.stringify(updated));
+        }
       } else {
         await fetchStudyLogs();
       }
@@ -218,17 +262,26 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
   // unique 주제 목록
   const uniqueSubjects = useMemo(() => {
-    const set = new Set(logs.map((l) => l.subject));
+    if (!Array.isArray(logs)) return [];
+    const set = new Set(logs.map((l) => l?.subject || '').filter(Boolean));
     return Array.from(set);
   }, [logs]);
 
   // 필터링된 기록 목록 (기록 탭용)
   const filteredLogs = useMemo(() => {
+    if (!Array.isArray(logs)) return [];
+    const query = (searchQuery || '').toLowerCase();
     return logs.filter((item) => {
+      if (!item) return false;
+      const itemSubject = (item.subject || '').toLowerCase();
+      const itemContent = (item.content || '').toLowerCase();
+      const itemDate = item.log_date || '';
+
       const matchesSearch =
-        item.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.log_date.includes(searchQuery);
+        !query ||
+        itemSubject.includes(query) ||
+        itemContent.includes(query) ||
+        itemDate.includes(query);
 
       const matchesSubject =
         selectedSubjectFilter === 'ALL' || item.subject === selectedSubjectFilter;
@@ -239,36 +292,38 @@ export default function DailyStudyWidget({ userId }: DailyStudyWidgetProps) {
 
   // 복습 모드 대상 기록들 (날짜 정렬: 과거 -> 최신 순 또는 최신 순)
   const reviewLogs = useMemo(() => {
+    if (!Array.isArray(logs)) return [];
     let result = [...logs];
 
     if (reviewFilterMode === '7days') {
       const past7 = new Date();
       past7.setDate(past7.getDate() - 7);
       const past7Str = past7.toISOString().split('T')[0];
-      result = result.filter((l) => l.log_date >= past7Str);
+      result = result.filter((l) => l && (l.log_date || '') >= past7Str);
     } else if (reviewFilterMode === '30days') {
       const past30 = new Date();
       past30.setDate(past30.getDate() - 30);
       const past30Str = past30.toISOString().split('T')[0];
-      result = result.filter((l) => l.log_date >= past30Str);
+      result = result.filter((l) => l && (l.log_date || '') >= past30Str);
     } else if (reviewFilterMode === 'custom') {
-      if (customStartDate) result = result.filter((l) => l.log_date >= customStartDate);
-      if (customEndDate) result = result.filter((l) => l.log_date <= customEndDate);
+      if (customStartDate) result = result.filter((l) => l && (l.log_date || '') >= customStartDate);
+      if (customEndDate) result = result.filter((l) => l && (l.log_date || '') <= customEndDate);
       if (selectedDates.size > 0) {
-        result = result.filter((l) => selectedDates.has(l.log_date));
+        result = result.filter((l) => l && selectedDates.has(l.log_date));
       }
     }
 
     // 복습할 때는 날짜 오름차순(과거->현재)으로 보기 편하게 정렬
-    return result.sort((a, b) => a.log_date.localeCompare(b.log_date));
+    return result.sort((a, b) => (a?.log_date || '').localeCompare(b?.log_date || ''));
   }, [logs, reviewFilterMode, customStartDate, customEndDate, selectedDates]);
 
   // 복습 텍스트 생성 [YYYY-MM-DD] 과목/공부 내용\n 줄글 내용...
   const combinedReviewText = useMemo(() => {
-    if (reviewLogs.length === 0) return '복습할 공부 기록이 없습니다.';
+    if (!Array.isArray(reviewLogs) || reviewLogs.length === 0) return '복습할 공부 기록이 없습니다.';
 
     return reviewLogs
-      .map((item) => `[${item.log_date}] ${item.subject} 공부 내용\n${item.content}`)
+      .filter(Boolean)
+      .map((item) => `[${item.log_date || ''}] ${item.subject || ''} 공부 내용\n${item.content || ''}`)
       .join('\n\n');
   }, [reviewLogs]);
 

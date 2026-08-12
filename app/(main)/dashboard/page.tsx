@@ -267,6 +267,12 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
+        {/* 📚 매일 공부 기록 & 복습/TXT 추출 위젯 */}
+        <DailyStudyWidget userId={user.id} />
+
+        {/* 💸 세금 납부 & 혜택/환급 비교 트래커 위젯 */}
+        <TaxBenefitWidget userId={user.id} />
+
         <div className="mt-8">
           <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
         </div>
