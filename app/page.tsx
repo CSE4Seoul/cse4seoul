@@ -378,6 +378,8 @@ export default function Home() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHallOfFameOpen, setIsHallOfFameOpen] = useState(false);
+  const [isHallOfShameOpen, setIsHallOfShameOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   
   // 권한 및 다국어, 공지사항을 위한 추가 상태
@@ -392,6 +394,19 @@ export default function Home() {
 
   const supabase = createClient();
   const t = contentData[lang];
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsHallOfFameOpen(false);
+        setIsHallOfShameOpen(false);
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // 사용자 및 추가 프로필 정보 불러오기
   useEffect(() => {
@@ -622,8 +637,31 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="flex items-center gap-5">
-            <p className="hidden md:inline-block text-[10px] font-mono text-white/40 tracking-wider">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* 맨 위 상단 Hall of Fame / Hall of Shame 팝업 트리거 버튼 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsHallOfFameOpen(true)}
+                className="group relative px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-500/10 hover:from-amber-500/25 hover:to-yellow-500/25 text-amber-300 border border-amber-500/30 hover:border-amber-400 text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.15)] hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-[1.03] active:scale-95 cursor-pointer"
+                title={lang === 'ko' ? '명예의 전당 팝업 열기' : 'Open Clan Hall of Fame'}
+              >
+                <span>🏆</span>
+                <span className="hidden sm:inline">{lang === 'ko' ? '명예의 전당' : 'Hall of Fame'}</span>
+                <span className="sm:hidden font-cyber">FAME</span>
+              </button>
+
+              <button
+                onClick={() => setIsHallOfShameOpen(true)}
+                className="group relative px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-500/10 to-red-500/10 hover:from-rose-500/25 hover:to-red-500/25 text-rose-300 border border-rose-500/30 hover:border-rose-400 text-[11px] font-bold font-mono transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(244,63,94,0.15)] hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:scale-[1.03] active:scale-95 cursor-pointer"
+                title={lang === 'ko' ? '비매너 박제소 팝업 열기' : 'Open Hall of Shame'}
+              >
+                <span>🚨</span>
+                <span className="hidden sm:inline">Hall of Shame</span>
+                <span className="sm:hidden font-cyber">SHAME</span>
+              </button>
+            </div>
+
+            <p className="hidden lg:inline-block text-[10px] font-mono text-white/40 tracking-wider">
               {user 
                 ? (lang === 'ko' ? `${user.email} 님 로그인됨` : `CONNECTED: ${user.email}`) 
                 : (lang === 'ko' ? '게스트 상태' : 'GUEST STATUS')}
@@ -658,15 +696,21 @@ export default function Home() {
             <a href="#intro" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
               ✨ 소개
             </a>
-            <a href="#clan-features" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
+            <a href="#clan-info" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
               ✨ 클랜소개
             </a>
-            <a href="#moments" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
-              🏆 모멘트 갤러리
-            </a>
-            <a href="#hall-of-shame" className="px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 border border-rose-500/20 transition-all font-bold">
+            <button
+              onClick={() => setIsHallOfFameOpen(true)}
+              className="px-3 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-400/60 transition-all font-bold cursor-pointer flex items-center gap-1 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
+            >
+              🏆 {lang === 'ko' ? '명예의 전당' : 'Hall of Fame'}
+            </button>
+            <button
+              onClick={() => setIsHallOfShameOpen(true)}
+              className="px-3 py-1.5 rounded-full bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400/60 transition-all font-bold cursor-pointer flex items-center gap-1 shadow-[0_0_10px_rgba(244,63,94,0.15)]"
+            >
               🚨 Hall of Shame
-            </a>
+            </button>
             <a href="#lobby-chat" className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 border border-white/5 transition-all">
               💬 로비채팅
             </a>
@@ -803,16 +847,6 @@ export default function Home() {
               </p>
             </HoverTiltCard>
           </div>
-        </section>
-
-        {/* 3. 클랜 모멘트 갤러리 (#moments) */}
-        <section id="moments" className="scroll-mt-32 w-full">
-          <MomentGallery />
-        </section>
-
-        {/* 🚨 CSE4Seoul Hall of Shame (비매너 블랙리스트 박제소) (#hall-of-shame) */}
-        <section id="hall-of-shame" className="scroll-mt-32 w-full">
-          <HallOfShameWidget />
         </section>
 
         {/* 6. 로비채팅 (#lobby-chat) */}
@@ -1144,6 +1178,110 @@ export default function Home() {
         isAdmin={profile?.role === 'admin'}
         onDeleteNotice={handleDeleteNotice}
       />
+
+      {/* 🏆 Hall of Fame (명예의 전당 / 모멘트 갤러리) 팝업 모달 */}
+      <AnimatePresence>
+        {isHallOfFameOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsHallOfFameOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.94, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-5xl bg-neutral-950 border border-amber-500/30 rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.18)] flex flex-col max-h-[92vh] overflow-hidden my-auto"
+            >
+              {/* 상단 앰버 골드 액센트 라인 */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent z-30" />
+
+              {/* 모달 상단 헤더 */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-neutral-900/80 backdrop-blur-md z-30 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🏆</span>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm md:text-base font-black text-white font-mono tracking-tight">
+                      CLAN HALL OF FAME
+                    </h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold">
+                      {lang === 'ko' ? '명예의 전당' : 'MOMENTS'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsHallOfFameOpen(false)}
+                  className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all border border-white/10 cursor-pointer"
+                  aria-label="Close Hall of Fame Modal"
+                >
+                  <RiCloseLine className="text-2xl" />
+                </button>
+              </div>
+
+              {/* 모달 바디 (MomentGallery 위젯) */}
+              <div className="overflow-y-auto custom-scrollbar p-3 sm:p-6">
+                <MomentGallery />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🚨 Hall of Shame (비매너 블랙리스트 박제소) 팝업 모달 */}
+      <AnimatePresence>
+        {isHallOfShameOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsHallOfShameOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.94, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-5xl bg-neutral-950 border border-rose-500/30 rounded-3xl shadow-[0_0_50px_rgba(244,63,94,0.18)] flex flex-col max-h-[92vh] overflow-hidden my-auto"
+            >
+              {/* 상단 로즈 레드 액센트 라인 */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-rose-500 to-transparent z-30" />
+
+              {/* 모달 상단 헤더 */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-rose-500/20 bg-rose-950/40 backdrop-blur-md z-30 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🚨</span>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm md:text-base font-black text-rose-400 font-mono tracking-tight">
+                      CSE4SEOUL HALL OF SHAME
+                    </h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono font-bold">
+                      {lang === 'ko' ? '비매너 블랙리스트' : 'BLACKLIST'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsHallOfShameOpen(false)}
+                  className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all border border-white/10 cursor-pointer"
+                  aria-label="Close Hall of Shame Modal"
+                >
+                  <RiCloseLine className="text-2xl" />
+                </button>
+              </div>
+
+              {/* 모달 바디 (HallOfShameWidget 위젯) */}
+              <div className="overflow-y-auto custom-scrollbar p-3 sm:p-6">
+                <HallOfShameWidget />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 7. CSS 스타일 시트 주입 (Marquee 및 Scanline 애니메이션) */}
       <style dangerouslySetInnerHTML={{ __html: `

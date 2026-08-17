@@ -408,12 +408,12 @@ export default function HallOfShameWidget() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
             onClick={closeLightbox}
           >
             {/* 상단 툴바 */}
             <div 
-              className="absolute top-0 left-0 right-0 p-4 md:px-8 flex items-center justify-between bg-gradient-to-b from-black/90 to-transparent z-50 font-cyber"
+              className="absolute top-0 left-0 right-0 p-4 md:px-8 flex items-center justify-between bg-gradient-to-b from-black/90 to-transparent z-[70] font-cyber"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3">

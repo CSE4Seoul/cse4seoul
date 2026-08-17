@@ -512,12 +512,12 @@ export default function MomentGallery() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
             onClick={closeLightbox}
           >
             {/* 상단 툴바 */}
             <div 
-              className="absolute top-0 left-0 right-0 p-4 md:px-8 flex items-center justify-between bg-gradient-to-b from-black/90 to-transparent z-50 font-cyber"
+              className="absolute top-0 left-0 right-0 p-4 md:px-8 flex items-center justify-between bg-gradient-to-b from-black/90 to-transparent z-[70] font-cyber"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3">
@@ -604,7 +604,7 @@ export default function MomentGallery() {
                     setModalImageIndex((prev) => (prev > 0 ? prev - 1 : validImages.length - 1));
                     setModalZoomScale(1);
                   }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-50"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-[70]"
                   aria-label="이전 사진"
                 >
                   <ChevronLeft size={28} />
@@ -615,7 +615,7 @@ export default function MomentGallery() {
                     setModalImageIndex((prev) => (prev < validImages.length - 1 ? prev + 1 : 0));
                     setModalZoomScale(1);
                   }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-50"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-gray-900/90 text-cyan-400 border border-cyan-700 hover:bg-cyan-900 hover:scale-110 transition-all shadow-glow-blue z-[70]"
                   aria-label="다음 사진"
                 >
                   <ChevronRight size={28} />
@@ -625,7 +625,7 @@ export default function MomentGallery() {
 
             {/* 하단 썸네일 스트립 */}
             <div 
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 rounded-2xl bg-gray-900/90 border border-gray-800 backdrop-blur-md z-50 font-cyber"
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 p-2 rounded-2xl bg-gray-900/90 border border-gray-800 backdrop-blur-md z-[70] font-cyber"
               onClick={(e) => e.stopPropagation()}
             >
               {validImages.map((img, idx) => (

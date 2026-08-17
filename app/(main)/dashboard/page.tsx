@@ -13,6 +13,7 @@ import MomentGallery from '@/components/widgets/MomentGallery';
 import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 import DailyStudyWidget from '@/components/widgets/DailyStudyWidget';
 import TaxBenefitWidget from '@/components/widgets/TaxBenefitWidget';
+import TreeWidget from '@/components/widgets/TreeWidget';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -189,7 +190,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* 전술 기록 및 작전 채널 (전체 너비) */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* 동물농장 카드 */}
           <Link
             href="/animal-farm"
@@ -201,11 +202,30 @@ export default async function DashboardPage() {
                 입장하기 →
               </span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">조의ver 동물농장</h3>
-            <p className="text-sm text-gray-400">지친 일상 속, 나만의 동물 친구들과 함께하는 힐링 타임.</p>
+            <h3 className="text-lg font-bold text-white mb-1">조의ver 동물농장</h3>
+            <p className="text-xs text-gray-400">나만의 동물 친구들과 함께하는 힐링 공간.</p>
             <div className="mt-4 flex items-center gap-2 text-xs text-pink-500 font-bold">
               <span className="w-1.5 h-1.5 bg-pink-400 rounded-full animate-pulse"></span>
-              NEW 콘텐츠 오픈!
+              NEW 오픈
+            </div>
+          </Link>
+
+          {/* 마인드맵 & 지식 트리 카드 */}
+          <Link
+            href="/mindmap"
+            className="group flex flex-col p-6 rounded-2xl bg-gradient-to-br from-cyan-900/20 to-indigo-900/20 border border-cyan-800/50 hover:border-cyan-400/60 transition-all hover:shadow-[0_0_30px_rgba(6,182,212,0.35)]"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-3xl group-hover:scale-110 transition-transform">🌳</span>
+              <span className="text-xs text-cyan-400 group-hover:translate-x-1 transition-transform">
+                스튜디오 →
+              </span>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">목표 & 지식 마인드맵</h3>
+            <p className="text-xs text-gray-400">무한 뎁스 캔버스 & 트리 계층형 구조화 로드맵.</p>
+            <div className="mt-4 flex items-center gap-2 text-xs text-cyan-400 font-bold font-mono">
+              <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>
+              TREE STUDIO
             </div>
           </Link>
 
@@ -220,8 +240,8 @@ export default async function DashboardPage() {
                 바로가기 →
               </span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">전술 기록 게시판</h3>
-            <p className="text-sm text-gray-400">작전 회의록, 전략 분석, 병력 배치 계획을 공유하세요.</p>
+            <h3 className="text-lg font-bold text-white mb-1">전술 기록 게시판</h3>
+            <p className="text-xs text-gray-400">작전 회의록, 전략 분석 및 개발 기록 공유.</p>
             <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
               <span className="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>
               실시간 업데이트
@@ -239,11 +259,11 @@ export default async function DashboardPage() {
                 보안 접속 →
               </span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">북 트래커 & 학습 로그</h3>
-            <p className="text-sm text-gray-400">독서 진도를 기록하고, 핵심 구절과 나의 생각을 보안 공간에 정리하세요.</p>
+            <h3 className="text-lg font-bold text-white mb-1">북 트래커 & 학습 로그</h3>
+            <p className="text-xs text-gray-400">독서 진도 및 핵심 구절/생각 정리 공간.</p>
             <div className="mt-4 flex items-center gap-2 text-xs text-cyan-500">
               <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></span>
-              공부용 템플릿 지원
+              공부용 템플릿
             </div>
           </Link>
 
@@ -258,13 +278,18 @@ export default async function DashboardPage() {
                 바로가기 →
               </span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">실시간 작전 채널</h3>
-            <p className="text-sm text-gray-400">암호화된 실시간 통신으로 즉각적인 작전 지시와 논의가 가능합니다.</p>
+            <h3 className="text-lg font-bold text-white mb-1">실시간 작전 채널</h3>
+            <p className="text-xs text-gray-400">암호화된 실시간 통신 및 작전 지시 논의.</p>
             <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
               <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
               접속자 대기 중
             </div>
           </Link>
+        </div>
+
+        {/* 🌳 인터랙티브 마인드맵 & 지식 트리 위젯 */}
+        <div className="mt-8">
+          <TreeWidget />
         </div>
 
         {/* 📚 매일 공부 기록 & 복습/TXT 추출 위젯 */}
