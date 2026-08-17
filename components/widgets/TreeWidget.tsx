@@ -69,6 +69,8 @@ import {
   calculateNodeStats, 
   generateClientUUID 
 } from '@/lib/treeService';
+import { createClient } from '@/utils/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface TreeWidgetProps {
   initialData?: TreeNode[];
@@ -106,18 +108,12 @@ export default function TreeWidget({
   className = "",
   isStandalone = false,
 }: TreeWidgetProps) {
+  const supabase = createClient();
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+  const [isLoadingFromCloud, setIsLoadingFromCloud] = useState(false);
+
   // 1. 노드 원본 Flat 배열 상태
   const [flatNodes, setFlatNodes] = useState<TreeNode[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cse4seoul_tree_nodes_v2');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse saved tree nodes:', e);
-        }
-      }
-    }
     return initialData && initialData.length > 0 ? initialData : INITIAL_TREE_DATA;
   });
 
@@ -147,15 +143,58 @@ export default function TreeWidget({
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // 로컬스토리지 자동 저장 & 상위 전달
+  // 유저 세션 및 클라우드 데이터 로드
+  useEffect(() => {
+    let isMounted = true;
+    const initUserAndData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (isMounted) setCurrentUser(user);
+
+        const storageKey = `cse4seoul_tree_nodes_${user?.id || 'guest'}`;
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem(storageKey);
+          if (cached) {
+            try {
+              if (isMounted) setFlatNodes(JSON.parse(cached));
+            } catch {}
+          }
+        }
+
+        // 클라우드 API 호출
+        setIsLoadingFromCloud(true);
+        const res = await fetch('/api/tree-nodes');
+        const json = await res.json();
+        if (isMounted && json.success && json.data && json.data.length > 0) {
+          setFlatNodes(json.data);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(storageKey, JSON.stringify(json.data));
+          }
+        }
+      } catch (err) {
+        console.warn('[TreeWidget] Cloud fetch fallback:', err);
+      } finally {
+        if (isMounted) setIsLoadingFromCloud(false);
+      }
+    };
+
+    initUserAndData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase]);
+
+  // 유저별 격리 로컬스토리지 자동 저장 & 상위 전달
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('cse4seoul_tree_nodes_v2', JSON.stringify(flatNodes));
+      const storageKey = `cse4seoul_tree_nodes_${currentUser?.id || 'guest'}`;
+      localStorage.setItem(storageKey, JSON.stringify(flatNodes));
     }
     if (onDataChange) {
       onDataChange(flatNodes);
     }
-  }, [flatNodes, onDataChange]);
+  }, [flatNodes, currentUser, onDataChange]);
 
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'warn' = 'success') => {
     setToastMessage({ text, type });
@@ -1216,21 +1255,30 @@ export default function TreeWidget({
 
       {/* 4. 하단 상태 바 */}
       <div className="flex flex-wrap items-center justify-between px-6 py-3 bg-neutral-950 border-t border-white/10 text-[10px] font-mono text-neutral-400">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>SYNC: SUPABASE LIVE / LOCAL</span>
+            <span className={`w-2 h-2 rounded-full ${currentUser ? 'bg-emerald-400' : 'bg-amber-400'} animate-ping`} />
+            <span className="font-bold">
+              {currentUser 
+                ? `CLOUD SYNC: ${currentUser.email}` 
+                : 'GUEST SANDBOX (LOCAL STORAGE)'}
+            </span>
           </span>
           <span className="hidden sm:inline">•</span>
           <span className="hidden sm:inline">
             완료율: {Math.round((flatNodes.filter((n) => n.status === 'completed').length / Math.max(1, flatNodes.length)) * 100)}%
           </span>
+          {!currentUser && (
+            <span className="hidden md:inline text-amber-400/80 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+              💡 로그인 시 개인 클라우드 DB에 영구 격리 저장됩니다.
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={handleResetToDefault}
-            className="text-neutral-500 hover:text-neutral-300 underline"
+            className="text-neutral-500 hover:text-neutral-300 underline cursor-pointer"
           >
             기본 템플릿 복원
           </button>

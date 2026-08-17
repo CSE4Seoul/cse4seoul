@@ -2,41 +2,71 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { INITIAL_TREE_DATA } from '@/lib/treeService';
 
-// GET: 노드 목록 조회 (계층 평탄화 목록)
+// GET: 노드 목록 조회 (로그인 유저별 데이터 격리)
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Supabase 쿼리 시도
-    let query = supabase
-      .from('tree_nodes')
-      .select('*')
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: true });
-
     if (user) {
-      // 본인 노드 또는 공용 템플릿(user_id IS NULL)
-      query = query.or(`user_id.eq.${user.id},user_id.is.null`);
+      // 1. 로그인 유저의 개인 트리 노드 조회
+      const { data: userNodes, error: userError } = await supabase
+        .from('tree_nodes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (!userError && userNodes && userNodes.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: userNodes,
+          userId: user.id,
+          source: 'supabase_user'
+        });
+      }
+
+      // 2. 유저가 아직 생성한 노드가 없는 경우 기본 공용 템플릿 반환
+      const { data: publicNodes } = await supabase
+        .from('tree_nodes')
+        .select('*')
+        .is('user_id', null)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (publicNodes && publicNodes.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: publicNodes,
+          userId: user.id,
+          source: 'supabase_template'
+        });
+      }
     } else {
-      query = query.is('user_id', null);
+      // 비로그인 게스트: 공용 기본 템플릿 조회
+      const { data: guestNodes } = await supabase
+        .from('tree_nodes')
+        .select('*')
+        .is('user_id', null)
+        .order('order_index', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (guestNodes && guestNodes.length > 0) {
+        return NextResponse.json({
+          success: true,
+          data: guestNodes,
+          userId: null,
+          source: 'supabase_guest'
+        });
+      }
     }
 
-    const { data, error } = await query;
-
-    if (error || !data || data.length === 0) {
-      // DB에 데이터가 없거나 테이블 미생성 시 초기 기본 데이터 반환
-      return NextResponse.json({
-        success: true,
-        data: INITIAL_TREE_DATA,
-        source: 'fallback'
-      });
-    }
-
+    // DB에 데이터가 없거나 연결 전인 경우 초기 데이터 반환
     return NextResponse.json({
       success: true,
-      data,
-      source: 'supabase'
+      data: INITIAL_TREE_DATA,
+      userId: user ? user.id : null,
+      source: 'fallback'
     });
   } catch (error: any) {
     console.warn('[Tree API] GET fallback due to error:', error?.message);

@@ -6,7 +6,7 @@
 -- 1. tree_nodes 테이블 생성 (무한 깊이의 계층형 트리 및 마인드맵 노드 구조)
 CREATE TABLE IF NOT EXISTS public.tree_nodes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
     parent_id UUID REFERENCES public.tree_nodes(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -32,26 +32,26 @@ CREATE INDEX IF NOT EXISTS idx_tree_nodes_parent_order ON public.tree_nodes(pare
 -- 3. RLS (Row Level Security) 활성화
 ALTER TABLE public.tree_nodes ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS 정책 정의
+-- 4. RLS 정책 정의 (유저별 데이터 완벽 격리)
 -- 본인 소유의 노드이거나, 공용/기본 템플릿(user_id IS NULL)인 경우 조회 가능
 DROP POLICY IF EXISTS "Users can select own or public tree nodes" ON public.tree_nodes;
 CREATE POLICY "Users can select own or public tree nodes"
 ON public.tree_nodes FOR SELECT
 USING (
-    user_id IS NULL OR 
-    (auth.uid() IS NOT NULL AND auth.uid() = user_id)
+    (auth.uid() IS NOT NULL AND auth.uid() = user_id) OR
+    (user_id IS NULL)
 );
 
--- 본인 소유로 노드 생성
+-- 본인 소유로 노드 생성 (user_id는 auth.uid()로 자동 매핑)
 DROP POLICY IF EXISTS "Users can insert their own tree nodes" ON public.tree_nodes;
 CREATE POLICY "Users can insert their own tree nodes"
 ON public.tree_nodes FOR INSERT
 WITH CHECK (
-    auth.uid() IS NOT NULL AND 
-    (user_id = auth.uid() OR user_id IS NULL)
+    (auth.uid() IS NOT NULL AND (user_id = auth.uid() OR user_id IS NULL)) OR
+    (user_id IS NULL AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (role = 'admin' OR is_admin = true)))
 );
 
--- 본인 소유 노드 수정
+-- 본인 소유 노드만 수정 가능
 DROP POLICY IF EXISTS "Users can update their own tree nodes" ON public.tree_nodes;
 CREATE POLICY "Users can update their own tree nodes"
 ON public.tree_nodes FOR UPDATE
@@ -64,7 +64,7 @@ WITH CHECK (
     (user_id IS NULL AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND (role = 'admin' OR is_admin = true)))
 );
 
--- 본인 소유 노드 삭제 (ON DELETE CASCADE로 하위 자식 노드 자동 연쇄 삭제)
+-- 본인 소유 노드만 삭제 가능 (ON DELETE CASCADE로 하위 자식 노드 자동 연쇄 삭제)
 DROP POLICY IF EXISTS "Users can delete their own tree nodes" ON public.tree_nodes;
 CREATE POLICY "Users can delete their own tree nodes"
 ON public.tree_nodes FOR DELETE
