@@ -13,6 +13,7 @@ import MomentGallery from '@/components/widgets/MomentGallery';
 import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 import DailyStudyWidget from '@/components/widgets/DailyStudyWidget';
 import TaxBenefitWidget from '@/components/widgets/TaxBenefitWidget';
+import AccountBookWidget from '@/components/widgets/AccountBookWidget';
 import TreeWidget from '@/components/widgets/TreeWidget';
 
 export default async function DashboardPage() {
@@ -294,6 +295,9 @@ export default async function DashboardPage() {
 
         {/* 📚 매일 공부 기록 & 복습/TXT 추출 위젯 */}
         <DailyStudyWidget userId={user.id} />
+
+        {/* 💼 실질급여 & 가계부 장부 위젯 */}
+        <AccountBookWidget userId={user.id} />
 
         {/* 💸 세금 납부 & 혜택/환급 비교 트래커 위젯 */}
         <TaxBenefitWidget userId={user.id} />

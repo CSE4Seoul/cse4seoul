@@ -41,6 +41,7 @@ import NoticeModal from '@/components/NoticeModal';
 import MomentGallery from '@/components/widgets/MomentGallery';
 import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 import ReservationWidget from '@/components/ReservationWidget';
+import AccountBookWidget from '@/components/widgets/AccountBookWidget';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // DB에서 가져올 게시글 타입 정의
@@ -1028,6 +1029,11 @@ export default function Home() {
             </div>
             <QAWidget user={user} profile={profile} lang={lang} />
           </div>
+        </section>
+
+        {/* 💼 실질급여 & 가계부 장부 위젯 (코스피/시세 섹션 상단) */}
+        <section id="account-book" className="scroll-mt-32">
+          <AccountBookWidget userId={user?.id} />
         </section>
 
         {/* 9. 실시간 시세 및 AI 분석 기능 (#analytics) */}
