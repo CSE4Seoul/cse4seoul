@@ -8,6 +8,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
+import CosmicBackground from '@/components/CosmicBackground';
 
 export default function LoginPage() {
   const { t, toggleLanguage, lang } = useLanguage();
@@ -139,8 +140,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
-      {/* 배경 그라데이션 (기존 코드 유지) */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900/50 via-black to-black z-0" />
+      {/* 은은한 별빛 및 오로라 배경 */}
+      <CosmicBackground />
 
       {/* 🏠 메인화면으로 돌아가기 버튼 (좌측 상단) */}
       <Link

@@ -15,6 +15,7 @@ import DailyStudyWidget from '@/components/widgets/DailyStudyWidget';
 import TaxBenefitWidget from '@/components/widgets/TaxBenefitWidget';
 import AccountBookWidget from '@/components/widgets/AccountBookWidget';
 import TreeWidget from '@/components/widgets/TreeWidget';
+import CosmicBackground from '@/components/CosmicBackground';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -52,8 +53,8 @@ export default async function DashboardPage() {
         </span>
       </Link>
 
-      {/* 배경 데코레이션 */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px] -z-10" />
+      {/* 은은하게 퍼지는 별빛 및 오로라 배경 */}
+      <CosmicBackground />
 
       <div className="max-w-5xl mx-auto z-10 relative">
         {/* 상단 네비게이션 바 */}

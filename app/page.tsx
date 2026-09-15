@@ -42,6 +42,7 @@ import MomentGallery from '@/components/widgets/MomentGallery';
 import HallOfShameWidget from '@/components/widgets/HallOfShameWidget';
 import ReservationWidget from '@/components/ReservationWidget';
 import AccountBookWidget from '@/components/widgets/AccountBookWidget';
+import CosmicBackground from '@/components/CosmicBackground';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 // DB에서 가져올 게시글 타입 정의
@@ -200,144 +201,7 @@ const contentData = {
   }
 };
 
-// 1. WebGL 스타일의 Canvas 인터랙티브 배경
-const BackgroundCanvas = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    const particles: Array<{
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      radius: number;
-      color: string;
-    }> = [];
-
-    const numParticles = Math.min(60, Math.floor((width * height) / 25000));
-
-    for (let i = 0; i < numParticles; i++) {
-      particles.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        radius: Math.random() * 2 + 1,
-        color: i % 3 === 0 ? 'rgba(6, 182, 212, 0.4)' : i % 3 === 1 ? 'rgba(139, 92, 246, 0.4)' : 'rgba(236, 72, 153, 0.3)',
-      });
-    }
-
-    let mouse = { x: -1000, y: -1000, active: false };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-      mouse.active = true;
-    };
-
-    const handleMouseLeave = () => {
-      mouse.x = -1000;
-      mouse.y = -1000;
-      mouse.active = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseleave', handleMouseLeave);
-
-    const handleResize = () => {
-      if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-    window.addEventListener('resize', handleResize);
-
-    const draw = () => {
-      ctx.clearRect(0, 0, width, height);
-
-      // Cyber Grid Background overlay
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
-      ctx.lineWidth = 1;
-      const gridSize = 45;
-      for (let x = 0; x < width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      // Draw particles & connect
-      particles.forEach((p, idx) => {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > width) p.vx *= -1;
-        if (p.y < 0 || p.y > height) p.vy *= -1;
-
-        if (mouse.active) {
-          const dx = mouse.x - p.x;
-          const dy = mouse.y - p.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 180) {
-            p.x += dx * 0.008;
-            p.y += dy * 0.008;
-          }
-        }
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-
-        for (let j = idx + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const dx = p.x - p2.x;
-          const dy = p.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < 110) {
-            const alpha = (1 - dist / 110) * 0.12;
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-          }
-        }
-      });
-
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseleave', handleMouseLeave);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none" />;
-};
-
-// 2. Framer Motion 3D Hover Tilt Card (스큐어모피즘 및 광택 효과)
+// Framer Motion 3D Hover Tilt Card (스큐어모피즘 및 광택 효과)
 const HoverTiltCard = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -572,35 +436,8 @@ export default function Home() {
 
   return (
     <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-black text-white">
-      {/* 1. WebGL 스타일 인터랙티브 백그라운드 canvas */}
-      <BackgroundCanvas />
-
-      {/* 2. Glow Blur Background Orbs */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(120,119,198,0.18),transparent_70%)]" />
-      <motion.div
-        animate={{
-          x: [0, 15, -15, 0],
-          y: [0, -15, 15, 0],
-        }}
-        transition={{
-          duration: 15,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="pointer-events-none absolute left-[10%] top-[8%] z-0 h-[600px] w-[600px] rounded-full bg-cyan-500/[0.03] blur-[150px]"
-      />
-      <motion.div
-        animate={{
-          x: [0, -20, 20, 0],
-          y: [0, 20, -20, 0],
-        }}
-        transition={{
-          duration: 22,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="pointer-events-none absolute right-[10%] top-[25%] z-0 h-[700px] w-[700px] rounded-full bg-violet-500/[0.03] blur-[180px]"
-      />
+      {/* 은은하게 퍼지는 별빛 및 오로라 배경 (통합 모듈) */}
+      <CosmicBackground />
 
       {/* 3. alert ticker marquee bar (공지 활성화 시 자동 표시) */}
       {notices.length > 0 && (
