@@ -204,8 +204,8 @@ export default function PrivacyPolicyModal({ isOpen, onClose, lang = "ko" }: Pri
                     <p>개인정보 처리에 관한 문의 사항이나 불만 사항은 아래 보호책임자에게 연락해 주시기 바랍니다:</p>
                     <div className="bg-black/30 p-3 rounded-lg border border-gray-800 mt-2">
                       <p>• <strong>부서 / 성명:</strong> CSE4Seoul 지원팀 / 개인정보 보호책임자 (CPO)</p>
-                      <p>• <strong>연락처:</strong> 02-1234-5678</p>
-                      <p>• <strong>이메일:</strong> support@cse4seoul.com</p>
+                      <p>• <strong>연락처:</strong> (이메일을 통해 연락 주세요)</p>
+                      <p>• <strong>이메일:</strong> johamin3624@konkuk.ac.kr</p>
                     </div>
                   </section>
 
@@ -372,8 +372,8 @@ export default function PrivacyPolicyModal({ isOpen, onClose, lang = "ko" }: Pri
                     <p>If you have any questions or complaints regarding privacy processing, please contact the CPO:</p>
                     <div className="bg-black/30 p-3 rounded-lg border border-gray-800 mt-2">
                       <p>• <strong>Department / Name:</strong> CSE4Seoul Support Team / Chief Privacy Officer (CPO)</p>
-                      <p>• <strong>Telephone:</strong> 02-1234-5678</p>
-                      <p>• <strong>Email:</strong> support@cse4seoul.com</p>
+                      <p>• <strong>Telephone:</strong> (Please contact via email)</p>
+                      <p>• <strong>Email:</strong> johamin3624@konkuk.ac.kr</p>
                     </div>
                   </section>
 
