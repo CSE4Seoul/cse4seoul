@@ -18,12 +18,14 @@ import {
   Receipt,
   Layers,
   Network,
-  Sparkles
+  Sparkles,
+  Code2
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
 import LobbyChatWidget from '@/components/LobbyChatWidget';
 import CosmicBackground from '@/components/CosmicBackground';
+import DevelopersWidget from '../components/widgets/DevelopersWidget';
 
 interface Post {
   id: string | number;
@@ -309,38 +311,19 @@ export default function LandingPage() {
             </Link>
 
             <a
-              href="#lobby-chat"
-              className="rounded-full border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 px-6 py-3.5 text-xs font-bold transition-all flex items-center gap-1.5"
-            >
-              <span>{t.lobbyChatNav}</span>
-            </a>
-
-            <a
               href="#showcase"
               className="rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] px-6 py-3.5 text-xs font-bold text-neutral-300 hover:text-white transition-all"
             >
               {t.showcaseBtn}
             </a>
+
+            <a
+              href="#lobby-chat"
+              className="rounded-full border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 px-6 py-3.5 text-xs font-bold transition-all flex items-center gap-1.5"
+            >
+              <span>{t.lobbyChatNav}</span>
+            </a>
           </motion.div>
-        </section>
-
-        {/* 5. 💬 공개 로비 실시간 채팅 섹션 (#lobby-chat) */}
-        <section id="lobby-chat" className="scroll-mt-24 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl">💬</span>
-              <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">{t.lobbyChatTitle}</h2>
-            </div>
-            <div className="flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-full border border-cyan-800/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-              <span>{t.lobbyChatStatus}</span>
-            </div>
-          </div>
-
-          <div className="relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/40 backdrop-blur-xl shadow-2xl transition-all duration-500 overflow-hidden">
-            <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent z-10" />
-            <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
-          </div>
         </section>
 
         {/* Bento Showcase (4대 핵심 도메인 요약) */}
@@ -543,6 +526,29 @@ export default function LandingPage() {
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
+        </div>
+
+        {/* 공개 로비 실시간 채팅 섹션 (#lobby-chat) */}
+        <section id="lobby-chat" className="scroll-mt-24 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">💬</span>
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">{t.lobbyChatTitle}</h2>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono text-[9px] text-cyan-400 bg-cyan-950/40 px-2.5 py-1 rounded-full border border-cyan-800/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+              <span>{t.lobbyChatStatus}</span>
+            </div>
+          </div>
+
+          <div className="relative group rounded-3xl border border-white/[0.08] hover:border-cyan-500/25 bg-black/40 backdrop-blur-xl shadow-2xl transition-all duration-500 overflow-hidden">
+            <div className="absolute top-0 left-5 right-5 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent z-10" />
+            <LobbyChatWidget isAdminProp={profile?.role === 'admin' || profile?.is_admin === true} />
+          </div>
+        </section>
+
+        <div className="flex justify-center">
+          <DevelopersWidget />
         </div>
 
         {/* Footer */}
