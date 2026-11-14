@@ -1422,6 +1422,10 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
   const handleEmoticonSend = async (keyword: string) => {
     if (isSendingRef.current) return;
+    if (!isLoggedIn) {
+      setFilterWarning('이모티콘 사용은 로그인 회원 전용입니다.');
+      return;
+    }
     if (isGuest && !canChat) {
       alert(`게스트는 하루에 ${GUEST_DAILY_CHAT_LIMIT}회만 메시지를 보낼 수 있습니다. 더 많은 대화를 나누고 싶다면 로그인해주세요!`);
       return;
@@ -2210,7 +2214,7 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
       <form onSubmit={sendMessage} className="border-t border-white/[0.08] p-4 bg-black/20">
         <div className="flex gap-2 items-end relative">
-          {showEmoticonPicker && (
+          {showEmoticonPicker && isLoggedIn && (
             <EmoticonPicker
               onSelect={handleEmoticonSend}
               onClose={() => setShowEmoticonPicker(false)}
@@ -2219,8 +2223,20 @@ export default function LobbyChatWidget({ isAdminProp }: LobbyChatWidgetProps = 
 
           <button
             type="button"
-            onClick={() => setShowEmoticonPicker(prev => !prev)}
-            className="flex-shrink-0 p-2.5 rounded-xl border border-gray-700 text-gray-400 hover:text-cyan-300 hover:border-cyan-500/30 bg-gray-800/50"
+            onClick={() => {
+              if (!isLoggedIn) {
+                setFilterWarning('이모티콘 사용은 로그인 회원 전용입니다.');
+                return;
+              }
+              setShowEmoticonPicker(prev => !prev);
+            }}
+            aria-label={isLoggedIn ? '이모티콘 선택' : '로그인 전용 이모티콘'}
+            title={isLoggedIn ? '이모티콘 선택' : '로그인 후 사용할 수 있습니다.'}
+            className={`flex-shrink-0 p-2.5 rounded-xl border border-gray-700 bg-gray-800/50 ${
+              isLoggedIn
+                ? 'text-gray-400 hover:text-cyan-300 hover:border-cyan-500/30'
+                : 'cursor-not-allowed text-gray-600'
+            }`}
           >
             <RiEmotionLine className="w-5 h-5" />
           </button>

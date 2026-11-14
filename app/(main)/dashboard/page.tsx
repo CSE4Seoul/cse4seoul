@@ -20,6 +20,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import CosmicBackground from '@/components/CosmicBackground';
+import InquiryDashboard from '@/components/InquiryDashboard';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -105,6 +106,8 @@ export default async function DashboardPage() {
             </span>
           </div>
         </header>
+
+        <InquiryDashboard isAdmin={profile?.role === 'admin' || profile?.is_admin === true} />
 
         {/* 상단 퀵 런처 바: 5대 핵심 도메인 바로가기 */}
         <section aria-label="Quick Launcher" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

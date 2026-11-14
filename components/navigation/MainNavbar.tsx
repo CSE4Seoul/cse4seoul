@@ -15,8 +15,7 @@ import {
   LogOut, 
   ChevronDown,
   LayoutDashboard,
-  ShieldCheck,
-  Sparkles
+  Code2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -33,7 +32,7 @@ export default function MainNavbar() {
   const pathname = rawPathname || '';
   const [user, setUser] = useState<User | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -57,6 +56,12 @@ export default function MainNavbar() {
       href: '/dashboard',
       matchPrefix: '/dashboard',
       icon: <LayoutDashboard className="w-4 h-4" />
+    },
+    {
+      name: '구성원 소개',
+      href: '/developers',
+      matchPrefix: '/developers',
+      icon: <Code2 className="w-4 h-4" />
     },
     {
       name: '개인 재무',
@@ -100,15 +105,16 @@ export default function MainNavbar() {
       subItems: [
         { name: '커뮤니티 라운지', href: '/community', desc: '클랜 소식 및 활동 현황' },
         { name: '전술 기록 게시판', href: '/board', desc: '작전 회의록 및 지식 공유' },
-        { name: '보안 전략 통신실', href: '/chat', desc: 'AES-256 암호화 실시간 채팅' },
+        { name: '보안 전략 통신실', href: '/chat', desc: '로그인 기반 실시간 대화' },
         { name: '익명 로비 채팅', href: '/community/lobby', desc: '자유로운 실시간 로비' },
-        { name: '동물농장 🐾', href: '/animal-farm', desc: '나만의 동물 친구 힐링 공간' },
+        { name: '문의 센터', href: '/community/inquiries', desc: '가입 및 클랜 대항전 문의' },
+        { name: '동물농장', href: '/animal-farm', desc: '나만의 동물 친구 공간' },
       ]
     }
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-black/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-800 bg-slate-950/95 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* 로고 & 메인 링크 */}
         <div className="flex items-center gap-6">
@@ -116,12 +122,12 @@ export default function MainNavbar() {
             href={user ? "/dashboard" : "/"} 
             className="flex items-center gap-2.5 group"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 border border-cyan-400/30 group-hover:scale-105 transition-transform">
-              <Cpu className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-md bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:bg-slate-700 transition-colors">
+              <Cpu className="w-4 h-4 text-sky-300" />
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-xs font-black tracking-widest text-white uppercase font-mono">CSE4SEOUL</span>
-              <span className="text-[9px] text-cyan-400 font-mono tracking-wider font-semibold">HQ CONTROL</span>
+              <span className="text-xs font-bold tracking-widest text-white uppercase">CSE4SEOUL</span>
+              <span className="text-[9px] text-slate-400 tracking-wider font-medium">COMMUNITY PLATFORM</span>
             </div>
           </Link>
 
@@ -142,8 +148,8 @@ export default function MainNavbar() {
                     href={item.href}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       isActive 
-                        ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
-                        : 'text-neutral-300 hover:text-white hover:bg-white/[0.06]'
+                        ? 'bg-white/10 text-white border border-white/10'
+                        : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
                     }`}
                   >
                     {item.icon}
@@ -156,7 +162,7 @@ export default function MainNavbar() {
                   {/* 서브 드롭다운 메뉴 */}
                   {hasDropdown && activeDropdown === item.name && (
                     <div className="absolute top-full left-0 pt-2 w-64 z-50">
-                      <div className="rounded-xl border border-white/10 bg-neutral-950/95 backdrop-blur-2xl p-2 shadow-2xl flex flex-col gap-1">
+                      <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl flex flex-col gap-1">
                         {item.subItems?.map((sub) => {
                           const isSubActive = pathname === sub.href;
                           return (
@@ -166,12 +172,12 @@ export default function MainNavbar() {
                               onClick={() => setActiveDropdown(null)}
                               className={`p-2.5 rounded-lg text-left transition-all ${
                                 isSubActive
-                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                  : 'hover:bg-white/[0.06] text-neutral-300 hover:text-white'
+                                ? 'bg-white/10 text-white border border-white/10'
+                                : 'hover:bg-white/[0.06] text-slate-300 hover:text-white'
                               }`}
                             >
                               <div className="text-xs font-semibold">{sub.name}</div>
-                              <div className="text-[10px] text-neutral-400 mt-0.5 line-clamp-1">{sub.desc}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{sub.desc}</div>
                             </Link>
                           );
                         })}
@@ -215,9 +221,9 @@ export default function MainNavbar() {
           ) : (
             <Link
               href="/login"
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 border border-cyan-400/30 transition-all"
+              className="px-4 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white font-semibold text-xs transition-colors"
             >
-              로그인 / 시스템 접속
+              로그인
             </Link>
           )}
         </div>

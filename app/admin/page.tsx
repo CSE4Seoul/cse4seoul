@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { approveUser } from './actions';
 import { unstable_noStore as noStore } from 'next/cache'
+import Link from 'next/link';
 
 
 export default async function AdminPage() {
@@ -16,12 +17,12 @@ export default async function AdminPage() {
 
   const { data: adminProfile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_admin')
     .eq('id', user.id)
     .single();
 
   // 관리자가 아니면 대시보드로 쫓아냄
-  if (adminProfile?.role !== 'admin') {
+  if (adminProfile?.role !== 'admin' && adminProfile?.is_admin !== true) {
     redirect('/dashboard');
   }
 
@@ -37,6 +38,13 @@ export default async function AdminPage() {
       <h1 className="text-3xl font-bold mb-8 text-red-500 flex items-center gap-2">
         👮‍♂️ Admin Control Center
       </h1>
+
+      <Link
+        href="/admin/inquiries"
+        className="mb-6 inline-flex rounded-lg bg-rose-700 px-4 py-2 text-sm font-bold text-white hover:bg-rose-600"
+      >
+        가입·대항전·관리자 문의함 →
+      </Link>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-800">

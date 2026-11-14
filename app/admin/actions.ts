@@ -6,22 +6,28 @@ import { revalidatePath } from 'next/cache'
 export async function approveUser(formData: FormData) {
   const supabase = await createClient()
 
-  // 1. 보안 검사
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return // 에러 메시지 대신 그냥 종료
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError) throw authError
+  if (!user) throw new Error('로그인이 필요합니다.')
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: profileError } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_admin')
     .eq('id', user.id)
     .single()
 
-  if (adminProfile?.role !== 'admin') {
-    return // 권한 없으면 종료
+  if (profileError) throw profileError
+  if (adminProfile?.role !== 'admin' && adminProfile?.is_admin !== true) {
+    throw new Error('관리자 권한이 필요합니다.')
   }
 
-  // 2. 승인 처리
-  const targetUserId = formData.get('userId') as string
+  const targetUserId = formData.get('userId')
+  if (
+    typeof targetUserId !== 'string'
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetUserId)
+  ) {
+    throw new Error('승인 대상 사용자가 올바르지 않습니다.')
+  }
   
   const { error } = await supabase
     .from('profiles')
@@ -30,11 +36,10 @@ export async function approveUser(formData: FormData) {
 
   if (error) {
     console.error('Approval failed:', error)
-    return 
+    throw error
   }
 
-  // 3. 새로고침
   revalidatePath('/admin')
-  // return 값을 아예 없앰!
+  revalidatePath('/dashboard')
 }
 

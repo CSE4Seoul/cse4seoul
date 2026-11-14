@@ -8,6 +8,13 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   const { content, author_name, expires_at } = await req.json();
 
+  if (typeof content !== 'string' || content.trim() === '') {
+    return NextResponse.json({ error: '메시지 내용을 입력해주세요.' }, { status: 400 });
+  }
+  if (!user && /^\[emoticon:[^\]]+\]$/.test(content.trim())) {
+    return NextResponse.json({ error: '이모티콘은 로그인 회원만 사용할 수 있습니다.' }, { status: 401 });
+  }
+
   const headerList = await headers();
   const ip = headerList.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
 
