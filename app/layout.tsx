@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from '../contexts/LanguageContext';
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
-
-export const metadata = {
-  title: 'CSE4Seoul | Game, Code, and Evolve',
-  description: '서울권 대학 연합 개발자 플랫폼. 리눅스 정신을 계승하여 실패를 두려워하지 않는 실험적인 문화를 만듭니다.',
+export const metadata: Metadata = {
+  metadataBase: new URL('https://cse4seoul.vercel.app'),
+  title: 'CSE4Seoul | Engineering & Arena',
+  description: '개발자와 게이머가 기술과 전술을 공유하고 함께 프로젝트를 구축하는 하이브리드 커뮤니티.',
   openGraph: {
-    title: 'CSE4Seoul HQ',
-    description: 'Game, Code, and Evolve with AI.',
+    title: 'CSE4Seoul | Engineering & Arena',
+    description: '개발과 게임, 기술과 전략을 함께 나누는 CSE4Seoul 커뮤니티.',
     url: 'https://cse4seoul.vercel.app',
     siteName: 'CSE4Seoul',
     images: [
@@ -34,6 +30,12 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  display: "swap",
+  subsets: ["latin"],
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -41,8 +43,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>
-        {/* 👇 앱 전체를 Provider로 감싸줍니다 */}
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <LanguageProvider>
           {children}
         </LanguageProvider>

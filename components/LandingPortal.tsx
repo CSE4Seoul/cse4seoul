@@ -1,22 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { User } from '@supabase/supabase-js';
 import {
+  ArrowDown,
   ArrowRight,
   BookOpen,
   ChevronRight,
   Code2,
   Cpu,
   ExternalLink,
+  Gamepad2,
+  LayoutDashboard,
+  Menu,
   MessageSquare,
+  Search,
   Shield,
-  TrendingUp,
-  Wallet,
+  Sparkles,
+  Trophy,
+  Users,
+  X,
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
+import MomentGallery from '@/components/widgets/MomentGallery';
 import { createClient } from '@/utils/supabase/client';
 
 interface Post {
@@ -47,102 +55,77 @@ function isNotice(value: unknown): value is Notice {
 
 const copy = {
   ko: {
-    nav: { about: '소개', services: '서비스', updates: '소식', members: '구성원', community: '커뮤니티', inquiry: '문의' },
+    nav: ['클랜 소개', '서비스·도구', '클랜 소식', '구성원', '전적·아레나', '가입·문의'],
     login: '로그인',
-    dashboard: '대시보드',
-    eyebrow: '개발과 게임을 함께하는 커뮤니티',
-    titleLine1: '배우고 나누며,',
-    titleLine2: '함께 성장하는 공간',
-    description: 'CSE4Seoul은 개발자와 게이머가 지식과 관심사를 나누고, 함께 활동할 수 있도록 만든 커뮤니티 플랫폼입니다.',
-    explore: '서비스 둘러보기',
-    joinChat: '로비 채팅 참여',
-    introTitle: '관심사를 연결하는 하나의 커뮤니티',
-    introText: '학습 도구부터 커뮤니티 활동까지, 필요한 기능을 목적에 따라 찾고 사용할 수 있도록 구성했습니다.',
-    servicesLabel: '서비스',
-    servicesTitle: '필요한 기능을 한곳에서',
-    servicesDescription: '개인 학습과 생활 관리, 시장 정보, 커뮤니티 활동을 지원합니다.',
-    serviceItems: [
-      { title: '개인 재무', description: '수입과 지출을 기록하고 급여·세금 관련 정보를 확인합니다.', href: '/finance', link: '재무 서비스 보기', icon: Wallet },
-      { title: '시장 정보', description: '시장 지표와 관심 종목 정보를 한 화면에서 살펴봅니다.', href: '/market', link: '시장 정보 보기', icon: TrendingUp },
-      { title: '학습 도구', description: '학습 목표와 기록을 관리하고 지식을 구조화합니다.', href: '/learning', link: '학습 도구 보기', icon: BookOpen },
-      { title: '커뮤니티', description: '게시판과 실시간 로비에서 구성원들과 소통합니다.', href: '/community', link: '커뮤니티 둘러보기', icon: MessageSquare },
-    ],
-    updatesLabel: '커뮤니티 소식',
-    updatesTitle: '공지와 최근 게시글',
+    dashboard: '클랜 대시보드 입장',
+    eyebrow: 'CSE4SEOUL // ENGINEERING & ARENA',
+    title: ['코드와 전략을 융합하여', '새로운 플레이의 기준을', '함께 만들어갑니다'],
+    description: 'CSE4Seoul은 개발자와 게이머가 기술과 전술을 공유하고, 함께 프로젝트를 구축하는 하이브리드 커뮤니티입니다.',
+    chat: '암호화 로비 채팅',
+    newsEyebrow: 'CLAN NEWS',
+    newsTitle: '새 소식',
+    newsDescription: '클랜의 최근 기록과 구성원들의 이야기를 확인하세요.',
     noticesTitle: '공지사항',
     postsTitle: '최근 게시글',
-    viewAll: '전체 보기',
+    all: '전체',
+    clan: '클랜전',
+    development: '개발·배포',
+    events: '이벤트',
+    viewAll: '더보기',
     noNotice: '등록된 공지가 없습니다.',
     noPosts: '아직 게시글이 없습니다.',
-    chatTitle: '실시간 로비',
-    chatText: '가벼운 인사부터 함께 나누는 이야기까지, 로비에서 자유롭게 대화해 보세요.',
-    chatLink: '로비 입장',
-    inquiryTitle: '가입 또는 대항전 문의',
-    inquiryText: '가입 신청과 클랜 대항전 제안은 문의 센터에서 접수하고 진행 상태를 확인할 수 있습니다.',
-    membership: '가입 문의',
-    clanBattle: '대항전 문의',
-    adminContact: '운영진에게 문의',
-    clanTitle: '공식 클래시로얄 클랜',
-    clanDescription: '클랜 가입과 활동에 대한 자세한 정보는 클랜 페이지에서 확인할 수 있습니다.',
-    clanLink: 'RoyaleAPI에서 클랜 보기',
-    aboutLabel: 'CSE4SEOUL',
-    aboutTitle: '함께 만드는 건강한 기술 커뮤니티',
-    aboutText: '개발과 학습, 게임이라는 공통 관심사를 중심으로 서로의 경험을 나누고 새로운 활동을 만들어 갑니다.',
-    teamLink: '개발 구성원 소개',
+    quickTitle: '주요 서비스 바로가기',
+    gallery: '영광의 갤러리',
+    join: '클랜 가입 신청',
+    footerText: '개발자와 게이머가 함께 만드는 기술·전술 커뮤니티',
     privacy: '개인정보 처리방침',
-    footerText: '개발과 게임을 좋아하는 사람들을 위한 커뮤니티',
-    announcement: '공지',
-    pinned: '중요',
+    searchPlaceholder: '공지와 게시글 검색',
   },
   en: {
-    nav: { about: 'About', services: 'Services', updates: 'Updates', members: 'Team', community: 'Community', inquiry: 'Inquiries' },
+    nav: ['About', 'Services & tools', 'Clan news', 'Members', 'Stats & arena', 'Join & contact'],
     login: 'Sign in',
-    dashboard: 'Dashboard',
-    eyebrow: 'A community for building and playing together',
-    titleLine1: 'Learn, share, and',
-    titleLine2: 'grow together',
-    description: 'CSE4Seoul is a community platform where developers and gamers share knowledge, interests, and activities.',
-    explore: 'Explore services',
-    joinChat: 'Join the lobby',
-    introTitle: 'One community for shared interests',
-    introText: 'Find tools for learning and everyday workflows alongside community spaces for conversation and collaboration.',
-    servicesLabel: 'Services',
-    servicesTitle: 'Useful tools in one place',
-    servicesDescription: 'Tools for personal learning, everyday finance, market information, and community activities.',
-    serviceItems: [
-      { title: 'Personal finance', description: 'Track income and expenses and review wage and tax information.', href: '/finance', link: 'Explore finance', icon: Wallet },
-      { title: 'Market information', description: 'Review market indicators and watchlist information in one place.', href: '/market', link: 'Explore markets', icon: TrendingUp },
-      { title: 'Learning tools', description: 'Organize learning goals, study records, and knowledge.', href: '/learning', link: 'Explore learning', icon: BookOpen },
-      { title: 'Community', description: 'Connect with members through boards and the live lobby.', href: '/community', link: 'Explore community', icon: MessageSquare },
-    ],
-    updatesLabel: 'Community updates',
-    updatesTitle: 'Announcements and recent posts',
-    noticesTitle: 'Announcements',
+    dashboard: 'Enter clan dashboard',
+    eyebrow: 'CSE4SEOUL // ENGINEERING & ARENA',
+    title: ['Code meets strategy.', 'A new standard for', 'play—built together.'],
+    description: 'CSE4Seoul is a hybrid community where developers and gamers share technology and tactics, and build projects together.',
+    chat: 'Encrypted lobby chat',
+    newsEyebrow: 'CLAN NEWS',
+    newsTitle: 'Latest updates',
+    newsDescription: 'Explore recent clan records and stories from our members.',
+    noticesTitle: 'Notices',
     postsTitle: 'Recent posts',
+    all: 'All',
+    clan: 'Clan',
+    development: 'Dev & release',
+    events: 'Events',
     viewAll: 'View all',
-    noNotice: 'No announcements yet.',
+    noNotice: 'No notices yet.',
     noPosts: 'No posts yet.',
-    chatTitle: 'Live lobby',
-    chatText: 'Drop by the lobby to say hello and talk with the community.',
-    chatLink: 'Enter the lobby',
-    inquiryTitle: 'Membership and clan battle inquiries',
-    inquiryText: 'Submit a membership request or clan battle proposal and follow its status in the inquiry center.',
-    membership: 'Membership',
-    clanBattle: 'Clan battle',
-    adminContact: 'Contact the team',
-    clanTitle: 'Official Clash Royale clan',
-    clanDescription: 'Visit the clan page for details about membership and activities.',
-    clanLink: 'View clan on RoyaleAPI',
-    aboutLabel: 'CSE4SEOUL',
-    aboutTitle: 'A community built around technology',
-    aboutText: 'We bring people together around shared interests in development, learning, and games.',
-    teamLink: 'Meet the team',
+    quickTitle: 'Quick access',
+    gallery: 'Hall of fame',
+    join: 'Join the clan',
+    footerText: 'A technology and tactics community built by developers and gamers',
     privacy: 'Privacy policy',
-    footerText: 'A community for people who enjoy building and playing',
-    announcement: 'Announcement',
-    pinned: 'Pinned',
+    searchPlaceholder: 'Search notices and posts',
   },
 } as const;
+
+const noticesCategories = [
+  { id: 'all', ko: '전체', en: 'All', keywords: [] },
+  { id: 'clan', ko: '클랜전', en: 'Clan', keywords: ['클랜', '전투', '전적', 'war', 'clan'] },
+  { id: 'development', ko: '개발·배포', en: 'Dev & release', keywords: ['개발', '배포', '업데이트', '서비스', 'dev', 'release'] },
+  { id: 'events', ko: '이벤트', en: 'Events', keywords: ['이벤트', '모집', '행사', 'event'] },
+] as const;
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date).replaceAll('. ', '/').replace('.', '');
+}
 
 export default function LandingPortal() {
   const { lang, toggleLanguage } = useLanguage();
@@ -153,6 +136,12 @@ export default function LandingPortal() {
   const [recentPosts, setRecentPosts] = useState<Post[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [noticeCategory, setNoticeCategory] = useState('all');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const primaryHref = user ? '/dashboard' : '/login';
+  const normalizedSearch = searchTerm.trim().toLocaleLowerCase();
 
   useEffect(() => {
     let active = true;
@@ -187,7 +176,6 @@ export default function LandingPortal() {
     const loadContent = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (active) setUser(currentUser);
-
       await Promise.all([loadNotices(), loadRecentPosts()]);
     };
 
@@ -205,255 +193,401 @@ export default function LandingPortal() {
     };
   }, [supabase]);
 
-  const latestNotice = notices.find((notice) => notice.is_pinned) ?? notices[0];
-  const primaryHref = user ? '/dashboard' : '/login';
+  const filteredNotices = useMemo(() => {
+    const category = noticesCategories.find((item) => item.id === noticeCategory);
+    return notices.filter((notice) => {
+      const text = notice.content.toLocaleLowerCase();
+      const matchesCategory = !category || category.keywords.length === 0
+        || category.keywords.some((keyword) => text.includes(keyword));
+      return matchesCategory && (!normalizedSearch || text.includes(normalizedSearch));
+    });
+  }, [noticeCategory, notices, normalizedSearch]);
+
+  const filteredPosts = useMemo(() => recentPosts.filter((post) => (
+    !normalizedSearch
+    || post.title.toLocaleLowerCase().includes(normalizedSearch)
+    || post.author_name.toLocaleLowerCase().includes(normalizedSearch)
+  )), [normalizedSearch, recentPosts]);
+
+  const featuredPost = filteredPosts[0];
+  const secondaryPosts = filteredPosts.slice(1, 4);
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      {latestNotice && (
-        <div className="border-b border-slate-200 bg-slate-100">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 text-sm sm:px-6 lg:px-8">
-            <span className="shrink-0 rounded bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">{t.announcement}</span>
-            <p className="truncate text-slate-700">{latestNotice.content}</p>
-            <Link href="/community" className="ml-auto hidden shrink-0 text-xs font-semibold text-slate-700 hover:text-sky-700 sm:inline">
-              {t.viewAll}
-            </Link>
-          </div>
-        </div>
-      )}
-
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between gap-5 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="CSE4Seoul home">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
+    <main className="min-h-screen overflow-hidden bg-[#080c14] text-slate-100">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#080c14]/80 backdrop-blur-md">
+        <div className="mx-auto flex min-h-[76px] max-w-[1440px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-10">
+          <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="CSE4Seoul home">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/30 bg-blue-500/10 text-cyan-300 shadow-[0_0_24px_rgba(6,182,212,0.12)]">
               <Cpu className="h-5 w-5" />
             </span>
             <span>
-              <span className="block text-sm font-bold tracking-[0.12em] text-slate-900">CSE4SEOUL</span>
-              <span className="hidden text-[10px] tracking-wide text-slate-500 sm:block">Community platform</span>
+              <span className="block font-mono text-sm font-bold tracking-[0.13em] text-white">CSE4SEOUL</span>
+              <span className="hidden text-[9px] tracking-[0.2em] text-slate-500 sm:block">DEV &amp; CLAN ARCHIVE</span>
             </span>
           </Link>
 
-          <nav aria-label="Main navigation" className="hidden items-center gap-6 lg:flex">
-            <a href="#about" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.about}</a>
-            <a href="#services" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.services}</a>
-            <a href="#updates" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.updates}</a>
-            <Link href="/developers" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.members}</Link>
-            <Link href="/community" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.community}</Link>
-            <Link href="/community/inquiries" className="text-sm text-slate-600 transition hover:text-sky-700">{t.nav.inquiry}</Link>
+          <nav aria-label="Main navigation" className="hidden items-center gap-5 xl:flex">
+            <Link href="/about" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[0]}</Link>
+            <a href="#services" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[1]}</a>
+            <a href="#updates" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[2]}</a>
+            <Link href="/developers" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[3]}</Link>
+            <Link href="/dashboard" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[4]}</Link>
+            <Link href="/community/inquiries" className="text-xs text-slate-300 transition hover:text-cyan-300">{t.nav[5]}</Link>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {searchOpen && (
+              <input
+                autoFocus
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setSearchTerm('');
+                    setSearchOpen(false);
+                  }
+                }}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.searchPlaceholder}
+                className="hidden w-36 rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-500/60 sm:block sm:w-52"
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (searchOpen) setSearchTerm('');
+                setSearchOpen(!searchOpen);
+              }}
+              aria-label={searchOpen ? 'Close search' : 'Search news'}
+              className="hidden rounded-md p-2 text-slate-400 transition hover:bg-white/[0.06] hover:text-cyan-300 sm:block"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={toggleLanguage}
-              className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="hidden font-mono text-[10px] font-semibold tracking-wider text-slate-400 transition hover:text-white sm:inline-flex"
               aria-label={currentLang === 'ko' ? 'Switch to English' : '한국어로 변경'}
             >
-              {currentLang === 'ko' ? 'KO / EN' : 'EN / KO'}
+              <span className={currentLang === 'ko' ? 'text-white' : ''}>KO</span>
+              <span className="px-1 text-slate-600">/</span>
+              <span className={currentLang === 'en' ? 'text-white' : ''}>EN</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'}
+              className="rounded-md p-2 text-slate-400 transition hover:bg-white/[0.06] hover:text-white xl:hidden"
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
             <Link
               href={primaryHref}
-              className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-slate-700 sm:px-4 sm:text-sm"
+              className="inline-flex items-center gap-2 rounded-md border border-blue-400/30 bg-blue-600 px-3.5 py-2.5 text-xs font-semibold text-white transition hover:border-cyan-300/50 hover:bg-blue-500 sm:px-4"
             >
               {user ? t.dashboard : t.login}
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <nav aria-label="Mobile navigation" className="grid grid-cols-2 gap-1 border-t border-white/[0.07] px-4 py-3 sm:px-6 xl:hidden">
+            <Link href="/about" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[0]}</Link>
+            <a href="#services" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[1]}</a>
+            <a href="#updates" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[2]}</a>
+            <Link href="/developers" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[3]}</Link>
+            <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[4]}</Link>
+            <Link href="/community/inquiries" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2.5 text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">{t.nav[5]}</Link>
+            <button type="button" onClick={toggleLanguage} className="rounded-md px-3 py-2.5 text-left font-mono text-[10px] text-slate-400 hover:bg-white/[0.05] hover:text-white">
+              KO / EN
+            </button>
+            <button type="button" onClick={() => setSearchOpen(!searchOpen)} className="inline-flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-300">
+              <Search className="h-3.5 w-3.5" />{t.searchPlaceholder}
+            </button>
+            {searchOpen && (
+              <input
+                autoFocus
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label={t.searchPlaceholder}
+                className="col-span-2 rounded-md border border-white/10 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none placeholder:text-slate-500 focus:border-cyan-500/60 sm:hidden"
+              />
+            )}
+          </nav>
+        )}
       </header>
 
-      <section id="about" className="scroll-mt-20 border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.25fr_0.75fr] lg:items-center lg:px-8 lg:py-24">
-          <div>
-            <p className="mb-5 text-xs font-bold uppercase tracking-[0.16em] text-sky-800">{t.eyebrow}</p>
-            <h1 className="max-w-3xl text-balance text-3xl font-semibold leading-[1.25] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              <span className="block">{t.titleLine1}</span>
-              <span className="block">{t.titleLine2}</span>
+      <section id="hero" className="relative isolate border-b border-white/[0.07]">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_75%_30%,rgba(29,78,216,0.22),transparent_38%),radial-gradient(ellipse_at_15%_80%,rgba(6,182,212,0.09),transparent_35%)]" />
+        <div className="absolute inset-0 -z-10 opacity-[0.13] [background-image:linear-gradient(rgba(148,163,184,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.24)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_90%)]" />
+        <div className="mx-auto grid max-w-[1440px] items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:gap-12 lg:px-10 lg:py-24 2xl:grid-cols-12">
+          <div className="relative z-10 2xl:col-span-5">
+            <p className="mb-6 flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.18em] text-cyan-300 sm:text-xs">
+              <span className="h-px w-7 bg-cyan-400" />{t.eyebrow}
+            </p>
+            <h1 className="max-w-3xl text-balance text-[clamp(1.5rem,6vw,3.25rem)] font-bold leading-[1.18] tracking-[-0.045em] text-white">
+              {t.title.map((line, index) => (
+                <span key={line} className={`block whitespace-nowrap ${index === 2 ? 'text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-sky-200' : ''}`}>
+                  {line}
+                </span>
+              ))}
             </h1>
-            <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-slate-600 sm:text-lg">
+            <p className="mt-6 max-w-xl text-sm leading-7 text-slate-400 sm:text-base sm:leading-8">
               {t.description}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href="#services" className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">
-                {t.explore}<ArrowRight className="h-4 w-4" />
-              </a>
-              <Link href="/community/lobby" className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50">
-                <MessageSquare className="h-4 w-4" />{t.joinChat}
+              <Link href={primaryHref} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,0.2)] transition hover:bg-blue-500">
+                {t.dashboard}<ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/community/inquiries" className="inline-flex items-center gap-2 px-2 py-3 text-sm font-semibold text-slate-700 transition hover:text-sky-800">
-                {t.nav.inquiry}<ArrowRight className="h-4 w-4" />
+              <Link href="/chat" className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.03] px-5 py-3.5 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:bg-cyan-400/[0.06]">
+                <MessageSquare className="h-4 w-4 text-cyan-300" />{t.chat}
               </Link>
+            </div>
+            <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 border-t border-white/[0.08] pt-5 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-2"><Code2 className="h-3.5 w-3.5 text-blue-400" />Engineering</span>
+              <span className="inline-flex items-center gap-2"><Gamepad2 className="h-3.5 w-3.5 text-cyan-400" />Arena</span>
+              <span className="inline-flex items-center gap-2"><Users className="h-3.5 w-3.5 text-amber-400" />Community</span>
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 sm:p-8">
-            <div className="flex items-center gap-3 border-b border-slate-200 pb-5">
-              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-white text-sky-800 ring-1 ring-slate-200">
-                <Code2 className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">CSE4Seoul</p>
-                <h2 className="mt-0.5 text-base font-semibold text-slate-900">{t.introTitle}</h2>
+          <div className="relative 2xl:col-span-7">
+            <div className="absolute -inset-4 -z-10 rounded-3xl bg-blue-500/10 blur-3xl" />
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b111c]/90 shadow-[0_24px_100px_rgba(0,0,0,0.45)]">
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3 sm:px-5">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs font-semibold text-slate-200">{t.gallery}</span>
+                </div>
+                <span className="font-mono text-[9px] tracking-[0.16em] text-cyan-400">MOMENT ARCHIVE</span>
+              </div>
+              <div className="home-moment-gallery">
+                <MomentGallery />
               </div>
             </div>
-            <p className="mt-5 text-sm leading-6 text-slate-600">{t.introText}</p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              {[
-                { label: currentLang === 'ko' ? '배우기' : 'Learn', detail: currentLang === 'ko' ? '학습 도구와 기록' : 'Tools and study records' },
-                { label: currentLang === 'ko' ? '소통하기' : 'Connect', detail: currentLang === 'ko' ? '게시판과 실시간 로비' : 'Boards and live lobby' },
-                { label: currentLang === 'ko' ? '함께하기' : 'Participate', detail: currentLang === 'ko' ? '가입·대항전 문의' : 'Membership and clan events' },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3 rounded-md bg-white px-4 py-3 ring-1 ring-slate-200">
-                  <span className="text-sm font-semibold text-slate-800">{item.label}</span>
-                  <span className="text-right text-xs text-slate-500">{item.detail}</span>
+            <Link href="/community/moments" className="mt-3 inline-flex items-center gap-1.5 text-xs text-slate-400 transition hover:text-cyan-300">
+              {currentLang === 'ko' ? '모든 순간 보기' : 'Explore all moments'}<ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+        <a href="#updates" aria-label="Scroll to clan news" className="absolute bottom-5 left-1/2 hidden -translate-x-1/2 text-slate-600 transition hover:text-cyan-300 lg:block">
+          <ArrowDown className="h-4 w-4" />
+        </a>
+      </section>
+
+      <section id="updates" className="scroll-mt-24 border-b border-white/[0.07] bg-[#0a101a]">
+        <div className="mx-auto max-w-[1440px] px-4 py-16 sm:px-6 lg:px-10 lg:py-20">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-cyan-400">{t.newsEyebrow}</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{t.newsTitle}</h2>
+              <p className="mt-2 text-sm text-slate-500">{t.newsDescription}</p>
+            </div>
+            <Link href="/community" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 transition hover:text-cyan-300">
+              {t.viewAll}<ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-12">
+            <article className="group relative flex min-h-[310px] flex-col justify-end overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-blue-950 via-[#101a2b] to-[#0c111b] p-6 transition duration-300 hover:border-cyan-500/50 sm:p-8 lg:col-span-5 lg:min-h-[400px]">
+              <div className="absolute right-[-35px] top-[-60px] h-64 w-64 rounded-full border border-blue-400/10 bg-blue-500/[0.04] shadow-[0_0_100px_rgba(37,99,235,0.12)]" />
+              <div className="absolute right-10 top-12 hidden h-36 w-36 rotate-45 border border-cyan-300/15 sm:block">
+                <div className="absolute inset-4 border border-blue-400/20" />
+              </div>
+              <div className="relative">
+                <span className="inline-flex items-center gap-1.5 rounded border border-cyan-400/20 bg-cyan-400/[0.07] px-2.5 py-1 font-mono text-[9px] tracking-[0.12em] text-cyan-300">
+                  <Sparkles className="h-3 w-3" />{featuredPost ? 'LATEST FROM THE BOARD' : 'CSE4SEOUL / COMMUNITY'}
+                </span>
+                <h3 className="mt-5 max-w-lg text-2xl font-semibold leading-snug text-white sm:text-3xl">
+                  {featuredPost?.title ?? (currentLang === 'ko' ? '기술과 전술, 함께 쌓아가는 클랜의 기록' : 'A shared archive of technology and tactics')}
+                </h3>
+                <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+                  {featuredPost
+                    ? `${featuredPost.author_name} · ${formatDate(featuredPost.created_at)}`
+                    : (currentLang === 'ko' ? '전략 아카이브에서 최신 게시글과 클랜 소식을 만나보세요.' : 'Explore the latest posts and clan updates in our archive.')}
+                </p>
+                <Link href={featuredPost && user ? `/board/${featuredPost.id}` : user ? '/board' : '/login'} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-300 transition group-hover:gap-3">
+                  {currentLang === 'ko' ? '게시글 확인하기' : 'Explore the post'}<ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </article>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:col-span-7">
+              {secondaryPosts.length > 0 ? secondaryPosts.map((post, index) => (
+                <Link
+                  key={post.id}
+                  href={user ? `/board/${post.id}` : '/login'}
+                  className="group flex min-h-[190px] flex-col justify-between rounded-xl border border-white/[0.09] bg-[#0c1420] p-5 transition duration-300 hover:border-cyan-500/50 hover:bg-[#0e1928]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`rounded px-2 py-1 font-mono text-[9px] tracking-wider ${index === 0 ? 'bg-amber-400/10 text-amber-300' : 'bg-blue-400/10 text-blue-300'}`}>
+                      {index === 0 ? 'CLAN LOG' : 'COMMUNITY'}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-slate-600 transition group-hover:translate-x-1 group-hover:text-cyan-300" />
+                  </div>
+                  <div className="mt-8">
+                    <h3 className="line-clamp-2 text-base font-semibold leading-6 text-slate-100">{post.title}</h3>
+                    <p className="mt-3 font-mono text-[10px] text-slate-500">{formatDate(post.created_at)} <span className="px-1.5">/</span> {post.author_name}</p>
+                  </div>
+                </Link>
+              )) : (
+                <div className="flex min-h-[190px] flex-col justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.015] p-6 sm:col-span-2">
+                  <p className="text-sm font-medium text-slate-300">
+                    {featuredPost
+                      ? (currentLang === 'ko' ? '추가 게시글이 없습니다.' : 'No additional posts yet.')
+                      : t.noPosts}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {currentLang === 'ko' ? '구성원들의 새로운 소식이 이곳에 표시됩니다.' : 'New stories from members will appear here.'}
+                  </p>
+                  <Link href={user ? '/board' : '/login'} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-300">
+                    {currentLang === 'ko' ? '전략 아카이브 둘러보기' : 'Explore the archive'}<ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="services" className="scroll-mt-24 border-b border-white/[0.07]">
+        <div className="mx-auto grid max-w-[1440px] gap-12 px-4 py-16 sm:px-6 lg:grid-cols-12 lg:gap-14 lg:px-10 lg:py-20">
+          <section aria-labelledby="notices-heading" className="lg:col-span-7">
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5">
+              <div>
+                <p className="font-mono text-[10px] font-semibold tracking-[0.18em] text-blue-300">NOTICE / UPDATE</p>
+                <h2 id="notices-heading" className="mt-2 text-2xl font-semibold text-white">{t.noticesTitle}</h2>
+              </div>
+              <Link href="/community" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 transition hover:text-cyan-300">
+                {t.viewAll}<ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+            <div role="tablist" aria-label={t.noticesTitle} className="flex gap-5 overflow-x-auto border-b border-white/[0.07] py-3">
+              {noticesCategories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={noticeCategory === category.id}
+                  onClick={() => setNoticeCategory(category.id)}
+                  className={`shrink-0 text-xs transition ${noticeCategory === category.id ? 'font-semibold text-cyan-300' : 'text-slate-500 hover:text-slate-200'}`}
+                >
+                  {currentLang === 'ko' ? category.ko : category.en}
+                </button>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
+            {filteredNotices.length > 0 ? (
+              <ul className="divide-y divide-white/[0.06]">
+                {filteredNotices.slice(0, 5).map((notice) => (
+                  <li key={notice.id}>
+                    <Link href="/community" className="group flex items-center gap-4 py-4 transition hover:text-cyan-200">
+                      <span className={`shrink-0 rounded px-2 py-1 text-[9px] font-semibold ${notice.is_pinned ? 'bg-amber-400/10 text-amber-300' : 'bg-white/[0.06] text-slate-400'}`}>
+                        {notice.is_pinned ? (currentLang === 'ko' ? '중요' : 'PINNED') : (currentLang === 'ko' ? '공지' : 'NOTICE')}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-slate-300 group-hover:text-white">{notice.content}</span>
+                      <span className="shrink-0 font-mono text-[9px] text-slate-600">NOTICE</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-8 text-sm text-slate-500">{t.noNotice}</p>
+            )}
+          </section>
 
-      <section id="services" className="scroll-mt-20">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <div className="mb-8 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-800">{t.servicesLabel}</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{t.servicesTitle}</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{t.servicesDescription}</p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {t.serviceItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <article key={item.href} className="flex min-h-[230px] flex-col rounded-lg border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:shadow-sm">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="mt-5 text-base font-semibold text-slate-900">{item.title}</h3>
-                  <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">{item.description}</p>
-                  <Link href={user ? item.href : '/login'} className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-sky-800 hover:text-sky-700">
-                    {item.link}<ChevronRight className="h-4 w-4" />
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section id="updates" className="scroll-mt-20 border-y border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <div className="mb-8">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-800">{t.updatesLabel}</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{t.updatesTitle}</h2>
-          </div>
-          <div className="grid gap-8 lg:grid-cols-2">
-            <section aria-labelledby="announcements-heading">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
-                <h3 id="announcements-heading" className="text-base font-semibold text-slate-900">{t.noticesTitle}</h3>
-                <Link href="/community" className="text-xs font-semibold text-sky-800 hover:text-sky-700">{t.viewAll}</Link>
-              </div>
-              {notices.length > 0 ? (
-                <ul className="divide-y divide-slate-100">
-                  {notices.slice(0, 4).map((notice) => (
-                    <li key={notice.id}>
-                      <Link href="/community" className="flex items-start gap-3 py-3.5 text-sm leading-5 text-slate-700 hover:text-sky-800">
-                        {notice.is_pinned && <span className="mt-0.5 shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">{t.pinned}</span>}
-                        <span className="line-clamp-2">{notice.content}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="py-6 text-sm text-slate-500">{t.noNotice}</p>
-              )}
-            </section>
-
-            <section aria-labelledby="recent-posts-heading">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
-                <h3 id="recent-posts-heading" className="text-base font-semibold text-slate-900">{t.postsTitle}</h3>
-                <Link href={user ? '/board' : '/login'} className="text-xs font-semibold text-sky-800 hover:text-sky-700">{t.viewAll}</Link>
-              </div>
-              {recentPosts.length > 0 ? (
-                <ul className="divide-y divide-slate-100">
-                  {recentPosts.map((post) => (
-                    <li key={post.id}>
-                      <Link href={user ? `/board/${post.id}` : '/login'} className="flex items-center justify-between gap-4 py-3.5 text-sm hover:text-sky-800">
-                        <span className="truncate font-medium text-slate-700">{post.title}</span>
-                        <span className="shrink-0 text-xs text-slate-500">{post.author_name}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="py-6 text-sm text-slate-500">{t.noPosts}</p>
-              )}
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section id="community" className="scroll-mt-20">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-16 sm:px-6 lg:grid-cols-3 lg:px-8 lg:py-20">
-          <article className="rounded-lg border border-slate-200 bg-white p-6">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700"><MessageSquare className="h-5 w-5" /></span>
-            <h2 className="mt-4 text-lg font-semibold text-slate-900">{t.chatTitle}</h2>
-            <p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">{t.chatText}</p>
-            <Link href="/community/lobby" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-sky-800 hover:text-sky-700">
-              {t.chatLink}<ArrowRight className="h-4 w-4" />
-            </Link>
-          </article>
-
-          <article className="rounded-lg border border-slate-200 bg-white p-6">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Shield className="h-5 w-5" /></span>
-            <h2 className="mt-4 text-lg font-semibold text-slate-900">{t.inquiryTitle}</h2>
-            <p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">{t.inquiryText}</p>
-            <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-sm font-semibold text-sky-800">
-              <Link href="/community/inquiries?type=membership" className="hover:text-sky-700">{t.membership}</Link>
-              <Link href="/community/inquiries?type=clan_battle" className="hover:text-sky-700">{t.clanBattle}</Link>
-              <Link href="/community/inquiries#admin-contact" className="hover:text-sky-700">{t.adminContact}</Link>
+          <section aria-labelledby="quick-access-heading" className="lg:col-span-5">
+            <div className="mb-5">
+              <p className="font-mono text-[10px] font-semibold tracking-[0.18em] text-cyan-400">QUICK ACCESS</p>
+              <h2 id="quick-access-heading" className="mt-2 text-2xl font-semibold text-white">{t.quickTitle}</h2>
             </div>
-          </article>
-
-          <article className="rounded-lg border border-slate-200 bg-slate-900 p-6 text-white">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-white/10 text-white"><Shield className="h-5 w-5" /></span>
-            <h2 className="mt-4 text-lg font-semibold">{t.clanTitle}</h2>
-            <p className="mt-2 min-h-12 text-sm leading-6 text-slate-300">{t.clanDescription}</p>
-            <a href="https://royaleapi.com/clan/RRG9U0C9" target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-sky-200">
-              {t.clanLink}<ExternalLink className="h-4 w-4" />
-            </a>
-          </article>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: currentLang === 'ko' ? '전적 대시보드' : 'Clan dashboard', detail: '/dashboard', href: '/dashboard', icon: LayoutDashboard, color: 'text-cyan-300' },
+                { label: currentLang === 'ko' ? '전략 아카이브' : 'Strategy archive', detail: '/board', href: '/board', icon: BookOpen, color: 'text-blue-300' },
+                { label: currentLang === 'ko' ? '비밀 통신 로비' : 'Secure lobby', detail: '/chat', href: '/chat', icon: Shield, color: 'text-emerald-300' },
+                { label: t.gallery, detail: '/community/moments', href: '/community/moments', icon: Trophy, color: 'text-amber-300' },
+                { label: currentLang === 'ko' ? '구성원 소개' : 'Our members', detail: '/developers', href: '/developers', icon: Users, color: 'text-violet-300' },
+                { label: t.join, detail: '/community/inquiries', href: '/community/inquiries?type=membership', icon: MessageSquare, color: 'text-cyan-300' },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.detail} href={item.href} className="group rounded-lg border border-white/[0.08] bg-[#0c1420] p-4 transition duration-300 hover:border-cyan-500/50 hover:bg-[#101b29]">
+                    <div className="flex items-center justify-between">
+                      <Icon className={`h-4 w-4 ${item.color}`} />
+                      <ArrowRight className="h-3.5 w-3.5 text-slate-700 transition group-hover:translate-x-0.5 group-hover:text-cyan-300" />
+                    </div>
+                    <p className="mt-4 text-xs font-semibold text-slate-200">{item.label}</p>
+                    <p className="mt-1 font-mono text-[9px] text-slate-600">{item.detail}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-12 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
-          <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-800">{t.aboutLabel}</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">{t.aboutTitle}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{t.aboutText}</p>
-          </div>
-          <Link
-            href="/developers"
-            className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
-            {t.teamLink}<ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
-
-      <footer className="bg-slate-950 text-slate-300">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+      <section className="border-b border-white/[0.07] bg-[radial-gradient(ellipse_at_50%_100%,rgba(29,78,216,0.12),transparent_65%)]">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-10">
           <div>
-            <p className="font-semibold tracking-wide text-white">CSE4SEOUL</p>
-            <p className="mt-1 text-xs text-slate-400">{t.footerText}</p>
+            <p className="font-mono text-[10px] tracking-[0.18em] text-cyan-400">CSE4SEOUL CLAN</p>
+            <h2 className="mt-2 text-xl font-semibold text-white">{currentLang === 'ko' ? '함께 플레이하고, 함께 만들어갈 동료를 찾습니다.' : 'Looking for teammates to build and play together.'}</h2>
+            <p className="mt-2 text-sm text-slate-400">{currentLang === 'ko' ? '클랜 가입 및 대항전 문의는 문의 센터에서 확인해 주세요.' : 'Visit the inquiry center for membership and clan battle requests.'}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-            <button type="button" onClick={() => setShowPrivacyModal(true)} className="hover:text-white">{t.privacy}</button>
-            <Link href="/developers" className="hover:text-white">{t.nav.members}</Link>
-            <Link href="/community/inquiries" className="hover:text-white">{t.nav.inquiry}</Link>
-            <Link href={primaryHref} className="hover:text-white">{user ? t.dashboard : t.login}</Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/community/inquiries?type=membership" className="inline-flex w-fit items-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/[0.06] px-4 py-3 text-sm font-semibold text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-400/10">
+              {t.join}<ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link href="/community/inquiries#admin-contact" className="inline-flex w-fit items-center gap-2 rounded-md border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:text-cyan-200">
+              {currentLang === 'ko' ? '대항전 등 클랜 교류 문의' : 'Clan battle & exchange inquiry'}<ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="bg-[#060a11]">
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-5 lg:px-10">
+          <div className="lg:col-span-2">
+            <Link href="/" className="inline-flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/[0.06] text-cyan-300"><Cpu className="h-4 w-4" /></span>
+              <span className="font-mono text-xs font-bold tracking-[0.14em] text-white">CSE4SEOUL</span>
+            </Link>
+            <p className="mt-4 max-w-sm text-xs leading-6 text-slate-500">{t.footerText}</p>
+          </div>
+          <div>
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.16em] text-slate-300">ABOUT</h3>
+            <div className="mt-4 flex flex-col gap-3 text-xs text-slate-500">
+              <Link href="/about" className="transition hover:text-cyan-300">{t.nav[0]}</Link>
+              <Link href="/developers" className="transition hover:text-cyan-300">{t.nav[3]}</Link>
+              <Link href="/community/inquiries" className="transition hover:text-cyan-300">{t.nav[5]}</Link>
+            </div>
+          </div>
+          <div>
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.16em] text-slate-300">SERVICES</h3>
+            <div className="mt-4 flex flex-col gap-3 text-xs text-slate-500">
+              <Link href="/dashboard" className="transition hover:text-cyan-300">{t.nav[4]}</Link>
+              <Link href="/board" className="transition hover:text-cyan-300">{currentLang === 'ko' ? '전략 아카이브' : 'Strategy archive'}</Link>
+              <Link href="/chat" className="transition hover:text-cyan-300">{currentLang === 'ko' ? '비밀 통신 로비' : 'Secure lobby'}</Link>
+            </div>
+          </div>
+          <div>
+            <h3 className="font-mono text-[10px] font-bold tracking-[0.16em] text-slate-300">ARCHIVE &amp; CONNECT</h3>
+            <div className="mt-4 flex flex-col gap-3 text-xs text-slate-500">
+              <Link href="/community" className="transition hover:text-cyan-300">{t.nav[2]}</Link>
+              <Link href="/community/moments" className="transition hover:text-cyan-300">{t.gallery}</Link>
+              <a href="https://royaleapi.com/clan/RRG9U0C9" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-cyan-300">
+                RoyaleAPI<ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-white/[0.07]">
+          <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-4 py-4 text-[10px] text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
+            <span>© {new Date().getFullYear()} CSE4SEOUL. {t.footerText}</span>
+            <div className="flex items-center gap-5">
+              <button type="button" onClick={() => setShowPrivacyModal(true)} className="transition hover:text-slate-300">{t.privacy}</button>
+              <span className="font-mono">Powered by CSE4SEOUL Engine</span>
+            </div>
           </div>
         </div>
       </footer>
