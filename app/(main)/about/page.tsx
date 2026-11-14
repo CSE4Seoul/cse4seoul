@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -9,6 +11,33 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'CSE4Seoul 소개',
+  description: '개발과 게임을 좋아하는 사람들이 모여 지식과 경험을 나누는 CSE4Seoul 커뮤니티를 소개합니다.',
+  openGraph: {
+    title: 'CSE4Seoul 소개',
+    description: '개발과 게임을 좋아하는 사람들이 모여 지식과 경험을 나누는 CSE4Seoul 커뮤니티를 소개합니다.',
+    url: 'https://cse4seoul.vercel.app/about',
+    siteName: 'CSE4Seoul',
+    images: [
+      {
+        url: '/images/cse4seoul-logo.png',
+        width: 1024,
+        height: 1024,
+        alt: 'CSE4Seoul 로고',
+      },
+    ],
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CSE4Seoul 소개',
+    description: '개발과 게임을 좋아하는 사람들이 모여 지식과 경험을 나누는 CSE4Seoul 커뮤니티를 소개합니다.',
+    images: ['/images/cse4seoul-logo.png'],
+  },
+};
 
 const records = [
   {
@@ -49,6 +78,15 @@ export default function AboutPage() {
         </Link>
 
         <header className="max-w-4xl py-16 sm:py-24">
+          <Image
+            src="/images/cse4seoul-logo.png"
+            alt="CSE4Seoul 로고"
+            width={1024}
+            height={1024}
+            sizes="(max-width: 640px) 160px, 192px"
+            priority
+            className="mb-8 h-40 w-40 rounded-2xl border border-white/10 object-cover shadow-xl shadow-black/30 sm:h-48 sm:w-48"
+          />
           <p className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.2em] text-cyan-300 sm:text-xs">
             <span className="h-px w-7 bg-cyan-400" />
             ABOUT CSE4SEOUL
@@ -78,15 +116,25 @@ export default function AboutPage() {
             <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">우리의 시작</h2>
           </div>
           <div className="border-l border-cyan-400/30 pl-5 sm:pl-7">
-            <p className="font-mono text-xs tracking-wider text-cyan-300">2026.01 무렵</p>
+            <p className="font-mono text-xs tracking-wider text-cyan-300">2026.01</p>
             <h3 className="mt-3 text-lg font-semibold text-slate-100">서울권 개발자들의 교류에서 출발했습니다.</h3>
             <p className="mt-3 max-w-2xl break-keep text-sm leading-7 text-slate-400">
               각자의 기술과 관심사를 나누고, 온라인에서도 함께 활동할 수 있는 공간을 만들기 위해
               CSE4Seoul을 시작했습니다. 개발 커뮤니티의 협업과 클래시 로얄 클랜 활동을 함께 이어가며,
               서로의 경험을 기록하고 있습니다.
             </p>
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <p className="font-mono text-xs tracking-wider text-cyan-300">2026.02~</p>
+              <h3 className="mt-3 text-lg font-semibold text-slate-100">CSE4Seoul 사이트를 개설했습니다.</h3>
+              <p className="mt-3 max-w-2xl break-keep text-sm leading-7 text-slate-400">
+                사이트를 개설한 이후, 커뮤니티에 필요한 다양한 기능을 지속적으로 추가하고 있습니다.
+              </p>
+            </div>
           </div>
         </section>
+        
+        
+        
 
         <section className="border-t border-white/10 py-10 sm:py-12">
           <div className="mb-6">

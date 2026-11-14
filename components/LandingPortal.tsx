@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import {
   ArrowDown,
@@ -217,9 +218,14 @@ export default function LandingPortal() {
       <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#080c14]/80 backdrop-blur-md">
         <div className="mx-auto flex min-h-[76px] max-w-[1440px] items-center justify-between gap-5 px-4 sm:px-6 lg:px-10">
           <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="CSE4Seoul home">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-400/30 bg-blue-500/10 text-cyan-300 shadow-[0_0_24px_rgba(6,182,212,0.12)]">
-              <Cpu className="h-5 w-5" />
-            </span>
+            <Image
+              src="/images/cse4seoul-logo.png"
+              alt=""
+              width={40}
+              height={40}
+              priority
+              className="h-10 w-10 rounded-lg border border-cyan-400/30 object-cover shadow-[0_0_24px_rgba(6,182,212,0.12)]"
+            />
             <span>
               <span className="block font-mono text-sm font-bold tracking-[0.13em] text-white">CSE4SEOUL</span>
               <span className="hidden text-[9px] tracking-[0.2em] text-slate-500 sm:block">DEV &amp; CLAN ARCHIVE</span>
