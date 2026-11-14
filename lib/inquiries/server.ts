@@ -17,7 +17,7 @@ export async function getInquiryIdentity() {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, is_admin, full_name, username')
+    .select('role, is_admin, full_name')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -26,7 +26,7 @@ export async function getInquiryIdentity() {
   return {
     user,
     isAdmin: profile?.role === 'admin' || profile?.is_admin === true,
-    displayName: profile?.full_name || profile?.username || user.email?.split('@')[0] || '회원',
+    displayName: profile?.full_name || user.email?.split('@')[0] || '회원',
   };
 }
 

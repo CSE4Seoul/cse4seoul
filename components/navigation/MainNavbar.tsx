@@ -16,6 +16,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Code2,
+  Handshake,
 } from 'lucide-react';
 
 interface NavItem {
@@ -62,6 +63,12 @@ export default function MainNavbar() {
       href: '/developers',
       matchPrefix: '/developers',
       icon: <Code2 className="w-4 h-4" />
+    },
+    {
+      name: '협력 클랜',
+      href: '/partner-clans',
+      matchPrefix: '/partner-clans',
+      icon: <Handshake className="w-4 h-4" />
     },
     {
       name: '개인 재무',

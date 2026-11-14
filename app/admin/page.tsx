@@ -45,6 +45,12 @@ export default async function AdminPage() {
       >
         가입·대항전·관리자 문의함 →
       </Link>
+      <Link
+        href="/admin/partner-clans"
+        className="mb-6 ml-2 inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600"
+      >
+        협력 클랜 관리 →
+      </Link>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-800">
