@@ -19,31 +19,10 @@ export interface DeveloperProfile {
   };
 }
 
-const DEFAULT_DEVELOPERS: DeveloperProfile[] = [
-  {
-    id: 'johamin',
-    name: '조하민',
-    email: 'johamin3624@konkuk.ac.kr',
-    portfolioUrl: 'https://hamin-portfolio.vercel.app/',
-    royaleApiUrl: 'https://royaleapi.com/player/8YUPJQC29',
-    isLead: true,
-  },
-  {
-    id: 'peval',
-    name: 'Peval',
-    royaleApiUrl: 'https://royaleapi.com/player/RQVPY0GGV',
-    youtubeUrl: 'https://youtube.com/channel/UC-kiTHAKYch0YTpvOLTOCWg?si=QSLk6Frh_zgLPyVg',
-    role: {
-      ko: '구성원 && 유튜버',
-      en: 'Member && YouTuber',
-    },
-  },
-];
-
 export default function DevelopersDirectory({
-  developers = DEFAULT_DEVELOPERS,
+  developers,
 }: {
-  developers?: DeveloperProfile[];
+  developers: DeveloperProfile[];
 }) {
   const { lang } = useLanguage();
   const isKorean = lang !== 'en';
