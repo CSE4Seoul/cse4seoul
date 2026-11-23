@@ -1,16 +1,22 @@
 'use client';
 
 import Image from 'next/image';
-import { Code2, ExternalLink, Mail, UserRound } from 'lucide-react';
+import { Code2, ExternalLink, Mail, UserRound, Youtube } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export interface DeveloperProfile {
   id: string;
   name: string;
-  email: string;
-  portfolioUrl: string;
+  email?: string;
+  portfolioUrl?: string;
+  royaleApiUrl?: string;
+  youtubeUrl?: string;
   photoUrl?: string;
   isLead?: boolean;
+  role?: {
+    ko: string;
+    en: string;
+  };
 }
 
 const DEFAULT_DEVELOPERS: DeveloperProfile[] = [
@@ -19,7 +25,18 @@ const DEFAULT_DEVELOPERS: DeveloperProfile[] = [
     name: '조하민',
     email: 'johamin3624@konkuk.ac.kr',
     portfolioUrl: 'https://hamin-portfolio.vercel.app/',
+    royaleApiUrl: 'https://royaleapi.com/player/8YUPJQC29',
     isLead: true,
+  },
+  {
+    id: 'peval',
+    name: 'Peval',
+    royaleApiUrl: 'https://royaleapi.com/player/RQVPY0GGV',
+    youtubeUrl: 'https://youtube.com/channel/UC-kiTHAKYch0YTpvOLTOCWg?si=QSLk6Frh_zgLPyVg',
+    role: {
+      ko: '구성원 && 유튜버',
+      en: 'Member && YouTuber',
+    },
   },
 ];
 
@@ -40,8 +57,8 @@ export default function DevelopersDirectory({
         </h1>
         <p className="mt-3 text-sm leading-6 text-neutral-400">
           {isKorean
-            ? 'CSE4Seoul의 서비스와 커뮤니티를 만들고 운영하는 구성원입니다.'
-            : 'Meet the people building and maintaining CSE4Seoul.'}
+            ? 'CSE4Seoul의 서비스와 커뮤니티를 만드는 개발자와 구성원들입니다.'
+            : 'The developers and members building CSE4Seoul’s services and community.'}
         </p>
       </header>
 
@@ -71,7 +88,9 @@ export default function DevelopersDirectory({
                 <h2 className="truncate text-base font-semibold text-white">{developer.name}</h2>
                 <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-sky-300">
                   <Code2 aria-hidden="true" className="h-3.5 w-3.5" />
-                  {developer.isLead
+                  {developer.role
+                    ? (isKorean ? developer.role.ko : developer.role.en)
+                    : developer.isLead
                     ? (isKorean ? '메인 개발자' : 'Lead developer')
                     : (isKorean ? '개발자' : 'Developer')}
                 </p>
@@ -79,22 +98,48 @@ export default function DevelopersDirectory({
             </div>
 
             <div className="mt-5 space-y-3 border-t border-slate-800 pt-4">
-              <a
-                href={`mailto:${developer.email}`}
-                className="flex min-w-0 items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
-              >
-                <Mail aria-hidden="true" className="h-4 w-4 shrink-0" />
-                <span className="truncate">{developer.email}</span>
-              </a>
-              <a
-                href={developer.portfolioUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-slate-200 transition-colors hover:text-sky-300"
-              >
-                <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                {isKorean ? '포트폴리오 보기' : 'View portfolio'}
-              </a>
+              {developer.email && (
+                <a
+                  href={`mailto:${developer.email}`}
+                  className="flex min-w-0 items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
+                >
+                  <Mail aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{developer.email}</span>
+                </a>
+              )}
+              {developer.portfolioUrl && (
+                <a
+                  href={developer.portfolioUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-fit items-center gap-2 text-sm font-medium text-slate-200 transition-colors hover:text-sky-300"
+                >
+                  <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                  {isKorean ? '포트폴리오 보기' : 'View portfolio'}
+                </a>
+              )}
+              {developer.royaleApiUrl && (
+                <a
+                  href={developer.royaleApiUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-fit items-center gap-2 text-sm font-medium text-slate-200 transition-colors hover:text-sky-300"
+                >
+                  <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                  {isKorean ? 'RoyaleAPI 바로가기' : 'RoyaleAPI profile'}
+                </a>
+              )}
+              {developer.youtubeUrl && (
+                <a
+                  href={developer.youtubeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-fit items-center gap-2 text-sm font-medium text-slate-200 transition-colors hover:text-sky-300"
+                >
+                  <Youtube aria-hidden="true" className="h-4 w-4" />
+                  {isKorean ? 'YouTube 채널 바로가기' : 'YouTube channel'}
+                </a>
+              )}
             </div>
           </article>
         ))}
