@@ -40,10 +40,14 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/auth");
   const isApiPage = pathname.startsWith("/api");
   const isPrivacyPage = pathname.startsWith("/privacy");
+  const isPublicPage = pathname === "/" ||
+    pathname === "/about" ||
+    pathname === "/developers" ||
+    pathname === "/partner-clans";
 
   // 1. Basic Auth Guard
   if (
-    pathname !== "/" &&
+    !isPublicPage &&
     !user &&
     !isAuthPage &&
     !isApiPage &&
